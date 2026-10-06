@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ใบแจ้งหนี้ / ใบเสร็จ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="config.js"></script>
+<script src="common.js"></script>
+<style>
+body{margin:0;background:#eef0f3;font-family:'Sarabun',system-ui,sans-serif;color:#1f2933}
+.paper{max-width:520px;margin:16px auto;background:#fff;border-radius:14px;padding:24px 22px;position:relative;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+h1{font-size:20px;margin:0}
+.muted{color:#6b7280;font-size:14px}
+.top{border-bottom:2px solid #1f2933;padding-bottom:10px;margin-bottom:14px;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:flex-start}.top>div:first-child{flex:1 1 240px}
+.doc{text-align:right;flex:none}
+.doc b{display:block;font-size:18px}
+.meta{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:14px;margin-bottom:14px}
+table{width:100%;border-collapse:collapse;font-size:15px}
+th{font-size:13px;color:#6b7280;text-align:left;border-bottom:1px solid #d6dae0;padding:6px 0}
+td{padding:8px 0;border-bottom:1px solid #eceef1}
+.r{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.total td{font-weight:700;font-size:19px;border-bottom:0;padding-top:12px}
+.pay{margin-top:16px;text-align:center;border:1px dashed #cfd4da;border-radius:12px;padding:14px}
+#qr{display:inline-block;margin:8px auto}
+.stamp{position:absolute;top:84px;right:24px;transform:rotate(-12deg);border:3px solid #15803d;color:#15803d;font-weight:700;padding:4px 12px;border-radius:8px;font-size:22px;background:rgba(255,255,255,.85)}
+.btns{text-align:center;margin:12px 0 28px}
+.btn{border:1px solid #cfd4da;background:#fff;padding:9px 18px;border-radius:9px;font:inherit;font-weight:600;cursor:pointer}
+.demo-bar{background:#fff7d6;color:#7a5b00;font-size:13px;text-align:center;padding:5px 10px}
+@media print{body{background:#fff}.paper{box-shadow:none;margin:0 auto}.btns,.demo-bar{display:none}}
+</style>
+</head>
+<body>
+<div id="demo"></div>
+<div class="paper" id="p"><p class="muted">กำลังโหลด…</p></div>
+<div class="btns" id="btns"><button class="btn" onclick="print()">พิมพ์ / บันทึก PDF</button></div>
+<script>
+document.getElementById('demo').innerHTML = demoBanner();
+if (IS_DEMO) document.getElementById('btns').innerHTML = '<span style="color:#6b7280;font-size:13px">ปุ่มพิมพ์ / บันทึก PDF ใช้ได้เมื่อติดตั้งระบบจริง</span>';
+(async function () {
+  const p = document.getElementById('p'), token = new URLSearchParams(location.search).get('t');
+  if (!token) { p.innerHTML = '<p>ลิงก์ไม่ถูกต้อง</p>'; return; }
+  try {
+    const { bill: b, info: i } = await callApi('getBill', { token });
+    const paid = b.status === 'ชำระแล้ว';
+    document.title = (paid ? 'ใบเสร็จ ' + b.receiptNo : 'ใบแจ้งหนี้ ' + b.no) + ' ห้อง ' + b.room;
+    p.innerHTML = `${paid ? '<div class="stamp">ชำระแล้ว</div>' : ''}
+      <div class="top"><div style="flex:1"><h1>${esc(i.apartmentName)}</h1><div class="muted">${esc(i.address)}${i.phone ? '<br>โทร ' + esc(i.phone) : ''}</div></div>
+        <div class="doc"><b>${paid ? 'ใบเสร็จรับเงิน' : 'ใบแจ้งหนี้'}</b><span class="muted">${paid ? 'เลขที่ ' + esc(b.receiptNo) : 'เลขที่ ' + esc(b.no)}</span></div></div>
+      <div class="meta"><div><span class="muted">ห้อง</span> <b>${esc(b.room)}</b></div><div><span class="muted">ผู้เช่า</span> ${esc(b.tenantName)}</div>
+        <div><span class="muted">รายการ</span> ${esc(billTitle(b))}</div><div><span class="muted">${paid ? 'วันที่ชำระ' : 'ครบกำหนด'}</span> ${fmtDate(paid ? b.paidDate : b.dueDate)}</div>
+        ${paid ? `<div><span class="muted">อ้างอิงใบแจ้งหนี้</span> ${esc(b.no)}</div><div><span class="muted">ชำระโดย</span> ${esc(b.payMethod)}</div>` : ''}</div>
+      <table><tr><th>รายการ</th><th class="r">จำนวนเงิน (บาท)</th></tr>
+        ${b.items.map(x => `<tr><td>${esc(x.l)}</td><td class="r">${money(x.a)}</td></tr>`).join('')}
+        <tr class="total"><td>รวมทั้งสิ้น</td><td class="r">${money(b.total)} บาท</td></tr></table>
+      ${paid ? `${b.received ? `<p class="muted">รับเงิน ${money(b.received)} บาท · ทอน ${money(b.received - b.total)} บาท</p>` : ''}${b.note ? `<p class="muted">${esc(b.note)}</p>` : ''}<p class="muted" style="margin-top:24px;text-align:right">ผู้รับเงิน ............................................<br>${esc(i.apartmentName)}</p>`
+        : `${i.promptpay || i.bankInfo ? `<div class="pay">${i.promptpay ? `<b>สแกนจ่ายด้วยพร้อมเพย์</b><br><div id="qr"></div><div class="muted">พร้อมเพย์ ${esc(i.promptpay)} · ${money(b.total)} บาท</div>` : ''}
+          ${i.bankInfo ? `<p style="margin:8px 0 0">${esc(i.bankInfo)}</p>` : ''}<p class="muted" style="margin:8px 0 0">โอนแล้วส่งสลิปในแอปผู้เช่า · <a href="tenant.html?room=${encodeURIComponent(b.room)}">เปิดแอปผู้เช่า</a></p></div>` : ''}
+          ${i.cashInfo ? `<p class="muted">เงินสด: ${esc(i.cashInfo)}</p>` : ''}`}`;
+    if (!paid && i.promptpay) drawQR(document.getElementById('qr'), promptPayPayload(i.promptpay, +b.total), 200);
+  } catch (e) { p.innerHTML = '<p>' + esc(e.message) + '</p>'; }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ผู้เช่า · อพาร์ทเม้นท์</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="app.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="config.js"></script>
+<script src="common.js"></script>
+<style>
+.pin{letter-spacing:10px;font-size:26px;text-align:center;font-weight:700}
+.hero{border:0;color:#fff}
+.hero .btn{background:#fff;color:var(--ink);border:0}
+.qa{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
+.qa button{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 4px;font-weight:700;font-size:14px;cursor:pointer}
+.qa i{display:block;font-style:normal;font-size:24px}
+.cats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.cats button{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 4px;font-weight:700;font-size:14px;cursor:pointer}
+.cats button i{display:block;font-style:normal;font-size:24px}
+.cats button.on{border-color:var(--t);background:var(--t-soft);color:var(--t)}
+.upl{border:2px dashed #9aa3ad;border-radius:12px;padding:16px;text-align:center;color:var(--muted);cursor:pointer;display:block}
+.unread b:after{content:' •';color:var(--bad)}
+</style>
+</head>
+<body class="tenant">
+<div class="wrap">
+  <div id="login" class="bd" style="padding-top:8vh">
+    <div class="card" style="text-align:center">
+      <div class="ic" style="width:68px;height:68px;font-size:34px;margin:6px auto 8px;background:var(--t);border-radius:20px">🏠</div>
+      <b style="font-size:21px" id="aptName">กำลังโหลด…</b><div class="muted">สำหรับผู้เช่า</div>
+      <div style="text-align:left;margin-top:18px">
+        <label class="f">เลขห้อง<select id="lRoom"><option value="">เลือกห้อง</option></select></label>
+        <label class="f">รหัสผู้เช่า (ได้รับจากเจ้าของหอ)<input id="lPin" class="pin" type="password" inputmode="numeric" maxlength="8" autocomplete="current-password" placeholder="••••••"></label>
+        <button class="btn pri blk lg" id="lBtn" onclick="login()">เข้าสู่ระบบ</button>
+        <p class="muted" id="lErr" style="color:var(--bad);text-align:center"></p>
+        <p class="muted small" id="demoHint" style="text-align:center"></p>
+        <p class="muted small" style="text-align:center" id="forgot"></p>
+      </div>
+    </div>
+    <p class="muted small" style="text-align:center"><a href="admin.html">สำหรับเจ้าของหอ</a></p>
+  </div>
+  <div id="app" class="hide">
+    <div id="demo"></div>
+    <div class="hd" id="hd"></div>
+    <div class="bd" id="view"></div>
+    <div class="nav" id="nav"></div>
+  </div>
+</div>
+<div class="sheet-bg" id="sbg" onclick="if(event.target===this)closeSheet()"><div class="sheet"><button class="x" onclick="closeSheet()">×</button><div id="sbody"></div></div></div>
+<div id="toast"></div>
+<div id="loading"><div>กำลังส่ง…</div></div>
+
+<script>
+let AUTH = null, D = null, ROUTE = ['home'], BSEG = 'all', CAT = '', SLIP = null, RPHOTO = null;
+const IMG = {};
+const $ = s => document.querySelector(s);
+const q = s => esc(JSON.stringify(String(s)));
+const CATS = [['❄️', 'แอร์'], ['💡', 'ไฟฟ้า'], ['🚰', 'ประปา'], ['🚪', 'ประตู/กุญแจ'], ['📶', 'อินเทอร์เน็ต'], ['📦', 'อื่นๆ']];
+
+function toast(m) { const t = $('#toast'); t.textContent = m; t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', 3200); }
+function openSheet(h) { $('#sbody').innerHTML = h; $('#sbg').classList.add('on'); }
+function closeSheet() { $('#sbg').classList.remove('on'); }
+function go(h) { if (location.hash === '#' + h) render(); else location.hash = h; }
+window.addEventListener('hashchange', () => { closeSheet(); render(); window.scrollTo(0, 0); });
+async function tApi(action, extra, quiet) {
+  if (!quiet) $('#loading').style.display = 'flex';
+  try { const j = await callApi(action, Object.assign({}, AUTH, extra || {})); if (j.data) D = j.data; return j; }
+  finally { $('#loading').style.display = 'none'; }
+}
+const T = () => D.tenant, I = () => D.info, today = () => D.serverToday;
+const isOver = b => b.status === 'รอชำระ' && b.dueDate < today();
+function badge(b) {
+  if (b.status === 'ชำระแล้ว') return '<span class="badge b-ok">ชำระแล้ว</span>';
+  if (b.status === 'รออนุมัติ') return '<span class="badge b-o">รออนุมัติสลิป</span>';
+  if (b.rejectReason) return '<span class="badge b-bad">สลิปไม่ผ่าน</span>';
+  return isOver(b) ? '<span class="badge b-bad">เกินกำหนด</span>' : '<span class="badge b-warn">รอชำระ</span>';
+}
+
+/* ---------- T1 เข้าระบบ ---------- */
+(async function init() {
+  const qRoom = new URLSearchParams(location.search).get('room');
+  const saved = load('tenant_auth');
+  if (saved) {
+    try { AUTH = JSON.parse(saved); if (!qRoom || qRoom === AUTH.room) { await tApi('tenantData', {}, true); return show(); } } catch (e) { store('tenant_auth'); AUTH = null; }
+  }
+  if (IS_DEMO) $('#demoHint').innerHTML = 'โหมดทดลอง: ห้อง <b>101</b> รหัส <b>111111</b> หรือห้อง <b>102</b> รหัส <b>222222</b>';
+  try {
+    const info = await callApi('publicInfo');
+    $('#aptName').textContent = info.apartmentName;
+    $('#forgot').textContent = 'ลืมรหัส? ติดต่อเจ้าของหอ' + (info.phone ? ' · โทร ' + info.phone : '');
+    info.rooms.forEach(r => { const o = new Option(r, r); if (r === qRoom) o.selected = true; $('#lRoom').add(o); });
+    if (qRoom) $('#lPin').focus();
+  } catch (e) { $('#aptName').textContent = e.message; }
+})();
+$('#lPin').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
+async function login() {
+  const room = $('#lRoom').value, pin = $('#lPin').value.trim();
+  if (!room || !/^\d{4,8}$/.test(pin)) { $('#lErr').textContent = 'กรุณาเลือกห้องและใส่รหัสผู้เช่า (ตัวเลข 4–8 หลัก)'; return; }
+  $('#lBtn').disabled = true; $('#lErr').textContent = ''; AUTH = { room, pin };
+  try { await tApi('tenantData', {}, true); store('tenant_auth', JSON.stringify(AUTH)); show(); }
+  catch (e) { $('#lErr').textContent = e.message; AUTH = null; }
+  $('#lBtn').disabled = false;
+}
+function logout() { store('tenant_auth'); location.href = 'tenant.html'; }
+function show() { if (!load(seenKey())) store(seenKey(), addDaysStr(D.serverToday, -3) + ' 00:00'); $('#login').classList.add('hide'); $('#app').classList.remove('hide'); $('#demo').innerHTML = demoBanner('<a href="admin.html">ลองฝั่งเจ้าของหอ</a>'); render(); }
+async function refresh() { try { await tApi('tenantData', {}, true); render(); } catch (e) { if (/PIN|รหัส/.test(e.message)) logout(); } }
+document.addEventListener('visibilitychange', () => { if (!document.hidden && D && !$('#sbg').classList.contains('on')) refresh(); });
+
+/* ---------- การแจ้งเตือน (T13) ---------- */
+function notes() {
+  const n = [];
+  D.bills.forEach(b => {
+    n.push({ at: b.createdAt, i: '🧾', bg: 'var(--warn-soft)', t: 'บิลใหม่: ' + billTitle(b), s: money(b.total) + ' บาท · ครบกำหนด ' + fmtDate(b.dueDate), h: 'bill/' + b.id });
+    if (b.status === 'ชำระแล้ว') n.push({ at: b.paidAt || b.paidDate + ' 12:00', i: '✓', bg: 'var(--ok-soft)', t: b.payMethod === 'โอน/พร้อมเพย์' ? 'อนุมัติสลิปแล้ว' : 'ชำระเงินเรียบร้อย', s: billTitle(b) + ' · ดูใบเสร็จ', h: 'bill/' + b.id });
+    if (b.status === 'รอชำระ' && b.rejectReason) n.push({ at: b.rejectedAt, i: '✕', bg: 'var(--bad-soft)', t: 'สลิปไม่ผ่านการตรวจ', s: b.rejectReason, h: 'bill/' + b.id });
+    if (b.status === 'รอชำระ') { const d = daysBetween(today(), b.dueDate); if (d <= 3) n.push({ at: today() + ' 00:00', i: '⏰', bg: 'var(--bad-soft)', t: d < 0 ? 'เลยกำหนดชำระ ' + (-d) + ' วัน' : d === 0 ? 'ครบกำหนดชำระวันนี้' : 'ใกล้ครบกำหนดชำระ (อีก ' + d + ' วัน)', s: billTitle(b) + ' · ' + money(b.total) + ' บาท', h: 'bill/' + b.id }); }
+  });
+  D.repairs.forEach(r => { if (r.updatedAt > r.createdAt) n.push({ at: r.updatedAt, i: '🔧', bg: 'var(--o-soft)', t: 'งานซ่อม: ' + r.status, s: r.category + (r.ownerMsg ? ' · ' + r.ownerMsg : ''), h: 'repairs' }); });
+  D.news.forEach(x => n.push({ at: x.createdAt, i: '📢', bg: '#eef0f2', t: x.title, s: x.body, h: 'notes' }));
+  return n.filter(x => x.at).sort((a, b) => b.at.localeCompare(a.at));
+}
+const seenKey = () => 'tn_seen_' + T().room + '_' + T().id;
+function unreadCount() { const s = load(seenKey()) || ''; return notes().filter(n => n.at > s).length; }
+function noteRow(n, seen) { return `<div class="item tap ${n.at > seen ? 'unread' : ''}" onclick="go('${n.h}')"><i class="ic" style="background:${n.bg}">${n.i}</i><div style="flex:1;min-width:0"><b>${esc(n.t)}</b><div class="muted small">${esc(n.s)}</div><div class="muted" style="font-size:11px">${fmtDateTime(n.at)}</div></div></div>`; }
+
+/* ---------- Render ---------- */
+const V = {};
+function render() {
+  if (!D) return;
+  ROUTE = (location.hash.slice(1) || 'home').split('/');
+  const v = (V[ROUTE[0]] || V.home)(...ROUTE.slice(1)), un = unreadCount();
+  $('#hd').innerHTML = (v.back ? `<button class="back" onclick="history.length>1?history.back():go('${v.back}')">‹</button>` : '') +
+    `<div class="tt"><b>${v.title}</b>${v.sub ? `<span>${v.sub}</span>` : ''}</div>` + (v.back ? '' : `<button class="pill" onclick="go('notes')">🔔${un ? `<span class="n">${un}</span>` : ''}</button>`);
+  $('#view').innerHTML = v.html;
+  const nav = v.nav || ROUTE[0], due = D.bills.filter(b => b.status === 'รอชำระ').length;
+  $('#nav').innerHTML = [['home', '🏠', 'หน้าหลัก'], ['bills', '🧾', 'บิล', due], ['repairs', '🔧', 'แจ้งซ่อม'], ['me', '👤', 'ห้องของฉัน']]
+    .map(([k, i, l, n]) => `<button class="${k === nav ? 'on' : ''}" onclick="go('${k}')"><i>${i}</i>${l}${n ? `<span class="n">${n}</span>` : ''}</button>`).join('');
+  document.title = 'ห้อง ' + T().room + ' · ' + I().apartmentName;
+  if (v.after) v.after();
+}
+
+/* ---------- T2 หน้าหลัก ---------- */
+V.home = () => {
+  const t = T(), due = D.bills.filter(b => b.status === 'รอชำระ').sort((a, b) => a.dueDate.localeCompare(b.dueDate)), wait = D.bills.filter(b => b.status === 'รออนุมัติ');
+  let hero;
+  const rej = due.find(b => b.rejectReason);
+  if (rej) hero = `<div class="card hero" style="background:var(--bad)"><div class="small">${esc(billTitle(rej))} · ${money(rej.total)} บาท</div><div style="font-size:22px;font-weight:700;margin:2px 0">สลิปไม่ผ่านการตรวจ</div>
+      <div class="small" style="background:rgba(255,255,255,.18);border-radius:9px;padding:6px 9px;margin-top:6px">เหตุผล: ${esc(rej.rejectReason)}</div><button class="btn blk" style="margin-top:10px" onclick="paySheet(${q(rej.id)})">ส่งสลิปใหม่</button></div>`;
+  else if (due.length) {
+    const sum = due.reduce((a, b) => a + +b.total, 0), b = due[0], d = daysBetween(today(), b.dueDate);
+    hero = `<div class="card hero" style="background:${d < 0 ? 'var(--bad)' : 'var(--t)'}"><div class="small">ยอดที่ต้องชำระ${due.length > 1 ? ' (' + due.length + ' บิล)' : ' · ' + esc(billTitle(b))}</div><div class="big">${money(sum)} บาท</div>
+      <div class="small" style="opacity:.9">${d < 0 ? 'เลยกำหนดมา ' + (-d) + ' วัน กรุณาชำระโดยเร็ว' : 'ครบกำหนด ' + fmtDate(b.dueDate) + (d === 0 ? ' · วันนี้' : ' · อีก ' + d + ' วัน')}</div>
+      <button class="btn blk lg" style="margin-top:12px" onclick="paySheet(${q(b.id)})">ชำระเงิน</button></div>`;
+  } else if (wait.length) hero = `<div class="card hero tap" style="background:var(--o)" onclick="go('bill/${wait[0].id}')"><div class="small">${esc(billTitle(wait[0]))} · ${money(wait[0].total)} บาท</div><div style="font-size:22px;font-weight:700;margin:2px 0">ส่งสลิปแล้ว รออนุมัติ</div><div class="small" style="opacity:.9">ไม่ต้องทำอะไรเพิ่ม จะแจ้งเตือนเมื่ออนุมัติ ›</div></div>`;
+  else hero = `<div class="card hero" style="background:var(--ok)"><div class="small">สถานะการชำระ</div><div style="font-size:22px;font-weight:700;margin:2px 0">ไม่มียอดค้างชำระ ✓</div><div class="small" style="opacity:.9">ขอบคุณที่ชำระตรงเวลา</div></div>`;
+  const seen = load(seenKey()) || '';
+  return {
+    title: 'สวัสดี คุณ' + esc(t.name.split(' ')[0]), sub: 'ห้อง ' + esc(t.room) + ' · ' + esc(I().apartmentName),
+    html: hero + `<div class="qa"><button onclick="go('bills')"><i>🧾</i>บิลทั้งหมด</button><button onclick="go('newrepair')"><i>🔧</i>แจ้งซ่อม</button>${I().phone ? `<button onclick="callPhone(${q(I().phone)})"><i>📞</i>โทรหาหอ</button>` : `<button onclick="go('me')"><i>👤</i>ห้องของฉัน</button>`}</div>
+      <div class="card"><div class="row"><h4 style="margin:0;flex:1">อัปเดตล่าสุด</h4><button class="btn sm" onclick="go('notes')">ทั้งหมด</button></div>${notes().slice(0, 4).map(n => noteRow(n, seen)).join('') || '<div class="muted">ยังไม่มีอัปเดต</div>'}</div>`,
+  };
+};
+
+/* ---------- T4 บิลทั้งหมด ---------- */
+V.bills = () => {
+  const list = D.bills.filter(b => BSEG === 'all' || (BSEG === 'due' ? b.status !== 'ชำระแล้ว' : b.status === 'ชำระแล้ว'));
+  return {
+    title: 'บิลของฉัน', sub: 'ห้อง ' + esc(T().room),
+    html: `<div class="seg">${[['all', 'ทั้งหมด'], ['due', 'ค้างชำระ'], ['paid', 'ชำระแล้ว']].map(([k, l]) => `<button class="${k === BSEG ? 'on' : ''}" onclick="BSEG='${k}';render()">${l}</button>`).join('')}</div>
+      <div class="card" style="padding:2px 14px">${list.map(b => `<div class="item tap" onclick="go('bill/${b.id}')"><div style="flex:1;min-width:0"><b>${esc(billTitle(b))}</b><div class="muted small">${b.status === 'ชำระแล้ว' ? 'จ่ายเมื่อ ' + fmtDate(b.paidDate) + ' · ' + esc(b.payMethod) : 'ครบกำหนด ' + fmtDate(b.dueDate)}</div></div><div style="text-align:right"><b>${money(b.total)}</b><div>${badge(b)}</div></div></div>`).join('') || '<div class="empty">ไม่มีบิล</div>'}</div>`,
+  };
+};
+
+/* ---------- T3 / T7 / T9 รายละเอียดบิล ---------- */
+V.bill = id => {
+  const b = D.bills.find(x => x.id === id);
+  if (!b) return { title: 'ไม่พบบิล', back: 'bills', nav: 'bills', html: '<div class="empty">ไม่พบบิลนี้</div>' };
+  const i = I(), paid = b.status === 'ชำระแล้ว', slip = D.slips.filter(s => s.billId === b.id).sort((a, c) => c.at.localeCompare(a.at))[0];
+  let top = '';
+  if (paid) top = `<div class="card" style="text-align:center"><div class="ok-ic">✓</div><b style="font-size:18px">ชำระเงินเรียบร้อย</b><div class="muted small">${b.payMethod === 'โอน/พร้อมเพย์' ? 'เจ้าของหออนุมัติสลิปแล้ว' : esc(b.payMethod)} · ${fmtDate(b.paidDate)}</div></div>`;
+  else if (b.status === 'รออนุมัติ') top = `<div class="card"><h4>สถานะการชำระ</h4><ul class="tl">
+      <li><div class="dot done">✓</div><div><b>ได้รับบิล</b><span class="muted small">${fmtDateTime(b.createdAt)}</span></div></li>
+      <li><div class="dot done">✓</div><div><b>ส่งสลิปแล้ว</b><span class="muted small">${fmtDateTime(b.slipAt)}</span></div></li>
+      <li><div class="dot now">⏳</div><div><b style="color:var(--o)">รอเจ้าของหออนุมัติ</b><span class="muted small">ไม่ต้องทำอะไรเพิ่ม</span></div></li>
+      <li><div class="dot">4</div><div><b class="muted">ชำระแล้ว · ได้ใบเสร็จ</b></div></li></ul>
+      <div class="row">${slip ? `<button class="btn sm" onclick="viewSlip(${q(slip.id)})">ดูสลิปที่ส่ง</button>` : ''}<button class="btn sm" onclick="paySheet(${q(b.id)})">ส่งรูปใหม่</button></div></div>`;
+  else if (b.rejectReason) top = `<div class="card hero" style="background:var(--bad)"><b style="font-size:18px">สลิปไม่ผ่านการตรวจ</b><div class="small" style="margin-top:4px">เหตุผลจากเจ้าของหอ: ${esc(b.rejectReason)}</div><button class="btn blk" style="margin-top:10px" onclick="paySheet(${q(b.id)})">ส่งสลิปใหม่</button></div>`;
+  return {
+    title: esc(billTitle(b)), sub: (paid ? 'ใบเสร็จ ' + esc(b.receiptNo) : 'เลขที่ ' + esc(b.no)), back: 'bills', nav: 'bills',
+    html: top + `<div class="card" style="position:relative">${paid ? '<span class="stamp">ชำระแล้ว</span>' : ''}<div class="row" style="margin-bottom:4px">${badge(b)}<span class="muted small">${paid ? '' : 'ครบกำหนด ' + fmtDate(b.dueDate)}</span></div>
+      ${b.items.map(x => `<div class="line"><span>${esc(x.l)}</span><span>${money(x.a)}</span></div>`).join('')}<div class="line tot"><span>รวม</span><span>${money(b.total)} บาท</span></div>
+      ${paid ? `<div class="muted small">ชำระโดย ${esc(b.payMethod)}${b.note ? ' · ' + esc(b.note) : ''}</div>` : ''}</div>
+      ${b.status === 'รอชำระ' && i.promptpay ? `<div class="card" style="text-align:center"><b>สแกนจ่ายพร้อมเพย์</b><div class="qrbox" id="qr"></div><div class="muted small">ยอด ${money(b.total)} บาทใส่ไว้ใน QR แล้ว${IS_DEMO ? '' : ' · <a href="#" onclick="saveQR(event)">บันทึก QR</a>'}</div>${i.bankInfo ? `<div class="muted small" style="margin-top:6px">หรือโอนเข้า ${esc(i.bankInfo)}</div>` : ''}</div>` : ''}
+      ${b.status === 'รอชำระ' && !b.rejectReason ? `<button class="btn pri blk lg" onclick="paySheet(${q(b.id)})">ชำระแล้ว แนบสลิป / จ่ายเงินสด</button>` : ''}
+      <a class="btn blk" style="margin-top:10px" target="_blank" href="${billUrl(b)}">${paid ? 'เปิดใบเสร็จ (พิมพ์ / PDF)' : 'เปิดบิล (พิมพ์ / PDF)'}</a>`,
+    after: () => { if (b.status === 'รอชำระ' && i.promptpay) drawQR($('#qr'), promptPayPayload(i.promptpay, +b.total), 190); },
+  };
+};
+function saveQR(e) {
+  e.preventDefault();
+  const c = $('#qr canvas'), img = $('#qr img'), src = img && img.src && img.src.startsWith('data:') ? img.src : c ? c.toDataURL('image/png') : '';
+  if (!src) return;
+  const a = document.createElement('a'); a.href = src; a.download = 'QR-พร้อมเพย์-ห้อง' + T().room + '.png'; a.click();
+}
+async function viewSlip(slipId) {
+  openSheet('<h3>สลิปที่ส่ง</h3><div class="empty" id="svw">กำลังโหลด…</div>');
+  try { const j = await tApi('tenantFile', { slipId }, true); $('#svw').outerHTML = `<img class="slipimg" src="${j.image}">`; }
+  catch (e) { $('#svw').textContent = e.message; }
+}
+
+/* ---------- T5 / T6 ชำระเงิน ---------- */
+function paySheet(id, mode) {
+  const b = D.bills.find(x => x.id === id), i = I(); mode = mode || 'transfer'; SLIP = null;
+  openSheet(`<h3>ชำระเงิน · ${money(b.total)} บาท</h3><div class="muted small" style="margin-bottom:10px">${esc(billTitle(b))}</div>
+    <div class="seg"><button class="${mode === 'transfer' ? 'on' : ''}" onclick="paySheet(${q(id)},'transfer')">โอน / พร้อมเพย์</button><button class="${mode === 'cash' ? 'on' : ''}" onclick="paySheet(${q(id)},'cash')">เงินสด</button></div>
+    ${mode === 'transfer' ? `<div class="muted" style="margin-bottom:8px">1. สแกน QR ในบิล หรือโอนเข้า<br><b style="color:var(--ink)">${i.promptpay ? 'พร้อมเพย์ ' + esc(i.promptpay) : ''}${i.promptpay && i.bankInfo ? '<br>' : ''}${esc(i.bankInfo)}</b>${!i.promptpay && !i.bankInfo ? 'ตามบัญชีที่เจ้าของหอแจ้ง' : ''}</div>
+      <div class="muted" style="margin-bottom:6px">2. แนบรูปสลิป</div>
+      <label class="upl" id="slipBox"><input type="file" accept="image/*" style="display:none" onchange="pickSlip(this)"><span style="font-size:30px">📎</span><br>แตะเพื่อเลือกรูปสลิป</label>
+      <button class="btn pri blk lg" style="margin-top:12px" id="sBtn" onclick="sendSlip(${q(id)})">ส่งสลิป</button>
+      <div class="muted small" style="text-align:center;margin-top:8px">เจ้าของหอจะตรวจและยืนยันให้</div>`
+    : `<div style="text-align:center;font-size:44px">💵</div><div class="card" style="background:#f4f6f8;border:0;text-align:center"><b>นำเงินสดมาจ่ายที่เจ้าของหอ</b><div class="muted" style="margin-top:4px;white-space:pre-wrap">${esc(i.cashInfo || '')}</div></div>
+      <div class="muted small" style="text-align:center;margin-bottom:12px">เมื่อเจ้าของหอรับเงินแล้ว ใบเสร็จจะเข้ามาในแอปให้อัตโนมัติ</div>
+      <div class="row">${i.phone ? `<button class="btn" style="flex:1" onclick="callPhone(${q(i.phone)})">📞 โทรหาหอ</button>` : ''}<button class="btn pri" style="flex:1" onclick="closeSheet()">เข้าใจแล้ว</button></div>`}`);
+}
+async function pickSlip(inp) {
+  const f = inp.files[0]; if (!f) return;
+  try {
+    SLIP = await resizeImage(f, 1400);
+    $('#slipBox').innerHTML = `<img src="${SLIP}" style="max-width:100%;max-height:240px;border-radius:8px"><div class="small" style="margin-top:6px;color:var(--t)">แตะเพื่อเปลี่ยนรูป</div><input type="file" accept="image/*" style="display:none" onchange="pickSlip(this)">`;
+  } catch (e) { uiAlert(e.message); }
+}
+async function sendSlip(id) {
+  if (!SLIP) return uiAlert('กรุณาแนบรูปสลิป');
+  const btn = $('#sBtn'); btn.disabled = true; btn.textContent = 'กำลังส่ง…';
+  try { await tApi('tenantSlip', { billId: id, image: SLIP }); closeSheet(); go('bill/' + id); toast('ส่งสลิปแล้ว รอเจ้าของหออนุมัติ'); }
+  catch (e) { uiAlert(e.message); btn.disabled = false; btn.textContent = 'ส่งสลิป'; }
+}
+
+/* ---------- T10 / T11 แจ้งซ่อม ---------- */
+V.repairs = () => ({
+  title: 'แจ้งซ่อม', sub: 'ห้อง ' + esc(T().room),
+  html: `<button class="btn pri blk lg" style="margin-bottom:12px" onclick="go('newrepair')">+ แจ้งซ่อมใหม่</button>
+    ${D.repairs.map(r => { const st = r.status, k = st === 'เสร็จแล้ว' ? 3 : st === 'กำลังซ่อม' ? 2 : 1; return `<div class="card"><div class="row"><span class="badge">${esc(r.category)}</span><span class="sp"></span><span class="badge ${k === 3 ? 'b-ok' : k === 2 ? 'b-o' : 'b-warn'}">${esc(st)}</span></div>
+      <div style="margin:8px 0">${esc(r.detail)}</div>
+      <ul class="tl"><li><div class="dot done">✓</div><div><b>แจ้งเรื่องแล้ว</b><span class="muted small">${fmtDateTime(r.createdAt)}</span></div></li>
+        <li><div class="dot ${k === 2 ? 'now' : k === 3 ? 'done' : ''}">${k >= 2 ? '🔧' : '2'}</div><div><b ${k === 2 ? 'style="color:var(--o)"' : k < 2 ? 'class="muted"' : ''}>กำลังซ่อม</b>${r.ownerMsg && k <= 2 ? `<span class="muted small">เจ้าของหอ: “${esc(r.ownerMsg)}”</span>` : ''}</div></li>
+        <li><div class="dot ${k === 3 ? 'done' : ''}">${k === 3 ? '✓' : '3'}</div><div><b ${k < 3 ? 'class="muted"' : ''}>เสร็จแล้ว</b>${k === 3 ? `<span class="muted small">${fmtDateTime(r.updatedAt)}${r.ownerMsg ? ' · ' + esc(r.ownerMsg) : ''}${+r.cost ? ' · ค่าซ่อม ' + money(r.cost) + ' บาท (ออกบิลแล้ว)' : ''}</span>` : ''}</div></li></ul></div>`; }).join('') || '<div class="empty">ยังไม่เคยแจ้งซ่อม</div>'}`,
+});
+V.newrepair = () => {
+  RPHOTO = null; CAT = '';
+  return {
+    title: 'แจ้งซ่อมใหม่', sub: 'ห้อง ' + esc(T().room), back: 'repairs', nav: 'repairs',
+    html: `<div class="muted small" style="margin-bottom:6px">ปัญหาอะไร</div><div class="cats" id="cats">${CATS.map(([i, l]) => `<button onclick="CAT=${q(l)};document.querySelectorAll('#cats button').forEach(x=>x.classList.toggle('on',x===this))"><i>${i}</i>${l}</button>`).join('')}</div>
+      <label class="f">รายละเอียด<textarea id="rDetail" rows="3" placeholder="เช่น แอร์ไม่เย็น มีน้ำหยด"></textarea></label>
+      <div class="muted small" style="margin-bottom:6px">รูปประกอบ (ไม่บังคับ)</div>
+      <label class="upl" id="rPhotoBox"><input type="file" accept="image/*" style="display:none" onchange="pickPhoto(this)"><span style="font-size:26px">📷</span><br>แตะเพื่อถ่าย/เลือกรูป</label>
+      <label class="f" style="margin-top:12px">เบอร์ติดต่อกลับ<input id="rPhone" inputmode="tel" value="${esc(T().phone)}"></label>
+      <label class="row" style="margin-bottom:14px;font-size:15px"><input type="checkbox" id="rEntry" checked style="width:20px;height:20px"> ช่างเข้าห้องได้แม้ฉันไม่อยู่</label>
+      <button class="btn pri blk lg" id="rBtn" onclick="sendRepair()">ส่งเรื่องแจ้งซ่อม</button>`,
+  };
+};
+async function pickPhoto(inp) {
+  const f = inp.files[0]; if (!f) return;
+  try { RPHOTO = await resizeImage(f, 1200); $('#rPhotoBox').innerHTML = `<img src="${RPHOTO}" style="max-width:100%;max-height:200px;border-radius:8px"><input type="file" accept="image/*" style="display:none" onchange="pickPhoto(this)">`; }
+  catch (e) { uiAlert(e.message); }
+}
+async function sendRepair() {
+  const detail = $('#rDetail').value.trim();
+  if (!CAT) return uiAlert('กรุณาเลือกประเภทปัญหา');
+  if (!detail) return uiAlert('กรุณาใส่รายละเอียด');
+  $('#rBtn').disabled = true;
+  try { await tApi('tenantRepair', { category: CAT, detail, phone: $('#rPhone').value.trim(), allowEntry: $('#rEntry').checked, image: RPHOTO || '' }); go('repairs'); toast('ส่งเรื่องแล้ว เจ้าของหอจะติดต่อกลับ'); }
+  catch (e) { uiAlert(e.message); $('#rBtn').disabled = false; }
+}
+
+/* ---------- T12 ห้องของฉัน ---------- */
+V.me = () => {
+  const t = T(), i = I(), d = t.endDate ? daysBetween(today(), t.endDate) : null;
+  const line = i.ownerLine ? (/^https?:/.test(i.ownerLine) ? i.ownerLine : 'https://line.me/R/ti/p/' + (i.ownerLine[0] === '@' ? encodeURIComponent(i.ownerLine) : '~' + encodeURIComponent(i.ownerLine))) : '';
+  return {
+    title: 'ห้องของฉัน', sub: 'ห้อง ' + esc(t.room) + (t.type ? ' · ' + esc(t.type) : ''),
+    html: `<div class="card"><h4>สัญญาเช่า</h4>
+      <div class="line"><span class="muted">ผู้เช่า</span><span>${esc(t.name)}</span></div>
+      <div class="line"><span class="muted">ค่าเช่า</span><span>${money(t.rent)} บาท/เดือน</span></div>
+      <div class="line"><span class="muted">เริ่มสัญญา</span><span>${fmtDate(t.startDate)}</span></div>
+      <div class="line"><span class="muted">สิ้นสุดสัญญา</span><span>${fmtDate(t.endDate)} ${d != null ? `<span class="badge ${d < 0 ? 'b-bad' : d <= 45 ? 'b-warn' : 'b-ok'}">${d < 0 ? 'หมดแล้ว' : 'อีก ' + d + ' วัน'}</span>` : ''}</span></div>
+      <div class="line"><span class="muted">เงินมัดจำ</span><span>${money(t.deposit)} บาท</span></div>
+      <div class="line" style="border:0"><span class="muted">ชำระทุกวันที่</span><span>${esc(i.dueDay)} ของเดือน</span></div></div>
+    <div class="card"><h4>ค่าบริการ</h4><div class="muted">น้ำ ${money(i.waterRate)} บาท/หน่วย · ไฟ ${money(i.elecRate)} บาท/หน่วย${+i.commonFee ? ' · ส่วนกลาง ' + money(i.commonFee) + ' บาท/เดือน' : ''}</div></div>
+    <div class="card"><h4>ติดต่อเจ้าของหอ</h4><div class="muted small" style="margin-bottom:8px">${esc(i.apartmentName)}${i.address ? '<br>' + esc(i.address) : ''}</div>
+      <div class="row">${i.phone ? `<button class="btn" style="flex:1" onclick="callPhone(${q(i.phone)})">📞 โทร ${esc(i.phone)}</button>` : ''}${line ? `<a class="btn ok" style="flex:1" target="_blank" href="${esc(line)}">💬 LINE</a>` : ''}</div></div>
+    <button class="btn bad blk" onclick="logout()">ออกจากระบบ</button>`,
+  };
+};
+
+/* ---------- T13 แจ้งเตือน ---------- */
+V.notes = () => {
+  const seen = load(seenKey()) || '', list = notes();
+  setTimeout(() => store(seenKey(), D.serverNow || today() + ' 23:59'), 300);
+  return { title: 'แจ้งเตือน', back: 'home', nav: 'home', html: `<div class="card" style="padding:2px 14px">${list.map(n => noteRow(n, seen)).join('') || '<div class="empty">ยังไม่มีการแจ้งเตือน</div>'}</div>` };
+};
+</script>
+</body>
+</html>

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ระบบบริหารอพาร์ทเม้นท์</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="app.css">
+<script src="config.js"></script>
+<script src="common.js"></script>
+<style>
+.choice{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid var(--line);border-radius:18px;padding:18px;margin-bottom:12px;text-decoration:none;color:inherit}
+.choice:hover{border-color:#9aa3ad}
+.choice .ic{width:56px;height:56px;font-size:28px;border-radius:16px}
+.choice b{display:block;font-size:19px}
+</style>
+</head>
+<body>
+<div class="wrap" style="display:flex;flex-direction:column">
+  <div id="demo"></div>
+  <div class="bd" style="flex:1;display:flex;flex-direction:column;justify-content:center;padding-bottom:40px">
+    <div style="text-align:center;margin-bottom:22px"><div style="font-size:44px">🏢</div><b style="font-size:24px" id="n">ระบบบริหารอพาร์ทเม้นท์</b><div class="muted">เลือกการเข้าใช้งาน</div></div>
+    <a class="choice" href="tenant.html"><i class="ic" style="background:var(--t-soft)">🏠</i><div><b>ผู้เช่า</b><span class="muted">ดูบิล สแกนจ่าย ส่งสลิป แจ้งซ่อม</span></div></a>
+    <a class="choice" href="admin.html"><i class="ic" style="background:var(--o-soft)">🔑</i><div><b>เจ้าของหอ</b><span class="muted">ห้อง มิเตอร์ ออกบิล รับเงิน งานซ่อม</span></div></a>
+    <div id="hint"></div>
+  </div>
+</div>
+<script>
+document.getElementById('demo').innerHTML = demoBanner();
+if (IS_DEMO) document.getElementById('hint').innerHTML = `<div class="card" style="background:#fffbea;border-color:#f1e3a0"><b>ลองใช้งานได้เลย</b><div class="muted small" style="margin-top:4px">
+  เจ้าของหอ: รหัสผ่าน <b>1234</b><br>ผู้เช่า: ห้อง <b>101</b> รหัส <b>111111</b> · ห้อง <b>102</b> รหัส <b>222222</b><br>
+  มีข้อมูลตัวอย่าง 24 ห้อง บิล 3 เดือน สลิปรออนุมัติ และงานซ่อม · ข้อมูลอยู่ในเบราว์เซอร์นี้เท่านั้น</div></div>`;
+callApi('publicInfo').then(i => { document.getElementById('n').textContent = i.apartmentName; document.title = i.apartmentName; }).catch(() => {});
+</script>
+</body>
+</html>
