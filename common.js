@@ -52,14 +52,14 @@ function billTitle(b) { return b.kind === 'รายเดือน' ? 'บิ�
 function billUrl(b) { return new URL('bill.html?t=' + b.token, location.href).href; }
 
 /* ---------- รูปภาพ: ย่อก่อนส่ง ---------- */
-function resizeImage(file, max) {
+function resizeImage(file, max, quality) {
   return new Promise((res, rej) => {
     const img = new Image(), url = URL.createObjectURL(file);
     img.onload = () => {
       const k = Math.min(1, (max || 1280) / Math.max(img.width, img.height)), c = document.createElement('canvas');
       c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
       const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
-      URL.revokeObjectURL(url); res(c.toDataURL('image/jpeg', 0.82));
+      URL.revokeObjectURL(url); res(c.toDataURL('image/jpeg', quality || 0.75));
     };
     img.onerror = () => rej(new Error('เปิดรูปนี้ไม่ได้ ลองเลือกรูปอื่น'));
     img.src = url;

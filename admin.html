@@ -440,7 +440,15 @@ function nudge(id) {
   openLine(`เรียนคุณ${b.tenantName} ห้อง ${b.room}\n${billTitle(b)} ยอด ${money(b.total)} บาท ครบกำหนดเมื่อ ${fmtDate(b.dueDate)} (เลยมา ${daysBetween(b.dueDate, today())} วัน)\nรบกวนชำระและส่งสลิปในแอปผู้เช่าได้เลยครับ\n${billUrl(b)}`);
 }
 async function unpay(id) { if (!await uiConfirm('ยกเลิกการรับเงินบิลนี้? ใบเสร็จจะถูกยกเลิก')) return; await act('unpay', { id }, 'ยกเลิกแล้ว'); closeSheet(); render(); }
-async function getImg(fileId) { if (!IMG[fileId]) IMG[fileId] = (await api('fileImage', { fileId }, true)).image; return IMG[fileId]; }
+// รูปสลิป/รูปแจ้งซ่อม: โหลดครั้งเดียวแล้วจำไว้ (ทั้งในหน้าและในแท็บนี้) เปิดซ้ำได้ทันที
+function getImg(fileId) {
+  if (!fileId) return Promise.reject(new Error('ไม่มีรูป'));
+  if (!IMG[fileId]) {
+    let cached = null; try { cached = sessionStorage.getItem('img_' + fileId); } catch (e) {}
+    IMG[fileId] = cached ? Promise.resolve(cached) : api('fileImage', { fileId }, true).then(j => { try { sessionStorage.setItem('img_' + fileId, j.image); } catch (e) {} return j.image; }, e => { delete IMG[fileId]; throw e; });
+  }
+  return IMG[fileId];
+}
 async function viewFile(fileId) {
   const w = document.createElement('div');
   w.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:70;display:flex;align-items:center;justify-content:center;padding:12px';
@@ -457,12 +465,16 @@ VIEWS.approve = first => {
   return {
     title: 'อนุมัติสลิป', sub: 'เหลือ ' + qd.length + ' รายการ', back: 'bills', nav: 'bills', right: `<span class="pill">1 / ${qd.length}</span>`,
     html: `<div class="row" style="margin-bottom:8px"><b style="font-size:18px">ห้อง ${esc(b.room)} · ${esc(b.tenantName.split(' ')[0])}</b><span class="sp"></span><span class="muted small">${esc(billTitle(b))}</span></div>
-      <img class="slipimg" id="slipImg" alt="กำลังโหลดสลิป…" onclick="viewFile(${q(slip.fileId)})">
+      <img class="slipimg" id="slipImg" alt="กำลังโหลดรูปสลิป…" onclick="viewFile(${q(slip.fileId)})">
       ${dup ? `<div class="card" style="background:var(--bad-soft);border:0;margin-top:10px"><b style="color:var(--bad)">⚠ สลิปนี้อาจซ้ำ</b><div class="small">${esc(slip.result)} — ตรวจกับแอปธนาคารก่อนอนุมัติ</div></div>` : ''}
       <div class="cmp"><div><span class="muted small">ยอดบิล</span><b>${money(b.total)}</b></div><div><span class="muted small">ส่งสลิปเมื่อ</span><b style="font-size:15px">${fmtDateTime(b.slipAt)}</b></div></div>
       <div class="muted small" style="margin-bottom:10px">ตรวจยอดเงินในสลิปให้ตรงกับยอดบิล และเช็กว่าเงินเข้าบัญชีจริง</div>
       <div class="row"><button class="btn bad lg" style="flex:1" onclick="rejectSheet(${q(b.id)})">ไม่อนุมัติ</button><button class="btn ok lg" style="flex:2" onclick="approve(${q(b.id)})">✓ อนุมัติ</button></div>`,
-    after: async () => { try { const img = $('#slipImg'); img.src = await getImg(slip.fileId); } catch (e) { $('#slipImg').alt = e.message; } },
+    after: async () => {
+      // โหลดสลิปใบถัดไปไว้ล่วงหน้า กดอนุมัติแล้วขึ้นทันที
+      qd.slice(1, 3).forEach(n => { const s2 = D.slips.find(x => x.id === n.slipId); if (s2) getImg(s2.fileId).catch(() => {}); });
+      try { const img = $('#slipImg'); img.src = await getImg(slip.fileId); } catch (e) { $('#slipImg').alt = e.message; }
+    },
   };
 };
 async function approve(id) { await act('approveSlip', { id }, 'อนุมัติแล้ว · ออกใบเสร็จให้ผู้เช่าแล้ว'); go('approve'); }
@@ -516,6 +528,7 @@ VIEWS.repairs = () => {
     html: `<div class="seg"><button class="${seg === 'open' ? 'on' : ''}" onclick="UI.repSeg='open';render()">ยังไม่เสร็จ ${open.length}</button><button class="${seg === 'done' ? 'on' : ''}" onclick="UI.repSeg='done';render()">เสร็จแล้ว</button></div>
     ${list.map(r => `<div class="card" id="rp-${r.id}"><div class="row"><b style="font-size:17px">ห้อง ${esc(r.room)}</b><span class="badge">${esc(r.category)}</span>${r.status === 'รอดำเนินการ' ? '<span class="badge b-warn">ใหม่</span>' : ''}<span class="sp"></span><span class="muted small">${fmtDateTime(r.createdAt)}</span></div>
       <div class="row" style="margin:8px 0;flex-wrap:nowrap;align-items:flex-start">${r.photoId ? `<img class="thumb" data-file="${esc(r.photoId)}" onclick="viewFile(${q(r.photoId)})">` : ''}<div style="flex:1">${esc(r.detail)}<div class="muted small">${esc(r.name)} ${r.phone ? `· <a href="#" onclick="event.preventDefault();event.stopPropagation();callPhone(${q(r.phone)})">${esc(r.phone)}</a>` : ''} · ช่างเข้าห้องได้${r.allowEntry === 'ได้' ? 'แม้ไม่อยู่' : 'เฉพาะตอนอยู่'}</div></div></div>
+      ${(r.log || []).length > 1 ? `<details style="margin-bottom:10px"><summary class="muted small" style="cursor:pointer">ประวัติ ${r.log.length} รายการ</summary><div style="margin-top:6px">${r.log.slice().reverse().map(e => `<div class="small" style="padding:3px 0;border-bottom:1px solid #eef0f2"><b>${esc(e.s)}</b> · <span class="muted">${fmtDateTime(e.at)}</span>${e.m ? ' · ' + esc(e.m) : ''}</div>`).join('')}</div></details>` : ''}
       <div class="seg rs">${['รอดำเนินการ', 'กำลังซ่อม', 'เสร็จแล้ว'].map(s => `<button class="${s === r.status ? 'on' : ''}" onclick="segPick(this)">${s}</button>`).join('')}</div>
       <label class="f">ข้อความถึงผู้เช่า<input name="ownerMsg" value="${esc(r.ownerMsg)}" placeholder="เช่น ช่างเข้าพรุ่งนี้ 10 โมง"></label>
       <div class="row" style="margin-bottom:10px"><label class="f" style="flex:1;margin:0">ค่าซ่อม (บาท)<input name="cost" type="number" inputmode="numeric" value="${esc(r.cost)}"></label>

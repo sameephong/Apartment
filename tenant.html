@@ -32,7 +32,7 @@
       <div class="ic" style="width:68px;height:68px;font-size:34px;margin:6px auto 8px;background:var(--t);border-radius:20px">🏠</div>
       <b style="font-size:21px" id="aptName">กำลังโหลด…</b><div class="muted">สำหรับผู้เช่า</div>
       <div style="text-align:left;margin-top:18px">
-        <label class="f">เลขห้อง<select id="lRoom"><option value="">เลือกห้อง</option></select></label>
+        <label class="f">เลขห้อง<input id="lRoom" list="roomList" inputmode="numeric" autocomplete="off" placeholder="พิมพ์หรือเลือกเลขห้อง เช่น 101" style="font-size:20px;text-align:center;font-weight:700"><datalist id="roomList"></datalist></label>
         <label class="f">รหัสผู้เช่า (ได้รับจากเจ้าของหอ)<input id="lPin" class="pin" type="password" inputmode="numeric" maxlength="8" autocomplete="current-password" placeholder="••••••"></label>
         <button class="btn pri blk lg" id="lBtn" onclick="login()">เข้าสู่ระบบ</button>
         <p class="muted" id="lErr" style="color:var(--bad);text-align:center"></p>
@@ -87,18 +87,23 @@ function badge(b) {
     try { AUTH = JSON.parse(saved); if (!qRoom || qRoom === AUTH.room) { await tApi('tenantData', {}, true); return show(); } } catch (e) { store('tenant_auth'); AUTH = null; }
   }
   if (IS_DEMO) $('#demoHint').innerHTML = 'โหมดทดลอง: ห้อง <b>101</b> รหัส <b>111111</b> หรือห้อง <b>102</b> รหัส <b>222222</b>';
+  if (qRoom) { $('#lRoom').value = qRoom; $('#lPin').focus(); }
+  await loadRooms();
+})();
+// ดึงรายชื่อห้องที่มีผู้เช่า (ใช้เป็นตัวช่วยเลือก) · พิมพ์เลขห้องเองได้เสมอ
+async function loadRooms() {
   try {
     const info = await callApi('publicInfo');
     $('#aptName').textContent = info.apartmentName;
     $('#forgot').textContent = 'ลืมรหัส? ติดต่อเจ้าของหอ' + (info.phone ? ' · โทร ' + info.phone : '');
-    info.rooms.forEach(r => { const o = new Option(r, r); if (r === qRoom) o.selected = true; $('#lRoom').add(o); });
-    if (qRoom) $('#lPin').focus();
-  } catch (e) { $('#aptName').textContent = e.message; }
-})();
+    $('#roomList').innerHTML = info.rooms.map(r => `<option value="${esc(r)}"></option>`).join('');
+  } catch (e) { if ($('#aptName').textContent === 'กำลังโหลด…') $('#aptName').textContent = 'เข้าสู่ระบบผู้เช่า'; }
+}
+$('#lRoom').addEventListener('focus', loadRooms, { once: true });
 $('#lPin').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
 async function login() {
-  const room = $('#lRoom').value, pin = $('#lPin').value.trim();
-  if (!room || !/^\d{4,8}$/.test(pin)) { $('#lErr').textContent = 'กรุณาเลือกห้องและใส่รหัสผู้เช่า (ตัวเลข 4–8 หลัก)'; return; }
+  const room = $('#lRoom').value.trim(), pin = $('#lPin').value.trim();
+  if (!room || !/^\d{4,8}$/.test(pin)) { $('#lErr').textContent = 'กรุณาใส่เลขห้องและรหัสผู้เช่า (ตัวเลข 4–8 หลัก)'; return; }
   $('#lBtn').disabled = true; $('#lErr').textContent = ''; AUTH = { room, pin };
   try { await tApi('tenantData', {}, true); store('tenant_auth', JSON.stringify(AUTH)); show(); }
   catch (e) { $('#lErr').textContent = e.message; AUTH = null; }
@@ -228,7 +233,7 @@ function paySheet(id, mode) {
 async function pickSlip(inp) {
   const f = inp.files[0]; if (!f) return;
   try {
-    SLIP = await resizeImage(f, 1400);
+    SLIP = await resizeImage(f, 1000, 0.72);
     $('#slipBox').innerHTML = `<img src="${SLIP}" style="max-width:100%;max-height:240px;border-radius:8px"><div class="small" style="margin-top:6px;color:var(--t)">แตะเพื่อเปลี่ยนรูป</div><input type="file" accept="image/*" style="display:none" onchange="pickSlip(this)">`;
   } catch (e) { uiAlert(e.message); }
 }
@@ -240,15 +245,35 @@ async function sendSlip(id) {
 }
 
 /* ---------- T10 / T11 แจ้งซ่อม ---------- */
-V.repairs = () => ({
-  title: 'แจ้งซ่อม', sub: 'ห้อง ' + esc(T().room),
-  html: `<button class="btn pri blk lg" style="margin-bottom:12px" onclick="go('newrepair')">+ แจ้งซ่อมใหม่</button>
-    ${D.repairs.map(r => { const st = r.status, k = st === 'เสร็จแล้ว' ? 3 : st === 'กำลังซ่อม' ? 2 : 1; return `<div class="card"><div class="row"><span class="badge">${esc(r.category)}</span><span class="sp"></span><span class="badge ${k === 3 ? 'b-ok' : k === 2 ? 'b-o' : 'b-warn'}">${esc(st)}</span></div>
-      <div style="margin:8px 0">${esc(r.detail)}</div>
-      <ul class="tl"><li><div class="dot done">✓</div><div><b>แจ้งเรื่องแล้ว</b><span class="muted small">${fmtDateTime(r.createdAt)}</span></div></li>
-        <li><div class="dot ${k === 2 ? 'now' : k === 3 ? 'done' : ''}">${k >= 2 ? '🔧' : '2'}</div><div><b ${k === 2 ? 'style="color:var(--o)"' : k < 2 ? 'class="muted"' : ''}>กำลังซ่อม</b>${r.ownerMsg && k <= 2 ? `<span class="muted small">เจ้าของหอ: “${esc(r.ownerMsg)}”</span>` : ''}</div></li>
-        <li><div class="dot ${k === 3 ? 'done' : ''}">${k === 3 ? '✓' : '3'}</div><div><b ${k < 3 ? 'class="muted"' : ''}>เสร็จแล้ว</b>${k === 3 ? `<span class="muted small">${fmtDateTime(r.updatedAt)}${r.ownerMsg ? ' · ' + esc(r.ownerMsg) : ''}${+r.cost ? ' · ค่าซ่อม ' + money(r.cost) + ' บาท (ออกบิลแล้ว)' : ''}</span>` : ''}</div></li></ul></div>`; }).join('') || '<div class="empty">ยังไม่เคยแจ้งซ่อม</div>'}`,
-});
+let RSEG = 'open';
+function repairCard(r) {
+  const st = r.status, k = st === 'เสร็จแล้ว' ? 3 : st === 'กำลังซ่อม' ? 2 : 1;
+  const steps = ['แจ้งเรื่องแล้ว', 'กำลังซ่อม', 'เสร็จแล้ว'];
+  const log = (r.log && r.log.length ? r.log : [{ at: r.createdAt, s: 'รอดำเนินการ', m: '' }]).slice().reverse();
+  return `<div class="card">
+    <div class="row"><b style="font-size:16px">${esc(r.category)}</b><span class="sp"></span><span class="badge ${k === 3 ? 'b-ok' : k === 2 ? 'b-o' : 'b-warn'}">${esc(st)}</span></div>
+    <div class="row" style="margin:8px 0;flex-wrap:nowrap;align-items:flex-start">${r.photoId ? `<img class="thumb" data-file="${esc(r.photoId)}" onclick="viewPhoto(${q(r.photoId)})" alt="รูปที่แนบ">` : ''}<div style="flex:1">${esc(r.detail)}<div class="muted small">แจ้งเมื่อ ${fmtDateTime(r.createdAt)}</div></div></div>
+    <div style="display:flex;gap:4px;margin:10px 0 4px">${steps.map((x, i) => `<div style="flex:1;height:6px;border-radius:3px;background:${i < k ? (k === 3 ? 'var(--ok)' : 'var(--o)') : '#e5e7eb'}"></div>`).join('')}</div>
+    <div style="display:flex;gap:4px" class="small muted">${steps.map((x, i) => `<div style="flex:1;text-align:center;${i === k - 1 ? 'color:var(--ink);font-weight:700' : ''}">${x}</div>`).join('')}</div>
+    ${+r.cost ? `<div class="badge b-warn" style="margin-top:8px">ค่าซ่อม ${money(r.cost)} บาท (ออกบิลแล้ว · ดูในเมนูบิล)</div>` : ''}
+    <div class="muted small" style="font-weight:700;margin:12px 0 6px">ประวัติ</div>
+    <ul class="tl">${log.map((e, i) => `<li><div class="dot ${i === 0 ? (e.s === 'เสร็จแล้ว' ? 'done' : 'now') : 'done'}">${e.s === 'เสร็จแล้ว' ? '✓' : e.s === 'กำลังซ่อม' ? '🔧' : '•'}</div><div><b>${e.s === 'รอดำเนินการ' && i === log.length - 1 ? 'แจ้งเรื่องแล้ว' : esc(e.s)}</b><span class="muted small">${fmtDateTime(e.at)}</span>${e.m ? `<div class="small">เจ้าของหอ: “${esc(e.m)}”</div>` : ''}</div></li>`).join('')}</ul>
+  </div>`;
+}
+V.repairs = () => {
+  const open = D.repairs.filter(r => r.status !== 'เสร็จแล้ว'), done = D.repairs.filter(r => r.status === 'เสร็จแล้ว');
+  const list = RSEG === 'open' ? open : done;
+  return {
+    title: 'แจ้งซ่อม', sub: 'ห้อง ' + esc(T().room) + ' · ทั้งหมด ' + D.repairs.length + ' เรื่อง',
+    html: `<button class="btn pri blk lg" style="margin-bottom:12px" onclick="go('newrepair')">+ แจ้งซ่อมใหม่</button>
+      <div class="seg"><button class="${RSEG === 'open' ? 'on' : ''}" onclick="RSEG='open';render()">กำลังดำเนินการ ${open.length}</button><button class="${RSEG === 'done' ? 'on' : ''}" onclick="RSEG='done';render()">ซ่อมเสร็จแล้ว ${done.length}</button></div>
+      ${list.map(repairCard).join('') || `<div class="empty">${RSEG === 'open' ? (D.repairs.length ? 'ไม่มีเรื่องที่ค้างอยู่ 👍' : 'ยังไม่เคยแจ้งซ่อม') : 'ยังไม่มีงานที่ซ่อมเสร็จ'}</div>`}`,
+    after: () => document.querySelectorAll('img[data-file]').forEach(async im => { try { im.src = await tFile(im.dataset.file); } catch (e) {} }),
+  };
+};
+const TIMG = {};
+async function tFile(fileId) { if (!TIMG[fileId]) TIMG[fileId] = (await tApi('tenantFile', { fileId }, true)).image; return TIMG[fileId]; }
+async function viewPhoto(fileId) { openSheet('<h3>รูปที่แนบ</h3><div class="empty" id="pvw">กำลังโหลด…</div>'); try { $('#pvw').outerHTML = `<img class="slipimg" src="${await tFile(fileId)}">`; } catch (e) { $('#pvw').textContent = e.message; } }
 V.newrepair = () => {
   RPHOTO = null; CAT = '';
   return {
@@ -264,7 +289,7 @@ V.newrepair = () => {
 };
 async function pickPhoto(inp) {
   const f = inp.files[0]; if (!f) return;
-  try { RPHOTO = await resizeImage(f, 1200); $('#rPhotoBox').innerHTML = `<img src="${RPHOTO}" style="max-width:100%;max-height:200px;border-radius:8px"><input type="file" accept="image/*" style="display:none" onchange="pickPhoto(this)">`; }
+  try { RPHOTO = await resizeImage(f, 900, 0.7); $('#rPhotoBox').innerHTML = `<img src="${RPHOTO}" style="max-width:100%;max-height:200px;border-radius:8px"><input type="file" accept="image/*" style="display:none" onchange="pickPhoto(this)">`; }
   catch (e) { uiAlert(e.message); }
 }
 async function sendRepair() {
@@ -272,7 +297,7 @@ async function sendRepair() {
   if (!CAT) return uiAlert('กรุณาเลือกประเภทปัญหา');
   if (!detail) return uiAlert('กรุณาใส่รายละเอียด');
   $('#rBtn').disabled = true;
-  try { await tApi('tenantRepair', { category: CAT, detail, phone: $('#rPhone').value.trim(), allowEntry: $('#rEntry').checked, image: RPHOTO || '' }); go('repairs'); toast('ส่งเรื่องแล้ว เจ้าของหอจะติดต่อกลับ'); }
+  try { await tApi('tenantRepair', { category: CAT, detail, phone: $('#rPhone').value.trim(), allowEntry: $('#rEntry').checked, image: RPHOTO || '' }); RSEG = 'open'; go('repairs'); toast('ส่งเรื่องแล้ว เจ้าของหอจะติดต่อกลับ'); }
   catch (e) { uiAlert(e.message); $('#rBtn').disabled = false; }
 }
 

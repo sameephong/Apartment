@@ -48,6 +48,7 @@
   const cache = {};
   const p2 = n => String(n).padStart(2, '0');
   const folder = {
+    getId: () => 'DEMOFOLDER',
     createFile: blob => {
       const id = 'F' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
       FILES[id] = { b64: blob.b64, mime: blob.mime };
@@ -86,6 +87,7 @@
   window.ScriptApp = { getProjectTriggers: () => [] };
   window.DriveApp = {
     getRootFolder: () => folder,
+    getFolderById: () => folder,
     getFoldersByName: () => ({ hasNext: () => true, next: () => folder }),
     createFolder: () => folder,
     getFileById: id => {
@@ -184,8 +186,12 @@
     const rep = (room, cat, detail, st, msg, ago) => {
       const t = tenants.filter(x => x.room === room)[0];
       const at = addDays_(today, -ago) + ' ' + p2(R(8, 21)) + ':' + p2(R(0, 59));
+      const log = [{ at, s: ST.R_NEW, m: '' }];
+      const later = (d, h) => addDays_(at.slice(0, 10), d) + ' ' + p2(h) + ':' + p2(R(0, 59));
+      if (st !== ST.R_NEW) log.push({ at: later(0, 21), s: ST.R_DOING, m: st === ST.R_DOING ? msg : 'รับเรื่องแล้ว ช่างจะเข้าตรวจ' });
+      if (st === ST.R_DONE) log.push({ at: later(1, 15), s: ST.R_DONE, m: msg });
       writeRow_('Repairs', { id: 'R' + room + ago, createdAt: at, room, tenantId: t.id, name: t.name, phone: t.phone, category: cat, detail, photoId: '',
-        allowEntry: 'ได้', status: st, ownerMsg: msg, cost: '', billId: '', updatedAt: at });
+        allowEntry: 'ได้', status: st, ownerMsg: msg, cost: '', billId: '', updatedAt: log[log.length - 1].at, log: JSON.stringify(log) });
     };
     rep('102', 'ประปา', 'ก๊อกน้ำห้องน้ำรั่ว น้ำหยดตลอด', ST.R_DONE, 'เปลี่ยนก๊อกใหม่แล้ว', 18);
     rep('101', 'แอร์', 'แอร์ไม่เย็น เปิดแล้วมีแต่ลม มีน้ำหยดด้วย', ST.R_DOING, 'ช่างเข้าพรุ่งนี้ 10 โมง', 1);
