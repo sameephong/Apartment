@@ -10,7 +10,7 @@ function loadScript(src) {
   });
 }
 function demoReady() {
-  if (!_demoReady) _demoReady = loadScript('demo.js').then(() => loadScript('backend.js')).then(() => window.DemoGAS.init());
+  if (!_demoReady) _demoReady = loadScript('demo.js?v=2.1.1').then(() => loadScript('backend.js?v=2.1.1')).then(() => window.DemoGAS.init());
   return _demoReady;
 }
 async function callApi(action, payload) {
@@ -21,13 +21,38 @@ async function callApi(action, payload) {
     await new Promise(r => setTimeout(r, 120));
     j = JSON.parse(window.DemoGAS.call(body));
   } else {
-    let res;
-    try { res = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body }); }
-    catch (e) { throw new Error('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ตรวจสอบอินเทอร์เน็ต'); }
-    j = await res.json();
+    j = await remoteCall(body, action, payload);
   }
   if (!j.ok) throw new Error(j.error || 'เกิดข้อผิดพลาด');
   return j;
+}
+
+// เรียก Google Apps Script: ไม่ส่งคุกกี้ Google ของเครื่อง (กันปัญหาบนมือถือที่ล็อกอิน Google ไว้)
+// ถ้า POST ไม่ผ่าน ลองแบบ GET อีกครั้ง และแจ้งสาเหตุให้ชัดเจน
+async function remoteCall(body, action, payload) {
+  const parse = async res => {
+    const txt = await res.text();
+    try { return JSON.parse(txt); }
+    catch (e) {
+      if (/accounts\.google|ServiceLogin|signin/i.test(txt) || /<html/i.test(txt))
+        throw new Error('เซิร์ฟเวอร์ขอให้ล็อกอิน Google — ให้เจ้าของหอตั้ง Deploy เป็น "ผู้มีสิทธิ์เข้าถึง: ทุกคน (Anyone)"');
+      throw new Error('เซิร์ฟเวอร์ตอบกลับผิดรูปแบบ (' + res.status + ') ลองใหม่อีกครั้ง');
+    }
+  };
+  const opts = { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body, credentials: 'omit', redirect: 'follow', cache: 'no-store' };
+  try {
+    return await parse(await fetch(API_URL, opts));
+  } catch (e1) {
+    // ลองแบบ GET สำหรับคำสั่งขนาดเล็ก (เช่น เข้าสู่ระบบ) — บางเบราว์เซอร์มือถือมีปัญหากับ POST ข้ามโดเมน
+    if (['login', 'getAll', 'publicInfo', 'tenantData', 'getBill'].includes(action)) {
+      try {
+        const qs = new URLSearchParams(Object.assign({ action }, Object.fromEntries(Object.entries(payload || {}).map(([k, v]) => [k, typeof v === 'object' ? JSON.stringify(v) : String(v)])))).toString();
+        return await parse(await fetch(API_URL + (API_URL.includes('?') ? '&' : '?') + qs, { credentials: 'omit', redirect: 'follow', cache: 'no-store' }));
+      } catch (e2) { if (/Deploy|ตอบกลับ/.test(e2.message)) throw e2; }
+    }
+    if (/Deploy|ตอบกลับ/.test(e1.message)) throw e1;
+    throw new Error('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ตรวจสอบอินเทอร์เน็ต แล้วลองใหม่');
+  }
 }
 
 /* ---------- ที่เก็บในเครื่อง (ปลอดภัยเมื่อเบราว์เซอร์ไม่อนุญาต) ---------- */
