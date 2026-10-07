@@ -81,7 +81,12 @@
     },
   };
   window.LockService = { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) };
-  window.CacheService = { getScriptCache: () => ({ get: k => (k in cache ? cache[k] : null), put: (k, v) => { cache[k] = v; }, remove: k => { delete cache[k]; } }) };
+  const skip = k => /^(sv|gen):/.test(k); // โหมดทดลองไม่แคชข้อมูลชีต (เปิดหลายแท็บได้ถูกต้อง)
+  window.CacheService = { getScriptCache: () => ({
+    get: k => (k in cache ? cache[k] : null), put: (k, v) => { if (!skip(k)) cache[k] = v; }, remove: k => { delete cache[k]; },
+    getAll: ks => { const o = {}; ks.forEach(k => { if (k in cache) o[k] = cache[k]; }); return o; },
+    putAll: o => { Object.keys(o).forEach(k => { if (!skip(k)) cache[k] = o[k]; }); },
+  }) };
   window.ContentService = { MimeType: { JSON: 'json' }, createTextOutput: t => ({ t, setMimeType() { return this; } }) };
   window.UrlFetchApp = { fetch: () => ({ getResponseCode: () => 200 }) };
   window.ScriptApp = { getProjectTriggers: () => [] };

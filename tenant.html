@@ -6,10 +6,10 @@
 <title>ผู้เช่า · อพาร์ทเม้นท์</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=2.1.1">
+<link rel="stylesheet" href="app.css?v=2.2">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="config.js?v=2.1.1"></script>
-<script src="common.js?v=2.1.1"></script>
+<script src="config.js?v=2.2"></script>
+<script src="common.js?v=2.2"></script>
 <style>
 .pin{letter-spacing:10px;font-size:26px;text-align:center;font-weight:700}
 .hero{border:0;color:#fff}
@@ -67,7 +67,7 @@ function go(h) { if (location.hash === '#' + h) render(); else location.hash = h
 window.addEventListener('hashchange', () => { closeSheet(); render(); window.scrollTo(0, 0); });
 async function tApi(action, extra, quiet) {
   if (!quiet) $('#loading').style.display = 'flex';
-  try { const j = await callApi(action, Object.assign({}, AUTH, extra || {})); if (j.data) D = j.data; return j; }
+  try { const j = await callApi(action, Object.assign({}, AUTH, extra || {})); if (j.data) { D = j.data; cacheData('tenant_cache', D); } return j; }
   finally { $('#loading').style.display = 'none'; }
 }
 const T = () => D.tenant, I = () => D.info, today = () => D.serverToday;
@@ -81,10 +81,18 @@ function badge(b) {
 
 /* ---------- T1 เข้าระบบ ---------- */
 (async function init() {
+  await new Promise(r => setTimeout(r)); // รอให้สคริปต์ทั้งหน้าโหลดเสร็จก่อน
   const qRoom = new URLSearchParams(location.search).get('room');
   const saved = load('tenant_auth');
   if (saved) {
-    try { AUTH = JSON.parse(saved); if (!qRoom || qRoom === AUTH.room) { await tApi('tenantData', {}, true); return show(); } } catch (e) { store('tenant_auth'); AUTH = null; }
+    try {
+      AUTH = JSON.parse(saved);
+      if (!qRoom || qRoom === AUTH.room) {
+        const cached = loadData('tenant_cache');
+        if (cached && cached.tenant && cached.tenant.room === AUTH.room) { D = cached; show(); refresh(); return; } // เปิดทันที แล้วอัปเดตเบื้องหลัง
+        await tApi('tenantData', {}, true); return show();
+      }
+    } catch (e) { store('tenant_auth'); store('tenant_cache'); AUTH = null; }
   }
   if (IS_DEMO) $('#demoHint').innerHTML = 'โหมดทดลอง: ห้อง <b>101</b> รหัส <b>111111</b> หรือห้อง <b>102</b> รหัส <b>222222</b>';
   if (qRoom) { $('#lRoom').value = qRoom; $('#lPin').focus(); }
@@ -104,14 +112,14 @@ $('#lPin').addEventListener('keydown', e => { if (e.key === 'Enter') login(); })
 async function login() {
   const room = $('#lRoom').value.trim(), pin = $('#lPin').value.trim();
   if (!room || !/^\d{4,8}$/.test(pin)) { $('#lErr').textContent = 'กรุณาใส่เลขห้องและรหัสผู้เช่า (ตัวเลข 4–8 หลัก)'; return; }
-  $('#lBtn').disabled = true; $('#lErr').textContent = ''; AUTH = { room, pin };
+  $('#lBtn').disabled = true; $('#lBtn').textContent = 'กำลังเข้าสู่ระบบ…'; $('#lErr').textContent = ''; AUTH = { room, pin };
   try { await tApi('tenantData', {}, true); store('tenant_auth', JSON.stringify(AUTH)); show(); }
   catch (e) { $('#lErr').textContent = e.message; AUTH = null; }
-  $('#lBtn').disabled = false;
+  $('#lBtn').disabled = false; $('#lBtn').textContent = 'เข้าสู่ระบบ';
 }
-function logout() { store('tenant_auth'); location.href = 'tenant.html'; }
+function logout() { store('tenant_auth'); store('tenant_cache'); location.href = 'tenant.html'; }
 function show() { if (!load(seenKey())) store(seenKey(), addDaysStr(D.serverToday, -3) + ' 00:00'); $('#login').classList.add('hide'); $('#app').classList.remove('hide'); $('#demo').innerHTML = demoBanner('<a href="admin.html">ลองฝั่งเจ้าของหอ</a>'); render(); }
-async function refresh() { try { await tApi('tenantData', {}, true); render(); } catch (e) { if (/PIN|รหัส/.test(e.message)) logout(); } }
+async function refresh() { syncBadge(true); try { await tApi('tenantData', {}, true); if (!$('#sbg').classList.contains('on')) render(); } catch (e) { if (/PIN|รหัส/.test(e.message)) logout(); } syncBadge(false); }
 document.addEventListener('visibilitychange', () => { if (!document.hidden && D && !$('#sbg').classList.contains('on')) refresh(); });
 
 /* ---------- การแจ้งเตือน (T13) ---------- */

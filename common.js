@@ -10,7 +10,7 @@ function loadScript(src) {
   });
 }
 function demoReady() {
-  if (!_demoReady) _demoReady = loadScript('demo.js?v=2.1.1').then(() => loadScript('backend.js?v=2.1.1')).then(() => window.DemoGAS.init());
+  if (!_demoReady) _demoReady = loadScript('demo.js?v=2.2').then(() => loadScript('backend.js?v=2.2')).then(() => window.DemoGAS.init());
   return _demoReady;
 }
 async function callApi(action, payload) {
@@ -54,6 +54,16 @@ async function remoteCall(body, action, payload) {
     throw new Error('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ตรวจสอบอินเทอร์เน็ต แล้วลองใหม่');
   }
 }
+
+/* ---------- ป้าย "กำลังอัปเดต" มุมจอ (แสดงข้อมูลที่จำไว้ทันที แล้วอัปเดตเบื้องหลัง) ---------- */
+function syncBadge(on) {
+  let el = document.getElementById('syncBadge');
+  if (!el) { el = document.createElement('div'); el.id = 'syncBadge'; el.style.cssText = 'position:fixed;top:calc(8px + env(safe-area-inset-top,0px));right:8px;z-index:40;background:rgba(17,24,39,.82);color:#fff;font-size:12px;padding:4px 10px;border-radius:999px;display:none;pointer-events:none'; el.textContent = 'กำลังอัปเดต…'; document.body.appendChild(el); }
+  el.style.display = on ? 'block' : 'none';
+}
+let _saveT = null;
+function cacheData(key, data) { clearTimeout(_saveT); _saveT = setTimeout(() => { try { localStorage.setItem(key, JSON.stringify(data)); } catch (e) {} }, 300); }
+function loadData(key) { try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch (e) { return null; } }
 
 /* ---------- ที่เก็บในเครื่อง (ปลอดภัยเมื่อเบราว์เซอร์ไม่อนุญาต) ---------- */
 function store(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) {} }

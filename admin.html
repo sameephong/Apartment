@@ -6,10 +6,10 @@
 <title>เจ้าของหอ · ระบบบริหารอพาร์ทเม้นท์</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=2.1.1">
+<link rel="stylesheet" href="app.css?v=2.2">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="config.js?v=2.1.1"></script>
-<script src="common.js?v=2.1.1"></script>
+<script src="config.js?v=2.2"></script>
+<script src="common.js?v=2.2"></script>
 </head>
 <body>
 <div class="wrap">
@@ -50,7 +50,7 @@ function curMonth() { return today().slice(0, 7); }
 function S() { return D.settings; }
 async function api(action, payload, quiet) {
   if (!quiet) $('#loading').style.display = 'flex';
-  try { const j = await callApi(action, Object.assign({ password: PW }, payload || {})); if (j.data) D = j.data; return j; }
+  try { const j = await callApi(action, Object.assign({ password: PW }, payload || {})); if (j.data) { D = j.data; cacheData('owner_cache', D); } return j; }
   finally { $('#loading').style.display = 'none'; }
 }
 async function act(action, payload, msg) {
@@ -90,22 +90,28 @@ function badgeCounts() {
 
 /* ================= เข้าสู่ระบบ ================= */
 async function doLogin() {
-  PW = $('#pw').value; $('#loginErr').textContent = ''; $('#loginBtn').disabled = true;
+  PW = $('#pw').value; $('#loginErr').textContent = ''; $('#loginBtn').disabled = true; $('#loginBtn').textContent = 'กำลังเข้าสู่ระบบ…';
   try { await api('login', {}, true); store('owner_pw', PW); start(); }
   catch (e) { $('#loginErr').textContent = e.message; }
-  $('#loginBtn').disabled = false;
+  $('#loginBtn').disabled = false; $('#loginBtn').textContent = 'เข้าสู่ระบบ';
 }
-function logout() { store('owner_pw'); location.href = 'admin.html'; }
+function logout() { store('owner_pw'); store('owner_cache'); location.href = 'admin.html'; }
 function start() { $('#login').classList.add('hide'); $('#app').classList.remove('hide'); $('#demo').innerHTML = demoBanner('<a href="tenant.html">ลองฝั่งผู้เช่า</a>'); render(); }
 $('#pw').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 (async () => {
+  await new Promise(r => setTimeout(r)); // รอให้สคริปต์ทั้งหน้าโหลดเสร็จก่อน
   if (IS_DEMO) $('#demoHint').innerHTML = 'โหมดทดลอง: รหัสผ่าน <b>1234</b>';
   const saved = load('owner_pw');
-  if (!saved) return;
+  if (!saved) { if (!IS_DEMO) callApi('publicInfo').catch(() => {}); return; } // ปลุกเซิร์ฟเวอร์ไว้ระหว่างพิมพ์รหัส
   PW = saved;
-  try { await api('getAll', {}, true); start(); } catch (e) { store('owner_pw'); }
+  const cached = loadData('owner_cache');
+  if (cached && cached.settings) { D = cached; start(); } // เปิดหน้าทันทีจากข้อมูลที่จำไว้
+  syncBadge(true);
+  try { await api('getAll', {}, true); if (cached && cached.settings) render(); else start(); }
+  catch (e) { if (/รหัสผ่าน/.test(e.message)) { store('owner_pw'); store('owner_cache'); location.reload(); } else if (!cached) $('#loginErr').textContent = e.message; }
+  syncBadge(false);
 })();
-async function refresh() { try { await api('getAll', {}, true); render(); } catch (e) {} }
+async function refresh() { syncBadge(true); try { await api('getAll', {}, true); if (!$('#sbg').classList.contains('on')) render(); } catch (e) {} syncBadge(false); }
 document.addEventListener('visibilitychange', () => { if (!document.hidden && D && !$('#sbg').classList.contains('on') && ROUTE[0] !== 'meters') refresh(); });
 
 /* ================= Render ================= */

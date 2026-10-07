@@ -19,7 +19,7 @@ const SCHEMA = {
              'payMethod', 'paidAmount', 'received', 'paidDate', 'receiptNo', 'note', 'paidAt'],
   Slips:    ['id', 'billId', 'room', 'at', 'fileId', 'hash', 'result'],
   Repairs:  ['id', 'createdAt', 'room', 'tenantId', 'name', 'phone', 'category', 'detail', 'photoId',
-             'allowEntry', 'status', 'ownerMsg', 'cost', 'billId', 'updatedAt'],
+             'allowEntry', 'status', 'ownerMsg', 'cost', 'billId', 'updatedAt', 'log'],
   News:     ['id', 'createdAt', 'title', 'body'],
 };
 
@@ -57,8 +57,9 @@ const DEFAULT_SETTINGS = [
   ['lineGroupId', '', 'LINE Group ID รับแจ้งเตือน (ไม่บังคับ)'],
   ['invSeq', '0', '(ระบบ) เลขที่ใบแจ้งหนี้ล่าสุด'],
   ['rcSeq', '0', '(ระบบ) เลขที่ใบเสร็จล่าสุด'],
+  ['fileFolderId', '', '(ระบบ) โฟลเดอร์ Google Drive ที่เก็บรูปสลิป/รูปแจ้งซ่อม'],
 ];
-const PRIVATE_SETTINGS = ['adminPassword', 'lineToken', 'invSeq', 'rcSeq'];
+const PRIVATE_SETTINGS = ['adminPassword', 'lineToken', 'invSeq', 'rcSeq', 'fileFolderId'];
 
 /* ============================ ติดตั้ง ============================ */
 
@@ -82,6 +83,18 @@ function setup() {
 function installDailyTrigger() {
   ScriptApp.getProjectTriggers().forEach(t => { if (t.getHandlerFunction() === 'dailyCheck') ScriptApp.deleteTrigger(t); });
   ScriptApp.newTrigger('dailyCheck').timeBased().everyDays(1).atHour(9).create();
+}
+
+/** ปลุกเซิร์ฟเวอร์ทุก 5 นาที (ลดอาการเปิดครั้งแรกช้า) + เติมแคชข้อมูล — รันฟังก์ชันนี้ครั้งเดียว */
+function installWarmup() {
+  ScriptApp.getProjectTriggers().forEach(t => { if (t.getHandlerFunction() === 'warmup') ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('warmup').timeBased().everyMinutes(5).create();
+}
+function warmup() { MEMO = {}; prefetch_(); Object.keys(SCHEMA).forEach(n => { try { readAll_(n); } catch (e) {} }); }
+
+/** แก้ข้อมูลใน Google Sheet ด้วยมือ → ล้างแคชของชีตนั้นอัตโนมัติ (ทำงานเอง ไม่ต้องตั้งค่า) */
+function onEdit(e) {
+  try { const n = e.range.getSheet().getName(); if (SCHEMA[n]) CacheService.getScriptCache().put('gen:' + n, String(Date.now()), 21600); } catch (err) {}
 }
 
 /* ============================ Web API ============================ */
@@ -118,19 +131,25 @@ const ADMIN_API = {
 };
 const NO_DATA = { previewBills: 1, fileImage: 1 }; // คำสั่งที่ไม่ต้องส่งข้อมูลทั้งหมดกลับ
 
+// คำสั่งที่อ่านอย่างเดียว ไม่ต้องรอคิว (เร็วขึ้นเวลามีหลายคนใช้พร้อมกัน)
+const READ_ONLY = { login: 1, getAll: 1, fileImage: 1, previewBills: 1, tenantData: 1, tenantFile: 1 };
+
 function handle_(req) {
+  MEMO = {};
+  prefetch_();
   const a = String(req.action || '');
   if (PUBLIC_API[a]) return Object.assign({ ok: true }, PUBLIC_API[a](req));
+  const lockIf = fn => (READ_ONLY[a] || (a === 'moveOut' && !req.confirm)) ? fn() : withLock_(fn);
   if (TENANT_API[a]) {
     const t = tenantAuth_(req);
-    return withLock_(() => {
+    return lockIf(() => {
       const r = TENANT_API[a](req, t) || {};
       return Object.assign({ ok: true, data: tenantView_(findBy_('Tenants', 'id', t.id)) }, r);
     });
   }
   if (!ADMIN_API[a]) throw new Error('ไม่รู้จักคำสั่ง: ' + a);
   adminAuth_(req);
-  return withLock_(() => {
+  return lockIf(() => {
     const r = ADMIN_API[a](req) || {};
     return NO_DATA[a] ? Object.assign({ ok: true }, r) : Object.assign({ ok: true, data: allData_() }, r);
   });
@@ -198,7 +217,7 @@ function api_deleteRoom(req) {
   const ex = findBy_('Rooms', 'room', String(req.room));
   if (!ex) throw new Error('ไม่พบห้อง');
   if (activeTenant_(ex.room)) throw new Error('ห้องนี้ยังมีผู้เช่า ต้องย้ายออกก่อน');
-  sheet_('Rooms').deleteRow(ex._row);
+  deleteRow_('Rooms', ex._row);
 }
 
 function api_bulkRooms(req) {
@@ -450,7 +469,7 @@ function api_updateBill(req) {
 function api_deleteBill(req) {
   const b = billById_(req.id);
   if (b.status === ST.PAID) throw new Error('บิลที่ชำระแล้วลบไม่ได้ (ยกเลิกการรับเงินก่อน)');
-  sheet_('Bills').deleteRow(b._row);
+  deleteRow_('Bills', b._row);
 }
 
 /* ============================ รับเงิน ============================ */
@@ -507,10 +526,17 @@ function api_saveRepair(req) {
   const p = req.repair || {};
   const r = findBy_('Repairs', 'id', String(p.id || ''));
   if (!r) throw new Error('ไม่พบรายการแจ้งซ่อม');
+  const before = { status: r.status, ownerMsg: r.ownerMsg };
   ['status', 'ownerMsg', 'cost'].forEach(k => { if (p[k] !== undefined) r[k] = p[k]; });
+  if (r.status !== before.status || r.ownerMsg !== before.ownerMsg) {
+    const log = parseLog_(r);
+    log.push({ at: now_(), s: r.status, m: r.ownerMsg !== before.ownerMsg ? r.ownerMsg : '' });
+    r.log = JSON.stringify(log);
+  }
   if (p.charge && Number(r.cost) > 0 && !r.billId) {
     const t = activeTenant_(r.room);
     if (!t) throw new Error('ห้องนี้ไม่มีผู้เช่าแล้ว เก็บค่าซ่อมไม่ได้');
+    const log = parseLog_(r); log.push({ at: now_(), s: r.status, m: 'ออกบิลค่าซ่อม ' + fmtNum_(r.cost) + ' บาท' }); r.log = JSON.stringify(log);
     r.billId = newBill_(t, KIND.SPECIAL, today_().slice(0, 7), [{ l: 'ค่าซ่อม: ' + r.category + ' (' + r.detail.slice(0, 30) + ')', a: Number(r.cost), c: 1 }], addDays_(today_(), 7)).id;
   }
   r.updatedAt = now_();
@@ -525,7 +551,7 @@ function api_postNews(req) {
 
 function api_deleteNews(req) {
   const n = findBy_('News', 'id', String(req.id || ''));
-  if (n) sheet_('News').deleteRow(n._row);
+  if (n) deleteRow_('News', n._row);
 }
 
 /* ============================ ตั้งค่า ============================ */
@@ -534,7 +560,7 @@ function api_saveSettings(req) {
   const p = req.settings || {}, rows = readAll_('Settings');
   DEFAULT_SETTINGS.forEach(d => {
     const k = d[0];
-    if (p[k] === undefined || k === 'invSeq' || k === 'rcSeq') return;
+    if (p[k] === undefined || k === 'invSeq' || k === 'rcSeq' || k === 'fileFolderId') return;
     if ((k === 'adminPassword' || k === 'lineToken') && String(p[k]) === '') return;
     if (k === 'adminPassword' && String(p[k]).length < 4) throw new Error('รหัสผ่านต้องยาวอย่างน้อย 4 ตัว');
     const ex = rows.filter(r => r.key === k)[0];
@@ -552,8 +578,8 @@ function tenantView_(t) {
   const bills = bills_().filter(b => b.tenantId === t.id).map(cleanBill_).sort(billSort_);
   const ids = new Set(bills.map(b => b.id));
   const slips = readAll_('Slips').filter(x => ids.has(x.billId)).map(x => ({ id: x.id, billId: x.billId, at: x.at, result: x.result }));
-  const repairs = readAll_('Repairs').filter(r => r.room === t.room && r.createdAt.slice(0, 10) >= t.startDate)
-    .map(r => { const o = strip_(r); delete o.tenantId; if (!o.billId) o.cost = ''; return o; })
+  const repairs = readAll_('Repairs').filter(r => r.tenantId ? r.tenantId === t.id : (r.room === t.room && r.createdAt.slice(0, 10) >= t.startDate))
+    .map(r => { const o = strip_(r); delete o.tenantId; if (!o.billId) o.cost = ''; o.log = parseLog_(r); return o; })
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const news = readAll_('News').map(strip_).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 20);
   const room = findBy_('Rooms', 'room', t.room) || {};
@@ -590,6 +616,7 @@ function api_tenantRepair(req, t) {
     detail: detail.slice(0, 1000), photoId, allowEntry: req.allowEntry ? 'ได้' : 'ไม่ได้', status: ST.R_NEW,
     ownerMsg: '', cost: '', billId: '', updatedAt: now_(),
   };
+  r.log = JSON.stringify([{ at: r.createdAt, s: ST.R_NEW, m: '' }]);
   writeRow_('Repairs', r);
   pushLine_('🔧 แจ้งซ่อม ห้อง ' + t.room + ' (' + r.category + ')\n' + r.detail + '\nโทร ' + r.phone);
   return {};
@@ -618,7 +645,7 @@ function allData_() {
     meters: readAll_('Meters').map(strip_),
     bills: bills_().map(b => { const o = strip_(b); return o; }).sort(billSort_),
     slips: readAll_('Slips').map(x => { const o = strip_(x); delete o.hash; return o; }),
-    repairs: readAll_('Repairs').map(strip_).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    repairs: readAll_('Repairs').map(r => { const o = strip_(r); o.log = parseLog_(r); return o; }).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     news: readAll_('News').map(strip_).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     serverToday: today_(), serverNow: now_(),
   };
@@ -747,9 +774,14 @@ function fileDataUrl_(id) {
   return 'data:' + blob.getContentType() + ';base64,' + Utilities.base64Encode(blob.getBytes());
 }
 function fileFolder_() {
-  const name = 'ไฟล์อพาร์ทเม้นท์ - ' + getSettings_().apartmentName;
+  const id = getSettings_().fileFolderId;
+  if (id) { try { return DriveApp.getFolderById(id); } catch (e) { /* ถูกลบไป สร้างใหม่ */ } }
+  const name = 'ไฟล์ระบบอพาร์ทเม้นท์ (สลิป-แจ้งซ่อม)';
   const it = DriveApp.getFoldersByName(name);
-  return it.hasNext() ? it.next() : DriveApp.createFolder(name);
+  const f = it.hasNext() ? it.next() : DriveApp.createFolder(name);
+  const row = readAll_('Settings').filter(r => r.key === 'fileFolderId')[0];
+  writeRow_('Settings', { key: 'fileFolderId', value: f.getId(), description: '(ระบบ) โฟลเดอร์ Google Drive ที่เก็บรูปสลิป/รูปแจ้งซ่อม' }, row && row._row);
+  return f;
 }
 
 /* ============================ Sheet helpers ============================ */
@@ -757,20 +789,69 @@ function fileFolder_() {
 function getSettings_() {
   const s = {};
   DEFAULT_SETTINGS.forEach(d => { s[d[0]] = d[1]; });
-  if (!SpreadsheetApp.getActive().getSheetByName('Settings')) throw new Error('ยังไม่ได้ติดตั้ง — กรุณารันฟังก์ชัน setup ใน Apps Script');
+  try { sheet_('Settings'); } catch (e) { throw new Error('ยังไม่ได้ติดตั้ง — กรุณารันฟังก์ชัน setup ใน Apps Script'); }
   readAll_('Settings').forEach(r => { if (r.key) s[r.key] = String(r.value); });
   return s;
 }
 function activeTenant_(room) { return readAll_('Tenants').filter(t => t.room === room && t.status === ST.ACTIVE)[0]; }
+// อ่านชีตแต่ละชีตครั้งเดียวต่อคำสั่ง (เร็วขึ้นมาก) · เขียนแล้วล้างแคชของชีตนั้น
+let MEMO = {};
+function deleteRow_(name, row) { sheet_(name).deleteRow(row); dropCache_(name); }
+
+/* ---- แคชข้อมูลชีตใน CacheService: อ่านเร็วกว่าอ่านจากชีตหลายเท่า ---- */
+const CACHE_TTL = 21600, CHUNK = 30000;
+function prefetch_() {
+  try {
+    const c = CacheService.getScriptCache(), names = Object.keys(SCHEMA);
+    const head = c.getAll(names.map(n => 'sv:' + n).concat(names.map(n => 'gen:' + n)));
+    const keys = [], ok = {};
+    names.forEach(n => {
+      const m = String(head['sv:' + n] || '').split('|'), gen = head['gen:' + n] || '0';
+      MEMO['g:' + n] = gen;
+      if (m.length === 2 && m[0] === gen) { ok[n] = +m[1]; for (let i = 0; i < ok[n]; i++) keys.push('sv:' + n + ':' + i); }
+    });
+    const parts = keys.length ? c.getAll(keys) : {};
+    Object.keys(ok).forEach(n => {
+      let str = '';
+      for (let i = 0; i < ok[n]; i++) { const p = parts['sv:' + n + ':' + i]; if (p == null) return; str += p; }
+      try { MEMO['v:' + n] = JSON.parse(str); } catch (e) {}
+    });
+  } catch (e) {}
+}
+function cachePut_(name, vals) {
+  try {
+    const str = JSON.stringify(vals), o = {};
+    let n = 0;
+    for (let i = 0; i < str.length; i += CHUNK) o['sv:' + name + ':' + (n++)] = str.slice(i, i + CHUNK);
+    if (n > 60) return;
+    o['sv:' + name] = (MEMO['g:' + name] || '0') + '|' + n;
+    CacheService.getScriptCache().putAll(o, CACHE_TTL);
+  } catch (e) {}
+}
+function dropCache_(name) {
+  delete MEMO['v:' + name];
+  const g = String(Date.now()) + rand_(3);
+  MEMO['g:' + name] = g;
+  try { CacheService.getScriptCache().put('gen:' + name, g, CACHE_TTL); } catch (e) {}
+}
+function parseLog_(r) { try { return JSON.parse(r.log || '[]'); } catch (e) { return []; } }
 function sheet_(name) {
+  if (MEMO['s:' + name]) return MEMO['s:' + name];
   const sh = SpreadsheetApp.getActive().getSheetByName(name);
   if (!sh) throw new Error('ไม่พบชีต ' + name + ' — กรุณารัน setup อีกครั้ง');
+  MEMO['s:' + name] = sh;
   return sh;
 }
 function readAll_(name) {
-  const sh = sheet_(name), last = sh.getLastRow(), H = SCHEMA[name];
-  if (last < 2) return [];
-  return sh.getRange(2, 1, last - 1, H.length).getValues().map((r, i) => {
+  const H = SCHEMA[name];
+  let vals = MEMO['v:' + name];
+  if (!vals) {
+    const sh = sheet_(name), last = sh.getLastRow();
+    const raw = last < 2 ? [] : sh.getRange(2, 1, last - 1, H.length).getValues();
+    vals = MEMO['v:' + name] = raw.map(r => r.map((v, j) => v instanceof Date ? norm_(H[j], v) : v));
+    cachePut_(name, vals);
+  }
+  return vals.map((r, i) => {
     const o = { _row: i + 2 };
     H.forEach((h, j) => { o[h] = norm_(h, r[j]); });
     return o;
@@ -794,11 +875,13 @@ function toCell_(key, v) {
 function writeRow_(name, obj, rowNum) {
   const row = SCHEMA[name].map(h => toCell_(h, obj[h])), sh = sheet_(name);
   sh.getRange(rowNum || sh.getLastRow() + 1, 1, 1, row.length).setValues([row]);
+  dropCache_(name);
 }
 function writeRows_(name, objs) {
   if (!objs.length) return;
   const sh = sheet_(name), rows = objs.map(o => SCHEMA[name].map(h => toCell_(h, o[h])));
   sh.getRange(sh.getLastRow() + 1, 1, rows.length, SCHEMA[name].length).setValues(rows);
+  dropCache_(name);
 }
 function findBy_(name, key, val) { return readAll_(name).filter(o => o[key] === val)[0]; }
 function strip_(o) { const c = Object.assign({}, o); delete c._row; return c; }
