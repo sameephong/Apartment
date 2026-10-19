@@ -6,9 +6,9 @@
 <title>ระบบบริหารอพาร์ทเม้นท์</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=2.4">
+<link rel="stylesheet" href="app.css?v=2.6">
 <script>document.write('<script src="config.js?t=' + Date.now() + '"><\/script>')</script>
-<script src="common.js?v=2.4"></script>
+<script src="common.js?v=2.6"></script>
 <style>
 .choice{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid var(--line);border-radius:18px;padding:18px;margin-bottom:12px;text-decoration:none;color:inherit}
 .choice:hover{border-color:#9aa3ad}
@@ -48,6 +48,7 @@ function $id(i) { return document.getElementById(i); }
 if (NEED_BLD) {
   $id('pick').classList.remove('hide'); $id('choices').classList.add('hide');
   $id('bCode').addEventListener('keydown', e => { if (e.key === 'Enter') pickB(); });
+  $id('bCode').value = ''; setTimeout(() => { $id('bCode').value = ''; $id('bCode').focus(); }, 50); // ไม่เติมรหัสเดิมให้
   document.querySelector('.muted').textContent = 'เลือกตึกของคุณ';
 } else {
   if (BLD_MANY) $id('bldLine').innerHTML = `ตึกรหัส <b>${esc(BLD.code)}</b> · <a href="#" onclick="changeBuilding();return false">เปลี่ยนตึก</a>`;

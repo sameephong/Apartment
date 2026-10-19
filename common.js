@@ -11,17 +11,29 @@ const BLD = (function () {
   if (!b && Object.keys(BLD_LIST).length === 1) b = find(Object.keys(BLD_LIST)[0]);
   // ลิงก์เก่าที่ไม่มีรหัสตึก (บิล/หน้าผู้เช่า) ใช้ตึกหลักได้
   if (!b && typeof DEFAULT_BUILDING !== 'undefined' && /\/(bill|tenant)\.html$/.test(location.pathname)) b = find(DEFAULT_BUILDING);
-  if (b) { try { localStorage.setItem('apt_bld', b.code); } catch (e) {} }
+  if (b) {
+    try {
+      localStorage.setItem('apt_bld', b.code);
+      // ความปลอดภัย: เครื่องหนึ่งจำการเข้าสู่ระบบได้ทีละตึก — ล้างรหัส/ข้อมูลของตึกอื่นทั้งหมดทิ้ง
+      const SECRET = /^(?:([A-Za-z0-9_-]+):)?(owner_pw|owner_cache|tenant_auth|tenant_cache|tn_seen_.*)$/;
+      Object.keys(localStorage).forEach(k => { const m = k.match(SECRET); if (m && m[1] !== b.code) localStorage.removeItem(k); });
+    } catch (e) {}
+  }
   return b;
 })();
 const BLD_MANY = BLD_MULTI && Object.keys(BLD_LIST).length > 1; // มีมากกว่า 1 ตึก → แสดงปุ่มเปลี่ยนตึก
+window.addEventListener('pageshow', e => { if (e.persisted) location.reload(); });
 const NEED_BLD = BLD_MULTI && !BLD;
 const API = BLD ? (BLD.url || '') : (typeof API_URL !== 'undefined' ? API_URL : '');
 const IS_DEMO = !NEED_BLD && (!API || /^PASTE/i.test(API));
 window.BLD_CODE = BLD ? BLD.code : '';
 const BKEY = k => BLD ? BLD.code + ':' + k : k; // แยกข้อมูลที่จำในเครื่องตามตึก
 function withB(url) { return BLD && BLD_MULTI ? url + (url.includes('?') ? '&' : '?') + 'b=' + encodeURIComponent(BLD.code) : url; }
-function changeBuilding() { try { localStorage.removeItem('apt_bld'); } catch (e) {} location.href = 'index.html'; }
+// เปลี่ยนตึก: ลืมตึกปัจจุบัน + ออกจากระบบของตึกนี้ในเครื่อง → ต้องกรอกรหัสตึก (และรหัสผ่าน) ใหม่ทุกครั้ง
+function changeBuilding() {
+  try { if (BLD) ['owner_pw', 'owner_cache', 'tenant_auth', 'tenant_cache'].forEach(k => localStorage.removeItem(BKEY(k))); localStorage.removeItem('apt_bld'); } catch (e) {}
+  location.href = 'index.html';
+}
 // ยังไม่ได้เลือกตึก → ไปหน้าแรกเพื่อใส่รหัสตึก
 if (NEED_BLD && !/\/(index\.html)?$/.test(location.pathname)) location.replace('index.html?next=' + encodeURIComponent(location.pathname.split('/').pop() + location.search + location.hash));
 let _demoReady = null;
@@ -34,7 +46,7 @@ function loadScript(src) {
   });
 }
 function demoReady() {
-  if (!_demoReady) _demoReady = loadScript('demo.js?v=2.4').then(() => loadScript('backend.js?v=2.4')).then(() => window.DemoGAS.init());
+  if (!_demoReady) _demoReady = loadScript('demo.js?v=2.6').then(() => loadScript('backend.js?v=2.6')).then(() => window.DemoGAS.init());
   return _demoReady;
 }
 async function callApi(action, payload) {
