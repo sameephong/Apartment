@@ -6,10 +6,10 @@
 <title>เจ้าของหอ · ระบบบริหารอพาร์ทเม้นท์</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=2.3">
+<link rel="stylesheet" href="app.css?v=2.4">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="config.js?v=2.3"></script>
-<script src="common.js?v=2.3"></script>
+<script>document.write('<script src="config.js?t=' + Date.now() + '"><\/script>')</script>
+<script src="common.js?v=2.4"></script>
 </head>
 <body>
 <div class="wrap">
@@ -101,7 +101,7 @@ $('#pw').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); })
 (async () => {
   await new Promise(r => setTimeout(r)); // รอให้สคริปต์ทั้งหน้าโหลดเสร็จก่อน
   if (IS_DEMO) $('#demoHint').innerHTML = 'โหมดทดลอง: รหัสผ่าน <b>1234</b>';
-  if (BLD_MULTI && BLD) $('#bldLine').innerHTML = `🏢 <b>${esc(BLD.name || BLD.code)}</b> (รหัส ${esc(BLD.code)}) · <a href="#" onclick="changeBuilding();return false">เปลี่ยนตึก</a>`;
+  if (BLD_MANY && BLD) $('#bldLine').innerHTML = `🏢 <b>${esc(BLD.name || BLD.code)}</b> (รหัส ${esc(BLD.code)}) · <a href="#" onclick="changeBuilding();return false">เปลี่ยนตึก</a>`;
   const saved = load('owner_pw');
   if (!saved) { if (!IS_DEMO) callApi('publicInfo').catch(() => {}); return; } // ปลุกเซิร์ฟเวอร์ไว้ระหว่างพิมพ์รหัส
   PW = saved;
@@ -601,7 +601,7 @@ VIEWS.more = () => ({
       <div class="item tap" onclick="navigator.clipboard&&navigator.clipboard.writeText(tenantUrl()).then(()=>toast('คัดลอกลิงก์แล้ว'))"><span style="font-size:20px">🔗</span><span style="flex:1">คัดลอกลิงก์แอปผู้เช่า<div class="muted small" style="word-break:break-all">${esc(tenantUrl())}</div></span></div>
       <a class="item tap" href="tenant.html" style="text-decoration:none;color:inherit"><span style="font-size:20px">🏠</span><span style="flex:1">เปิดหน้าผู้เช่า</span><span class="muted">›</span></a></div>
     ${IS_DEMO ? `<button class="btn blk" style="margin-bottom:10px" onclick="resetDemo()">↺ ล้างข้อมูลทดลอง เริ่มใหม่</button>` : ''}
-    ${BLD_MULTI ? `<button class="btn blk" style="margin-bottom:10px" onclick="changeBuilding()">🏢 เปลี่ยนตึก (ตอนนี้: ${esc(BLD.code)})</button>` : ''}
+    ${BLD_MANY ? `<button class="btn blk" style="margin-bottom:10px" onclick="changeBuilding()">🏢 เปลี่ยนตึก (ตอนนี้: ${esc(BLD.code)})</button>` : ''}
     <button class="btn bad blk" onclick="logout()">ออกจากระบบ</button>`,
 });
 async function resetDemo() { if (!await uiConfirm('ล้างข้อมูลทดลองทั้งหมดแล้วสร้างข้อมูลตัวอย่างใหม่?')) return; window.DemoGAS.reset(); store('owner_pw'); location.href = 'admin.html'; }

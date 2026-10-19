@@ -6,9 +6,9 @@
 <title>ระบบบริหารอพาร์ทเม้นท์</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=2.3">
-<script src="config.js?v=2.3"></script>
-<script src="common.js?v=2.3"></script>
+<link rel="stylesheet" href="app.css?v=2.4">
+<script>document.write('<script src="config.js?t=' + Date.now() + '"><\/script>')</script>
+<script src="common.js?v=2.4"></script>
 <style>
 .choice{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid var(--line);border-radius:18px;padding:18px;margin-bottom:12px;text-decoration:none;color:inherit}
 .choice:hover{border-color:#9aa3ad}
@@ -50,7 +50,7 @@ if (NEED_BLD) {
   $id('bCode').addEventListener('keydown', e => { if (e.key === 'Enter') pickB(); });
   document.querySelector('.muted').textContent = 'เลือกตึกของคุณ';
 } else {
-  if (BLD_MULTI) $id('bldLine').innerHTML = `ตึกรหัส <b>${esc(BLD.code)}</b> · <a href="#" onclick="changeBuilding();return false">เปลี่ยนตึก</a>`;
+  if (BLD_MANY) $id('bldLine').innerHTML = `ตึกรหัส <b>${esc(BLD.code)}</b> · <a href="#" onclick="changeBuilding();return false">เปลี่ยนตึก</a>`;
 callApi('publicInfo').then(i => { document.getElementById('n').textContent = i.apartmentName; document.title = i.apartmentName; }).catch(() => {});
 }
 </script>

@@ -14,6 +14,7 @@ const BLD = (function () {
   if (b) { try { localStorage.setItem('apt_bld', b.code); } catch (e) {} }
   return b;
 })();
+const BLD_MANY = BLD_MULTI && Object.keys(BLD_LIST).length > 1; // มีมากกว่า 1 ตึก → แสดงปุ่มเปลี่ยนตึก
 const NEED_BLD = BLD_MULTI && !BLD;
 const API = BLD ? (BLD.url || '') : (typeof API_URL !== 'undefined' ? API_URL : '');
 const IS_DEMO = !NEED_BLD && (!API || /^PASTE/i.test(API));
@@ -33,7 +34,7 @@ function loadScript(src) {
   });
 }
 function demoReady() {
-  if (!_demoReady) _demoReady = loadScript('demo.js?v=2.3').then(() => loadScript('backend.js?v=2.3')).then(() => window.DemoGAS.init());
+  if (!_demoReady) _demoReady = loadScript('demo.js?v=2.4').then(() => loadScript('backend.js?v=2.4')).then(() => window.DemoGAS.init());
   return _demoReady;
 }
 async function callApi(action, payload) {
