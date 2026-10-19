@@ -2,7 +2,7 @@
  * ใช้โค้ด backend.js ตัวจริงทั้งหมด ข้อมูลเก็บใน localStorage ของเครื่องนี้
  * ไม่ต้องอัปโหลดไฟล์นี้ถ้าใช้งานจริง (ใส่ API_URL แล้วไฟล์นี้จะไม่ถูกโหลด) */
 (function () {
-  const KEY = 'apt_demo_v2', FKEY = 'apt_demo_files_v2';
+  const SUF = window.BLD_CODE ? ':' + window.BLD_CODE : '', KEY = 'apt_demo_v2' + SUF, FKEY = 'apt_demo_files_v2' + SUF; // แยกข้อมูลทดลองตามตึก
   let DB = {}, FILES = {};
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(DB)); } catch (e) {} };
   const saveFiles = () => { try { localStorage.setItem(FKEY, JSON.stringify(FILES)); } catch (e) {} };

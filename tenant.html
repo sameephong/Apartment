@@ -6,10 +6,10 @@
 <title>ผู้เช่า · อพาร์ทเม้นท์</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=2.2">
+<link rel="stylesheet" href="app.css?v=2.3">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="config.js?v=2.2"></script>
-<script src="common.js?v=2.2"></script>
+<script src="config.js?v=2.3"></script>
+<script src="common.js?v=2.3"></script>
 <style>
 .pin{letter-spacing:10px;font-size:26px;text-align:center;font-weight:700}
 .hero{border:0;color:#fff}
@@ -40,7 +40,7 @@
         <p class="muted small" style="text-align:center" id="forgot"></p>
       </div>
     </div>
-    <p class="muted small" style="text-align:center"><a href="admin.html">สำหรับเจ้าของหอ</a></p>
+    <p class="muted small" style="text-align:center"><a href="admin.html">สำหรับเจ้าของหอ</a><span id="bldLine"></span></p>
   </div>
   <div id="app" class="hide">
     <div id="demo"></div>
@@ -94,6 +94,7 @@ function badge(b) {
       }
     } catch (e) { store('tenant_auth'); store('tenant_cache'); AUTH = null; }
   }
+  if (BLD_MULTI && BLD) $('#bldLine').innerHTML = ` · ตึกรหัส ${esc(BLD.code)} · <a href="#" onclick="changeBuilding();return false">เปลี่ยนตึก</a>`;
   if (IS_DEMO) $('#demoHint').innerHTML = 'โหมดทดลอง: ห้อง <b>101</b> รหัส <b>111111</b> หรือห้อง <b>102</b> รหัส <b>222222</b>';
   if (qRoom) { $('#lRoom').value = qRoom; $('#lPin').focus(); }
   await loadRooms();

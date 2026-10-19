@@ -1,5 +1,28 @@
 // ===== ฟังก์ชันกลางที่ทุกหน้าใช้ร่วมกัน (ไม่ต้องแก้) =====
-const IS_DEMO = !API_URL || /^PASTE/i.test(API_URL);
+/* ---------- หลายตึก: เลือกตึกจากรหัสตึก (?b=CODE หรือที่จำไว้ในเครื่อง) ---------- */
+const BLD_LIST = (typeof BUILDINGS !== 'undefined' && BUILDINGS) ? BUILDINGS : null;
+const BLD_MULTI = !!(BLD_LIST && Object.keys(BLD_LIST).length);
+const BLD = (function () {
+  if (!BLD_MULTI) return null;
+  const find = c => { c = String(c || '').trim().toUpperCase(); return c && BLD_LIST[c] ? Object.assign({ code: c }, BLD_LIST[c]) : null; };
+  let raw = null; try { raw = localStorage.getItem('apt_bld'); } catch (e) {}
+  const q = new URLSearchParams(location.search).get('b');
+  let b = find(q) || find(raw);
+  if (!b && Object.keys(BLD_LIST).length === 1) b = find(Object.keys(BLD_LIST)[0]);
+  // ลิงก์เก่าที่ไม่มีรหัสตึก (บิล/หน้าผู้เช่า) ใช้ตึกหลักได้
+  if (!b && typeof DEFAULT_BUILDING !== 'undefined' && /\/(bill|tenant)\.html$/.test(location.pathname)) b = find(DEFAULT_BUILDING);
+  if (b) { try { localStorage.setItem('apt_bld', b.code); } catch (e) {} }
+  return b;
+})();
+const NEED_BLD = BLD_MULTI && !BLD;
+const API = BLD ? (BLD.url || '') : (typeof API_URL !== 'undefined' ? API_URL : '');
+const IS_DEMO = !NEED_BLD && (!API || /^PASTE/i.test(API));
+window.BLD_CODE = BLD ? BLD.code : '';
+const BKEY = k => BLD ? BLD.code + ':' + k : k; // แยกข้อมูลที่จำในเครื่องตามตึก
+function withB(url) { return BLD && BLD_MULTI ? url + (url.includes('?') ? '&' : '?') + 'b=' + encodeURIComponent(BLD.code) : url; }
+function changeBuilding() { try { localStorage.removeItem('apt_bld'); } catch (e) {} location.href = 'index.html'; }
+// ยังไม่ได้เลือกตึก → ไปหน้าแรกเพื่อใส่รหัสตึก
+if (NEED_BLD && !/\/(index\.html)?$/.test(location.pathname)) location.replace('index.html?next=' + encodeURIComponent(location.pathname.split('/').pop() + location.search + location.hash));
 let _demoReady = null;
 
 function loadScript(src) {
@@ -10,7 +33,7 @@ function loadScript(src) {
   });
 }
 function demoReady() {
-  if (!_demoReady) _demoReady = loadScript('demo.js?v=2.2').then(() => loadScript('backend.js?v=2.2')).then(() => window.DemoGAS.init());
+  if (!_demoReady) _demoReady = loadScript('demo.js?v=2.3').then(() => loadScript('backend.js?v=2.3')).then(() => window.DemoGAS.init());
   return _demoReady;
 }
 async function callApi(action, payload) {
@@ -41,13 +64,13 @@ async function remoteCall(body, action, payload) {
   };
   const opts = { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body, credentials: 'omit', redirect: 'follow', cache: 'no-store' };
   try {
-    return await parse(await fetch(API_URL, opts));
+    return await parse(await fetch(API, opts));
   } catch (e1) {
     // ลองแบบ GET สำหรับคำสั่งขนาดเล็ก (เช่น เข้าสู่ระบบ) — บางเบราว์เซอร์มือถือมีปัญหากับ POST ข้ามโดเมน
     if (['login', 'getAll', 'publicInfo', 'tenantData', 'getBill'].includes(action)) {
       try {
         const qs = new URLSearchParams(Object.assign({ action }, Object.fromEntries(Object.entries(payload || {}).map(([k, v]) => [k, typeof v === 'object' ? JSON.stringify(v) : String(v)])))).toString();
-        return await parse(await fetch(API_URL + (API_URL.includes('?') ? '&' : '?') + qs, { credentials: 'omit', redirect: 'follow', cache: 'no-store' }));
+        return await parse(await fetch(API + (API.includes('?') ? '&' : '?') + qs, { credentials: 'omit', redirect: 'follow', cache: 'no-store' }));
       } catch (e2) { if (/Deploy|ตอบกลับ/.test(e2.message)) throw e2; }
     }
     if (/Deploy|ตอบกลับ/.test(e1.message)) throw e1;
@@ -62,12 +85,12 @@ function syncBadge(on) {
   el.style.display = on ? 'block' : 'none';
 }
 let _saveT = null;
-function cacheData(key, data) { clearTimeout(_saveT); _saveT = setTimeout(() => { try { localStorage.setItem(key, JSON.stringify(data)); } catch (e) {} }, 300); }
-function loadData(key) { try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch (e) { return null; } }
+function cacheData(key, data) { clearTimeout(_saveT); _saveT = setTimeout(() => { try { localStorage.setItem(BKEY(key), JSON.stringify(data)); } catch (e) {} }, 300); }
+function loadData(key) { try { return JSON.parse(localStorage.getItem(BKEY(key)) || 'null'); } catch (e) { return null; } }
 
 /* ---------- ที่เก็บในเครื่อง (ปลอดภัยเมื่อเบราว์เซอร์ไม่อนุญาต) ---------- */
-function store(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) {} }
-function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function store(k, v) { try { v == null ? localStorage.removeItem(BKEY(k)) : localStorage.setItem(BKEY(k), v); } catch (e) {} }
+function load(k) { try { return localStorage.getItem(BKEY(k)); } catch (e) { return null; } }
 
 /* ---------- รูปแบบข้อความ ---------- */
 const TH_MONTHS = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
@@ -84,7 +107,7 @@ function daysBetween(a, b) { return Math.round((new Date(b.slice(0, 10) + 'T00:0
 function addDaysStr(d, n) { const x = new Date(d + 'T00:00:00'); x.setDate(x.getDate() + n); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); }
 function addMonthStr(m, n) { const [y, mm] = m.split('-').map(Number); const d = new Date(y, mm - 1 + n, 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
 function billTitle(b) { return b.kind === 'รายเดือน' ? 'บิลเดือน ' + fmtMonth(b.month) : b.kind === 'แรกเข้า' ? 'บิลแรกเข้าอยู่' : b.kind === 'ย้ายออก' ? 'บิลย้ายออก' : (b.items && b.items[0] ? b.items[0].l : 'บิลพิเศษ'); }
-function billUrl(b) { return new URL('bill.html?t=' + b.token, location.href).href; }
+function billUrl(b) { return new URL(withB('bill.html?t=' + b.token), location.href).href; }
 
 /* ---------- รูปภาพ: ย่อก่อนส่ง ---------- */
 function resizeImage(file, max, quality) {

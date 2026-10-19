@@ -7,8 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="config.js?v=2.2"></script>
-<script src="common.js?v=2.2"></script>
+<script src="config.js?v=2.3"></script>
+<script src="common.js?v=2.3"></script>
 <style>
 body{margin:0;background:#eef0f3;font-family:'Sarabun',system-ui,sans-serif;color:#1f2933}
 .paper{max-width:520px;margin:16px auto;background:#fff;border-radius:14px;padding:24px 22px;position:relative;box-shadow:0 1px 3px rgba(0,0,0,.08)}
@@ -57,7 +57,7 @@ if (IS_DEMO) document.getElementById('btns').innerHTML = '<span style="color:#6b
         <tr class="total"><td>รวมทั้งสิ้น</td><td class="r">${money(b.total)} บาท</td></tr></table>
       ${paid ? `${b.received ? `<p class="muted">รับเงิน ${money(b.received)} บาท · ทอน ${money(b.received - b.total)} บาท</p>` : ''}${b.note ? `<p class="muted">${esc(b.note)}</p>` : ''}<p class="muted" style="margin-top:24px;text-align:right">ผู้รับเงิน ............................................<br>${esc(i.apartmentName)}</p>`
         : `${i.promptpay || i.bankInfo ? `<div class="pay">${i.promptpay ? `<b>สแกนจ่ายด้วยพร้อมเพย์</b><br><div id="qr"></div><div class="muted">พร้อมเพย์ ${esc(i.promptpay)} · ${money(b.total)} บาท</div>` : ''}
-          ${i.bankInfo ? `<p style="margin:8px 0 0">${esc(i.bankInfo)}</p>` : ''}<p class="muted" style="margin:8px 0 0">โอนแล้วส่งสลิปในแอปผู้เช่า · <a href="tenant.html?room=${encodeURIComponent(b.room)}">เปิดแอปผู้เช่า</a></p></div>` : ''}
+          ${i.bankInfo ? `<p style="margin:8px 0 0">${esc(i.bankInfo)}</p>` : ''}<p class="muted" style="margin:8px 0 0">โอนแล้วส่งสลิปในแอปผู้เช่า · <a href="${withB('tenant.html?room=' + encodeURIComponent(b.room))}">เปิดแอปผู้เช่า</a></p></div>` : ''}
           ${i.cashInfo ? `<p class="muted">เงินสด: ${esc(i.cashInfo)}</p>` : ''}`}`;
     if (!paid && i.promptpay) drawQR(document.getElementById('qr'), promptPayPayload(i.promptpay, +b.total), 200);
   } catch (e) { p.innerHTML = '<p>' + esc(e.message) + '</p>'; }

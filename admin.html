@@ -6,17 +6,17 @@
 <title>เจ้าของหอ · ระบบบริหารอพาร์ทเม้นท์</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=2.2">
+<link rel="stylesheet" href="app.css?v=2.3">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="config.js?v=2.2"></script>
-<script src="common.js?v=2.2"></script>
+<script src="config.js?v=2.3"></script>
+<script src="common.js?v=2.3"></script>
 </head>
 <body>
 <div class="wrap">
   <div id="login" class="bd" style="padding-top:12vh">
     <div class="card">
       <div style="text-align:center;font-size:40px">🔑</div>
-      <h4 style="text-align:center;font-size:20px">เข้าสู่ระบบเจ้าของหอ</h4>
+      <h4 style="text-align:center;font-size:20px">เข้าสู่ระบบเจ้าของหอ</h4><p class="muted small" style="text-align:center" id="bldLine"></p>
       <label class="f">รหัสผ่าน<input id="pw" type="password" autocomplete="current-password"></label>
       <button class="btn pri blk lg" id="loginBtn" onclick="doLogin()">เข้าสู่ระบบ</button>
       <p class="muted" id="loginErr" style="color:var(--bad)"></p>
@@ -60,7 +60,7 @@ async function act(action, payload, msg) {
 function go(h) { if (location.hash === '#' + h) render(); else location.hash = h; }
 window.addEventListener('hashchange', () => { closeSheet(); render(); window.scrollTo(0, 0); });
 function openLine(text) { const a = document.createElement('a'); a.href = 'https://line.me/R/share?text=' + encodeURIComponent(text); a.target = '_blank'; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove(); }
-function tenantUrl(room) { return new URL('tenant.html' + (room ? '?room=' + encodeURIComponent(room) : ''), location.href).href; }
+function tenantUrl(room) { return new URL(withB('tenant.html' + (room ? '?room=' + encodeURIComponent(room) : '')), location.href).href; }
 
 /* ================= ข้อมูล ================= */
 const active = () => D.tenants.filter(t => t.status === 'อยู่');
@@ -101,6 +101,7 @@ $('#pw').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); })
 (async () => {
   await new Promise(r => setTimeout(r)); // รอให้สคริปต์ทั้งหน้าโหลดเสร็จก่อน
   if (IS_DEMO) $('#demoHint').innerHTML = 'โหมดทดลอง: รหัสผ่าน <b>1234</b>';
+  if (BLD_MULTI && BLD) $('#bldLine').innerHTML = `🏢 <b>${esc(BLD.name || BLD.code)}</b> (รหัส ${esc(BLD.code)}) · <a href="#" onclick="changeBuilding();return false">เปลี่ยนตึก</a>`;
   const saved = load('owner_pw');
   if (!saved) { if (!IS_DEMO) callApi('publicInfo').catch(() => {}); return; } // ปลุกเซิร์ฟเวอร์ไว้ระหว่างพิมพ์รหัส
   PW = saved;
@@ -600,6 +601,7 @@ VIEWS.more = () => ({
       <div class="item tap" onclick="navigator.clipboard&&navigator.clipboard.writeText(tenantUrl()).then(()=>toast('คัดลอกลิงก์แล้ว'))"><span style="font-size:20px">🔗</span><span style="flex:1">คัดลอกลิงก์แอปผู้เช่า<div class="muted small" style="word-break:break-all">${esc(tenantUrl())}</div></span></div>
       <a class="item tap" href="tenant.html" style="text-decoration:none;color:inherit"><span style="font-size:20px">🏠</span><span style="flex:1">เปิดหน้าผู้เช่า</span><span class="muted">›</span></a></div>
     ${IS_DEMO ? `<button class="btn blk" style="margin-bottom:10px" onclick="resetDemo()">↺ ล้างข้อมูลทดลอง เริ่มใหม่</button>` : ''}
+    ${BLD_MULTI ? `<button class="btn blk" style="margin-bottom:10px" onclick="changeBuilding()">🏢 เปลี่ยนตึก (ตอนนี้: ${esc(BLD.code)})</button>` : ''}
     <button class="btn bad blk" onclick="logout()">ออกจากระบบ</button>`,
 });
 async function resetDemo() { if (!await uiConfirm('ล้างข้อมูลทดลองทั้งหมดแล้วสร้างข้อมูลตัวอย่างใหม่?')) return; window.DemoGAS.reset(); store('owner_pw'); location.href = 'admin.html'; }
