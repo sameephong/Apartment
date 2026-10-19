@@ -1,3 +1,59 @@
-<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>MS apartment</title>
-<script>location.replace('../index.html?b=MS')</script></head>
-<body style="font-family:sans-serif;text-align:center;padding-top:30vh">กำลังเข้าสู่ MS apartment… <a href="../index.html?b=MS">กดที่นี่ถ้าไม่ไปต่อ</a></body></html>
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ระบบบริหารอพาร์ทเม้นท์</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="app.css?v=2.5">
+<script>document.write('<script src="config.js?t=' + Date.now() + '"><\/script>')</script>
+<script src="common.js?v=2.5"></script>
+<style>
+.choice{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid var(--line);border-radius:18px;padding:18px;margin-bottom:12px;text-decoration:none;color:inherit}
+.choice:hover{border-color:#9aa3ad}
+.choice .ic{width:56px;height:56px;font-size:28px;border-radius:16px}
+.choice b{display:block;font-size:19px}
+</style>
+</head>
+<body>
+<div class="wrap" style="display:flex;flex-direction:column">
+  <div id="demo"></div>
+  <div class="bd" style="flex:1;display:flex;flex-direction:column;justify-content:center;padding-bottom:40px">
+    <div style="text-align:center;margin-bottom:22px"><div style="font-size:44px">🏢</div><b style="font-size:24px" id="n">ระบบบริหารอพาร์ทเม้นท์</b><div class="muted">เลือกการเข้าใช้งาน</div></div>
+    <div id="pick" class="card hide"><b style="font-size:18px">ใส่รหัสตึก</b><div class="muted small">ได้รับจากเจ้าของหอ หรือดูในลิงก์ที่ได้รับ</div>
+      <label class="f" style="margin-top:10px"><input id="bCode" autocomplete="off" autocapitalize="characters" placeholder="เช่น CHARAT" style="font-size:20px;text-align:center;font-weight:700;text-transform:uppercase"></label>
+      <button class="btn pri blk lg" onclick="pickB()">ตกลง</button><p class="muted" id="bErr" style="color:var(--bad);text-align:center"></p></div>
+    <div id="choices">
+    <a class="choice" href="tenant.html"><i class="ic" style="background:var(--t-soft)">🏠</i><div><b>ผู้เช่า</b><span class="muted">ดูบิล สแกนจ่าย ส่งสลิป แจ้งซ่อม</span></div></a>
+    <a class="choice" href="admin.html"><i class="ic" style="background:var(--o-soft)">🔑</i><div><b>เจ้าของหอ</b><span class="muted">ห้อง มิเตอร์ ออกบิล รับเงิน งานซ่อม</span></div></a>
+    </div>
+    <p class="muted small" style="text-align:center" id="bldLine"></p>
+    <div id="hint"></div>
+  </div>
+</div>
+<script>
+document.getElementById('demo').innerHTML = demoBanner();
+if (IS_DEMO) document.getElementById('hint').innerHTML = `<div class="card" style="background:#fffbea;border-color:#f1e3a0"><b>ลองใช้งานได้เลย</b><div class="muted small" style="margin-top:4px">
+  เจ้าของหอ: รหัสผ่าน <b>1234</b><br>ผู้เช่า: ห้อง <b>101</b> รหัส <b>111111</b> · ห้อง <b>102</b> รหัส <b>222222</b><br>
+  มีข้อมูลตัวอย่าง 24 ห้อง บิล 3 เดือน สลิปรออนุมัติ และงานซ่อม · ข้อมูลอยู่ในเบราว์เซอร์นี้เท่านั้น</div></div>`;
+function pickB() {
+  const c = $id('bCode').value.trim().toUpperCase();
+  if (!BLD_LIST[c]) { $id('bErr').textContent = 'ไม่พบรหัสตึกนี้ ตรวจสอบอีกครั้ง'; return; }
+  try { localStorage.setItem('apt_bld', c); } catch (e) {}
+  const next = new URLSearchParams(location.search).get('next');
+  location.href = next && /^(admin|tenant|bill)\.html/.test(next) ? next : 'index.html';
+}
+function $id(i) { return document.getElementById(i); }
+if (NEED_BLD) {
+  $id('pick').classList.remove('hide'); $id('choices').classList.add('hide');
+  $id('bCode').addEventListener('keydown', e => { if (e.key === 'Enter') pickB(); });
+  $id('bCode').value = ''; setTimeout(() => { $id('bCode').value = ''; $id('bCode').focus(); }, 50); // ไม่เติมรหัสเดิมให้
+  document.querySelector('.muted').textContent = 'เลือกตึกของคุณ';
+} else {
+  if (BLD_MANY) $id('bldLine').innerHTML = `ตึกรหัส <b>${esc(BLD.code)}</b> · <a href="#" onclick="changeBuilding();return false">เปลี่ยนตึก</a>`;
+callApi('publicInfo').then(i => { document.getElementById('n').textContent = i.apartmentName; document.title = i.apartmentName; }).catch(() => {});
+}
+</script>
+</body>
+</html>
