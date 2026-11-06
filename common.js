@@ -30,6 +30,20 @@ window.BLD_CODE = BLD ? BLD.code : '';
 const BKEY = k => BLD ? BLD.code + ':' + k : k; // แยกข้อมูลที่จำในเครื่องตามตึก
 function withB(url) { return BLD && BLD_MULTI ? url + (url.includes('?') ? '&' : '?') + 'b=' + encodeURIComponent(BLD.code) : url; }
 // เปลี่ยนตึก: ลืมตึกปัจจุบัน + ออกจากระบบของตึกนี้ในเครื่อง → ต้องกรอกรหัสตึก (และรหัสผ่าน) ใหม่ทุกครั้ง
+/* ชื่อตึก + สถานะระบบผู้เช่า ที่จำไว้ (ไม่ใช่ข้อมูลลับ) — แสดงในรายการเลือกตึกได้ทันที */
+function bInfo(code, info) {
+  const k = 'apt_binfo:' + (code || '-');
+  if (info) { try { localStorage.setItem(k, JSON.stringify({ name: info.buildingName || info.apartmentName || '', app: !(info.flags && info.flags.app === false) })); } catch (e) {} return; }
+  try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; }
+}
+function bLabel(code) { const c = bInfo(code); return (c && c.name) || (BLD_LIST && BLD_LIST[code] && BLD_LIST[code].name) || code; }
+async function fetchBInfo(code) {
+  const b = BLD_LIST && BLD_LIST[code]; if (!b || !b.url) return null;
+  const c = new AbortController(), t = setTimeout(() => c.abort(), 15000);
+  try { const r = await fetch(b.url + (b.url.includes('?') ? '&' : '?') + 'action=publicInfo', { credentials: 'omit', redirect: 'follow', signal: c.signal }); const j = JSON.parse(await r.text()); if (j.ok) { bInfo(code, j); return j; } }
+  catch (e) {} finally { clearTimeout(t); }
+  return null;
+}
 function changeBuilding() {
   try { if (BLD) ['owner_pw', 'owner_cache', 'tenant_auth', 'tenant_cache'].forEach(k => localStorage.removeItem(BKEY(k))); localStorage.removeItem('apt_bld'); } catch (e) {}
   location.href = 'index.html';
@@ -46,7 +60,7 @@ function loadScript(src) {
   });
 }
 function demoReady() {
-  if (!_demoReady) _demoReady = loadScript('demo.js?v=3.0').then(() => loadScript('backend.js?v=3.0')).then(() => window.DemoGAS.init());
+  if (!_demoReady) _demoReady = loadScript('demo.js?v=3.2').then(() => loadScript('backend.js?v=3.2')).then(() => window.DemoGAS.init());
   return _demoReady;
 }
 async function callApi(action, payload) {
@@ -75,15 +89,19 @@ async function remoteCall(body, action, payload) {
       throw new Error('เซิร์ฟเวอร์ตอบกลับผิดรูปแบบ (' + res.status + ') ลองใหม่อีกครั้ง');
     }
   };
+  // ตั้งเวลาหมด: เซิร์ฟเวอร์ค้าง จะไม่หมุนรอตลอดไป
+  const timed = (url, o, ms) => { const c = new AbortController(), t = setTimeout(() => c.abort(), ms); return fetch(url, Object.assign({ signal: c.signal }, o)).finally(() => clearTimeout(t)); };
   const opts = { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body, credentials: 'omit', redirect: 'follow', cache: 'no-store' };
   try {
-    return await parse(await fetch(API, opts));
+    return await parse(await timed(API, opts, 45000));
   } catch (e1) {
+    if (e1.name === 'AbortError') throw new Error(['login', 'getAll', 'publicInfo', 'tenantData', 'getBill', 'previewBills', 'fileImage', 'tenantFile'].includes(action)
+      ? 'เซิร์ฟเวอร์ตอบช้าเกินไป ลองใหม่อีกครั้ง' : 'เซิร์ฟเวอร์ตอบช้าเกินไป · กดรีเฟรชเพื่อตรวจว่าบันทึกแล้วหรือยัง ก่อนกดซ้ำ');
     // ลองแบบ GET สำหรับคำสั่งขนาดเล็ก (เช่น เข้าสู่ระบบ) — บางเบราว์เซอร์มือถือมีปัญหากับ POST ข้ามโดเมน
     if (['login', 'getAll', 'publicInfo', 'tenantData', 'getBill'].includes(action)) {
       try {
         const qs = new URLSearchParams(Object.assign({ action }, Object.fromEntries(Object.entries(payload || {}).map(([k, v]) => [k, typeof v === 'object' ? JSON.stringify(v) : String(v)])))).toString();
-        return await parse(await fetch(API + (API.includes('?') ? '&' : '?') + qs, { credentials: 'omit', redirect: 'follow', cache: 'no-store' }));
+        return await parse(await timed(API + (API.includes('?') ? '&' : '?') + qs, { credentials: 'omit', redirect: 'follow', cache: 'no-store' }, 30000));
       } catch (e2) { if (/Deploy|ตอบกลับ/.test(e2.message)) throw e2; }
     }
     if (/Deploy|ตอบกลับ/.test(e1.message)) throw e1;
@@ -160,7 +178,11 @@ function crc16(s) {
 function drawQR(el, text, size) {
   if (!el) return;
   el.innerHTML = '';
-  if (!window.QRCode) { el.textContent = 'โหลด QR ไม่ได้'; return; }
+  if (!window.QRCode) { // สคริปต์ QR โหลดแบบไม่บล็อกหน้า — รอสักครู่
+    const n = (+el.dataset.qrTry || 0) + 1; el.dataset.qrTry = n;
+    if (n < 40) { el.textContent = 'กำลังสร้าง QR…'; setTimeout(() => drawQR(el, text, size), 150); } else el.textContent = 'โหลด QR ไม่ได้';
+    return;
+  }
   new QRCode(el, { text, width: size, height: size, correctLevel: QRCode.CorrectLevel.M });
 }
 

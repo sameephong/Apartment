@@ -11,7 +11,8 @@ const SCHEMA = {
   Settings: ['key', 'value', 'description'],
   Rooms:    ['room', 'floor', 'type', 'rent', 'status', 'note'],
   Tenants:  ['id', 'room', 'name', 'phone', 'lineId', 'startDate', 'endDate', 'deposit',
-             'status', 'moveOutDate', 'pin', 'note', 'createdAt'],
+             'status', 'moveOutDate', 'pin', 'note', 'createdAt',
+             'advanceRent', 'keyDeposit', 'cardFee', 'contractMonths', 'refundAmount', 'refundStatus', 'refundDate'],
   Meters:   ['month', 'room', 'waterPrev', 'waterCur', 'elecPrev', 'elecCur', 'updatedAt'],
   Bills:    ['id', 'no', 'token', 'kind', 'month', 'room', 'tenantId', 'tenantName', 'items',
              'waterUnits', 'elecUnits', 'total', 'dueDate', 'status', 'createdAt',
@@ -20,18 +21,18 @@ const SCHEMA = {
   Slips:    ['id', 'billId', 'room', 'at', 'fileId', 'hash', 'result'],
   Repairs:  ['id', 'createdAt', 'room', 'tenantId', 'name', 'phone', 'category', 'detail', 'photoId',
              'allowEntry', 'status', 'ownerMsg', 'cost', 'billId', 'updatedAt', 'log',
-             'source', 'urgent', 'appointAt'],
+             'source', 'urgent', 'appointAt', 'outcome'],
   News:     ['id', 'createdAt', 'title', 'body'],
 };
 
 const NUM_KEYS = new Set(['floor', 'rent', 'deposit', 'waterPrev', 'waterCur', 'elecPrev', 'elecCur',
-  'waterUnits', 'elecUnits', 'total', 'paidAmount', 'received', 'cost']);
+  'waterUnits', 'elecUnits', 'total', 'paidAmount', 'received', 'cost', 'advanceRent', 'keyDeposit', 'cardFee', 'refundAmount']);
 
 const ST = {
   OCC: 'มีผู้เช่า', VAC: 'ว่าง', RES: 'จอง', FIX: 'ซ่อม',
   ACTIVE: 'อยู่', LEFT: 'ย้ายออก',
   DUE: 'รอชำระ', REVIEW: 'รออนุมัติ', PAID: 'ชำระแล้ว',
-  R_NEW: 'รอดำเนินการ', R_DOING: 'กำลังซ่อม', R_DONE: 'เสร็จแล้ว',
+  R_NEW: 'รอดำเนินการ', R_DOING: 'กำลังซ่อม', R_DONE: 'เสร็จแล้ว', R_BROKEN: 'ซ่อมไม่ได้',
 };
 const KIND = { MONTH: 'รายเดือน', SPECIAL: 'พิเศษ', FIRST: 'แรกเข้า', OUT: 'ย้ายออก' };
 const PAY = { TRANSFER: 'โอน/พร้อมเพย์', CASH: 'เงินสด', DEPOSIT: 'หักเงินมัดจำ' };
@@ -49,7 +50,10 @@ const DEFAULT_SETTINGS = [
   ['elecMin', '0', 'ค่าไฟขั้นต่ำ/เดือน'],
   ['commonFee', '0', 'ค่าส่วนกลาง/เน็ต ต่อเดือน'],
   ['dueDay', '5', 'ครบกำหนดชำระ วันที่ ... ของเดือนถัดไป'],
-  ['depositMonths', '2', 'เงินมัดจำ (จำนวนเดือนของค่าเช่า)'],
+  ['depositMonths', '1', 'เงินประกัน (จำนวนเดือนของค่าเช่า)'],
+  ['advanceMonths', '1', 'ค่าเช่าล่วงหน้าตอนเข้า (จำนวนเดือน · ใช้แทนค่าเช่าเดือนแรก)'],
+  ['keyDeposit', '100', 'มัดจำกุญแจ (คืนเมื่อคืนกุญแจตอนย้ายออก)'],
+  ['cardFee', '100', 'ค่าคีย์การ์ด (ไม่คืน)'],
   ['contractMonths', '12', 'ระยะสัญญาเริ่มต้น (เดือน)'],
   ['promptpay', '', 'เบอร์/เลขบัตร PromptPay (สร้าง QR บนบิล)'],
   ['bankInfo', '', 'บัญชีธนาคาร (แสดงบนบิล)'],
@@ -59,6 +63,7 @@ const DEFAULT_SETTINGS = [
   ['invSeq', '0', '(ระบบ) เลขที่ใบแจ้งหนี้ล่าสุด'],
   ['rcSeq', '0', '(ระบบ) เลขที่ใบเสร็จล่าสุด'],
   ['fileFolderId', '', '(ระบบ) โฟลเดอร์ Google Drive ที่เก็บรูปสลิป/รูปแจ้งซ่อม'],
+  ['buildingName', '', 'ชื่อตึกที่แสดงในรายการเลือกตึกตอนเข้าระบบ (ไทย/อังกฤษได้ · เว้นว่าง = ใช้ชื่ออพาร์ทเม้นท์)'],
   ['tenantMode', 'shared', 'การใช้งานร่วมกับผู้เช่า: shared = ใช้ร่วมกับผู้เช่า · owner = เจ้าของจัดการเอง'],
   ['tenantApp', '1', 'ผู้เช่าเข้าแอปดูบิลและประวัติ (1 = เปิด, 0 = ปิด)'],
   ['tenantSlip', '1', 'ผู้เช่าส่งสลิปในแอป (1/0)'],
@@ -137,7 +142,7 @@ const TENANT_API = {
 const ADMIN_API = {
   login: () => ({}), getAll: () => ({}),
   saveRoom: api_saveRoom, deleteRoom: api_deleteRoom, bulkRooms: api_bulkRooms,
-  checkIn: api_checkIn, saveTenant: api_saveTenant, resetPin: api_setPin, setPin: api_setPin, moveOut: api_moveOut,
+  checkIn: api_checkIn, saveTenant: api_saveTenant, markRefund: api_markRefund, resetPin: api_setPin, setPin: api_setPin, moveOut: api_moveOut,
   saveMeters: api_saveMeters, previewBills: api_previewBills, generateBills: api_generateBills,
   createBill: api_createBill, updateBill: api_updateBill, deleteBill: api_deleteBill,
   approveSlip: api_approveSlip, rejectSlip: api_rejectSlip, receiveCash: api_receiveCash, recordPayment: api_recordPayment, unpay: api_unpay,
@@ -208,7 +213,7 @@ function api_publicInfo() {
   const s = getSettings_();
   const f = tenantFlags_(s);
   return {
-    apartmentName: s.apartmentName, phone: s.phone, ownerLine: s.ownerLine, flags: f,
+    apartmentName: s.apartmentName, buildingName: s.buildingName || s.apartmentName, phone: s.phone, ownerLine: s.ownerLine, flags: f,
     rooms: f.app ? readAll_('Tenants').filter(t => t.status === ST.ACTIVE).map(t => t.room).sort(roomSort_) : [],
   };
 }
@@ -263,12 +268,16 @@ function api_checkIn(req) {
   if (!String(t.name || '').trim()) throw new Error('กรุณาระบุชื่อผู้เช่า');
   const start = isDate_(t.startDate) ? t.startDate : today_();
   const months = Number(t.contractMonths) || Number(s.contractMonths) || 12;
+  const rent0 = Number(room.rent) || 0, num = (v, d) => v === '' || v == null ? d : Number(v) || 0;
+  const advMonths = num(t.advanceMonths, Number(s.advanceMonths) || 0);
   const tenant = {
     id: 'T' + Date.now().toString(36) + rand_(3), room: room.room, name: String(t.name).trim(),
     phone: t.phone || '', lineId: t.lineId || '', startDate: start,
     endDate: isDate_(t.endDate) ? t.endDate : addDays_(addMonths_(start, months), -1),
     deposit: t.deposit === '' || t.deposit == null ? (Number(room.rent) || 0) * (Number(s.depositMonths) || 0) : Number(t.deposit) || 0,
     status: ST.ACTIVE, moveOutDate: '', pin: t.pin ? checkPin_(t.pin) : newPin_(), note: t.note || '', createdAt: now_(),
+    advanceRent: t.firstBill ? rent0 * advMonths : 0, keyDeposit: num(t.keyDeposit, Number(s.keyDeposit) || 0), cardFee: num(t.cardFee, Number(s.cardFee) || 0),
+    contractMonths: months, refundAmount: '', refundStatus: '', refundDate: '',
   };
   writeRow_('Tenants', tenant);
   room.status = ST.OCC;
@@ -286,19 +295,31 @@ function api_checkIn(req) {
   let bill = null;
   if (t.firstBill) {
     const items = [];
-    if (tenant.deposit > 0) items.push({ l: 'เงินมัดจำ', a: tenant.deposit, k: 'deposit' });
-    const rent = Number(room.rent) || 0;
-    if (rent > 0) items.push(rentItem_(rent, start, monthEnd_(month)));
+    if (tenant.advanceRent > 0) items.push({ l: 'ค่าเช่าล่วงหน้า ' + advMonths + ' เดือน', a: tenant.advanceRent, k: 'advance' });
+    else if (rent0 > 0) items.push(rentItem_(rent0, start, monthEnd_(month)));
+    if (tenant.deposit > 0) items.push({ l: 'เงินประกัน', a: tenant.deposit, k: 'deposit' });
+    if (tenant.keyDeposit > 0) items.push({ l: 'มัดจำกุญแจ (คืนเมื่อคืนกุญแจ)', a: tenant.keyDeposit, k: 'keydep' });
+    if (tenant.cardFee > 0) items.push({ l: 'ค่าคีย์การ์ด', a: tenant.cardFee, k: 'card' });
     if (items.length) bill = newBill_(tenant, KIND.FIRST, month, items, start);
   }
   return { id: tenant.id, pin: tenant.pin, billId: bill && bill.id };
+}
+
+/** บันทึกว่าคืนเงินประกัน/เงินคงเหลือให้ผู้เช่าที่ย้ายออกแล้ว */
+function api_markRefund(req) {
+  const t = findBy_('Tenants', 'id', String(req.id || ''));
+  if (!t || t.status !== ST.LEFT) throw new Error('ไม่พบผู้เช่าที่ย้ายออกแล้ว');
+  t.refundStatus = req.undo ? 'รอคืนเงิน' : 'คืนแล้ว';
+  t.refundDate = req.undo ? '' : (isDate_(req.date) ? req.date : today_());
+  if (req.method) t.note = (t.note ? t.note + ' | ' : '') + 'คืนเงิน ' + fmtNum_(t.refundAmount) + ' บาท ทาง' + String(req.method).slice(0, 30);
+  writeRow_('Tenants', t, t._row);
 }
 
 function api_saveTenant(req) {
   const p = req.tenant || {};
   const t = findBy_('Tenants', 'id', String(p.id || ''));
   if (!t) throw new Error('ไม่พบผู้เช่า');
-  ['name', 'phone', 'lineId', 'startDate', 'endDate', 'deposit', 'note'].forEach(k => { if (p[k] !== undefined) t[k] = p[k]; });
+  ['name', 'phone', 'lineId', 'startDate', 'endDate', 'deposit', 'keyDeposit', 'advanceRent', 'contractMonths', 'note'].forEach(k => { if (p[k] !== undefined) t[k] = p[k]; });
   writeRow_('Tenants', t, t._row);
 }
 
@@ -323,7 +344,7 @@ function api_moveOut(req) {
   const monthlyDone = mine.some(b => b.kind === KIND.MONTH && b.month === month);
   let waterUnits = '', elecUnits = '';
   if (!monthlyDone) {
-    const firstCovers = t.startDate.slice(0, 7) === month && mine.some(b => b.kind === KIND.FIRST);
+    const firstCovers = t.startDate.slice(0, 7) === month && mine.some(b => b.kind === KIND.FIRST && (b.items || []).some(i => i.k === 'rent'));
     if (!firstCovers) {
       const from = t.startDate.slice(0, 7) === month ? t.startDate : month + '-01';
       if (from <= date) items.push(rentItem_(Number(room.rent) || 0, from, date));
@@ -338,13 +359,24 @@ function api_moveOut(req) {
       items.push(utilItem_('elec', elecUnits, prev.elec, req.elecCur, s));
     }
   }
+  applyAdvance_(t, items, mine, null);
   const unpaid = mine.filter(b => b.status !== ST.PAID);
   unpaid.forEach(b => items.push({ l: 'ยอดค้าง: ' + billTitle_(b), a: b.total, k: 'unpaid' }));
   if (Number(req.damages) > 0) items.push({ l: req.damageNote || 'ค่าทำความสะอาด/ความเสียหาย', a: Number(req.damages), k: 'damage' });
-  if (Number(t.deposit) > 0) items.push({ l: 'หักเงินมัดจำ', a: -Number(t.deposit), k: 'deposit' });
+  // เงินประกัน: ครบสัญญาคืนเต็ม · ออกก่อนสัญญา เจ้าของเลือกเอง (คืนเต็ม / คืนบางส่วน / ไม่คืน)
+  const dep = Number(t.deposit) || 0, early = !!(t.endDate && date < t.endDate);
+  const mode = ['full', 'partial', 'none'].indexOf(req.depositMode) >= 0 ? req.depositMode : (early ? '' : 'full');
+  const keep = mode === 'none' ? dep : mode === 'partial' ? Math.min(dep, Math.max(0, Number(req.depositKeep) || 0)) : 0;
+  if (dep > 0 && dep - keep > 0) items.push({ l: keep ? 'คืนเงินประกัน (หักไว้ ' + fmtNum_(keep) + ')' : 'คืนเงินประกัน', a: -(dep - keep), k: 'deposit' });
+  const kd = Number(t.keyDeposit) || 0, keyBack = req.keyReturned === undefined || req.keyReturned === true || req.keyReturned === 'true';
+  if (kd > 0 && keyBack) items.push({ l: 'คืนมัดจำกุญแจ', a: -kd, k: 'keydep' });
+  const advLeft = advanceLeft_(t, mine, null) - items.filter(i => i.k === 'advuse').reduce((a, i) => a - i.a, 0);
+  if (advLeft > 0) items.push({ l: 'คืนค่าเช่าล่วงหน้าที่ยังไม่ได้ใช้', a: -advLeft, k: 'advback' });
   const total = sumItems_(items);
-  const calc = { items, total, refund: total < 0 ? -total : 0, owe: total > 0 ? total : 0, deposit: Number(t.deposit) || 0 };
+  const calc = { items, total, refund: total < 0 ? -total : 0, owe: total > 0 ? total : 0, deposit: dep, keyDeposit: kd, keep, early, needChoice: early && dep > 0 && !mode,
+    endDate: t.endDate, daysLeft: early ? dayDiff_(date, t.endDate) : 0 };
   if (!req.confirm) return { calc };
+  if (calc.needChoice) throw new Error('ยังไม่ครบสัญญา — กรุณาเลือกว่าจะคืนเงินประกันอย่างไร');
 
   unpaid.forEach(b => markPaid_(b, PAY.DEPOSIT, b.total, date));
   const bill = newBill_(t, KIND.OUT, month, items, date, { waterUnits, elecUnits });
@@ -361,6 +393,11 @@ function api_moveOut(req) {
     writeRow_('Meters', rec, m && m._row);
   }
   t.status = ST.LEFT; t.moveOutDate = date; t.pin = '';
+  if (calc.refund > 0) { t.refundAmount = calc.refund; t.refundStatus = 'รอคืนเงิน'; t.refundDate = ''; }
+  const notes = [];
+  if (keep) notes.push('ไม่คืนเงินประกัน ' + fmtNum_(keep) + ' บาท' + (early ? ' (ย้ายออกก่อนครบสัญญา)' : ''));
+  if (kd > 0 && !keyBack) notes.push('ไม่ได้คืนกุญแจ (ไม่คืนมัดจำกุญแจ ' + fmtNum_(kd) + ')');
+  if (notes.length) { bill.note = notes.join(' · '); writeBill_(bill); }
   if (req.note) t.note = (t.note ? t.note + ' | ' : '') + req.note;
   writeRow_('Tenants', t, t._row);
   const r = findBy_('Rooms', 'room', t.room);
@@ -408,9 +445,11 @@ function computeMonth_(month) {
     const items = [];
     const rent = Number(room.rent) || 0;
     if (t.startDate.slice(0, 7) === month) {
-      const first = all.some(b => b.tenantId === t.id && b.kind === KIND.FIRST);
-      if (!first && rent > 0) items.push(rentItem_(rent, t.startDate, monthEnd_(month)));
+      // แบบเดิม: บิลแรกเข้ารวมค่าเช่าเดือนแรกแล้ว → ไม่เก็บซ้ำ · แบบใหม่: เก็บค่าเช่าตามวัน แล้วหักด้วยค่าเช่าล่วงหน้า
+      const firstHasRent = all.some(b => b.tenantId === t.id && b.kind === KIND.FIRST && (b.items || []).some(i => i.k === 'rent'));
+      if (!firstHasRent && rent > 0) items.push(rentItem_(rent, t.startDate, monthEnd_(month)));
     } else if (rent > 0) items.push({ l: 'ค่าเช่าห้อง ' + monthLabel_(month), a: rent, k: 'rent' });
+    applyAdvance_(t, items, all, ex && ex.id);
     const wu = Math.max(0, Number(rec.waterCur) - Number(wp)), eu = Math.max(0, Number(rec.elecCur) - Number(ep));
     items.push(utilItem_('water', wu, wp, rec.waterCur, s));
     items.push(utilItem_('elec', eu, ep, rec.elecCur, s));
@@ -572,21 +611,27 @@ function api_saveRepair(req) {
   const r = findBy_('Repairs', 'id', String(p.id || ''));
   if (!r) throw new Error('ไม่พบรายการแจ้งซ่อม');
   const before = { status: r.status, ownerMsg: r.ownerMsg };
-  ['status', 'ownerMsg', 'cost', 'appointAt'].forEach(k => { if (p[k] !== undefined) r[k] = String(p[k]).slice(0, 300); });
+  if (p.status !== undefined && [ST.R_NEW, ST.R_DOING, ST.R_DONE, ST.R_BROKEN].indexOf(p.status) < 0) throw new Error('สถานะไม่ถูกต้อง');
+  ['status', 'ownerMsg', 'cost', 'appointAt', 'outcome'].forEach(k => { if (p[k] !== undefined) r[k] = String(p[k]).slice(0, 300); });
   if (p.urgent !== undefined) r.urgent = p.urgent ? 'ด่วน' : '';
   if (r.status !== before.status || r.ownerMsg !== before.ownerMsg) {
     const log = parseLog_(r);
     log.push({ at: now_(), s: r.status, m: r.ownerMsg !== before.ownerMsg ? r.ownerMsg : '' });
     r.log = JSON.stringify(log);
   }
-  if (p.charge && Number(r.cost) > 0 && !r.billId) {
-    const t = activeTenant_(r.room);
-    if (!t) throw new Error('ห้องนี้ไม่มีผู้เช่าแล้ว เก็บค่าซ่อมไม่ได้');
-    const log = parseLog_(r); log.push({ at: now_(), s: r.status, m: 'ออกบิลค่าซ่อม ' + fmtNum_(r.cost) + ' บาท' }); r.log = JSON.stringify(log);
-    r.billId = newBill_(t, KIND.SPECIAL, today_().slice(0, 7), [{ l: 'ค่าซ่อม: ' + r.category + ' (' + r.detail.slice(0, 30) + ')', a: Number(r.cost), c: 1 }], addDays_(today_(), 7)).id;
-  }
+  if (p.charge) chargeRepair_(r);
   r.updatedAt = now_();
   writeRow_('Repairs', r, r._row);
+}
+
+/** ออกบิลเก็บผู้เช่า: ค่าซ่อม หรือ ค่าเสียหาย (กรณีของเสียหาย/ซ่อมไม่ได้) */
+function chargeRepair_(r) {
+  if (!(Number(r.cost) > 0) || r.billId) return;
+  const t = activeTenant_(r.room);
+  if (!t) throw new Error('ห้องนี้ไม่มีผู้เช่าแล้ว ออกบิลเก็บเงินไม่ได้');
+  const what = r.status === ST.R_BROKEN ? 'ค่าเสียหาย' : 'ค่าซ่อม';
+  const log = parseLog_(r); log.push({ at: now_(), s: r.status, m: 'ออกบิล' + what + ' ' + fmtNum_(r.cost) + ' บาท' }); r.log = JSON.stringify(log);
+  r.billId = newBill_(t, KIND.SPECIAL, today_().slice(0, 7), [{ l: what + ': ' + r.category + ' (' + r.detail.slice(0, 30) + ')', a: Number(r.cost), c: 1 }], addDays_(today_(), 7)).id;
 }
 
 /** เจ้าของหอบันทึกแจ้งซ่อมเอง (ผู้เช่าโทร/LINE/มาบอก หรือเจ้าของพบเอง) */
@@ -598,14 +643,17 @@ function api_createRepair(req) {
   const t = activeTenant_(room);
   let photoId = '';
   if (p.image) photoId = saveImage_(p.image, 'แจ้งซ่อม_' + room).fileId;
-  const status = [ST.R_NEW, ST.R_DOING, ST.R_DONE].indexOf(p.status) >= 0 ? p.status : ST.R_NEW;
+  const status = [ST.R_NEW, ST.R_DOING, ST.R_DONE, ST.R_BROKEN].indexOf(p.status) >= 0 ? p.status : ST.R_NEW;
   const r = {
     id: 'R' + Date.now().toString(36) + rand_(2), createdAt: now_(), room: room, tenantId: t ? t.id : '', name: t ? t.name : '',
     phone: t ? t.phone : '', category: String(p.category || 'อื่นๆ').slice(0, 40), detail: detail.slice(0, 1000), photoId: photoId,
     allowEntry: p.allowEntry ? 'ได้' : 'ไม่ได้', status: status, ownerMsg: String(p.ownerMsg || '').slice(0, 300), cost: '', billId: '', updatedAt: now_(),
     source: String(p.source || 'เจ้าของบันทึก').slice(0, 30), urgent: p.urgent ? 'ด่วน' : '', appointAt: String(p.appointAt || '').slice(0, 20),
+    outcome: status === ST.R_BROKEN ? String(p.outcome || '').slice(0, 60) : '',
   };
+  if (has_(p.cost) && Number(p.cost) > 0) r.cost = Number(p.cost);
   r.log = JSON.stringify([{ at: r.createdAt, s: status, m: 'บันทึกโดยเจ้าของหอ (' + r.source + ')' }]);
+  if (p.charge) chargeRepair_(r);
   writeRow_('Repairs', r);
   return { id: r.id };
 }
@@ -750,7 +798,7 @@ function dailyCheck() {
   const review = all.filter(b => b.status === ST.REVIEW);
   const overdue = all.filter(b => b.status === ST.DUE && b.dueDate < today);
   const exp = readAll_('Tenants').filter(t => t.status === ST.ACTIVE && t.endDate && t.endDate <= in30);
-  const reps = readAll_('Repairs').filter(r => r.status !== ST.R_DONE);
+  const reps = readAll_('Repairs').filter(r => r.status === ST.R_NEW || r.status === ST.R_DOING);
   if (!review.length && !overdue.length && !exp.length && !reps.length) return;
   const L = ['📋 สรุปประจำวัน ' + getSettings_().apartmentName];
   if (review.length) L.push('🧾 สลิปรออนุมัติ ' + review.length + ' รายการ');
@@ -798,6 +846,17 @@ function cleanItems_(items, custom) {
 function sumItems_(items) { return round2_((items || []).reduce((a, i) => a + (Number(i.a) || 0), 0)); }
 function billSort_(a, b) { return (b.createdAt || '').localeCompare(a.createdAt || '') || roomSort_(a.room, b.room); }
 function billTitle_(b) { return b.kind === KIND.MONTH ? 'บิลเดือน ' + monthLabel_(b.month) : 'บิล' + b.kind + ' ' + (b.no || ''); }
+/** ค่าเช่าล่วงหน้าคงเหลือ (เงินที่จ่ายตอนเข้า ใช้หักค่าเช่าเดือนแรก ๆ) ไม่นับบิล exceptId */
+function advanceLeft_(t, bills, exceptId) {
+  const used = bills.filter(b => b.tenantId === t.id && b.id !== exceptId)
+    .reduce((a, b) => a + (b.items || []).filter(i => i.k === 'advuse').reduce((x, i) => x - Number(i.a || 0), 0), 0);
+  return Math.max(0, round2_((Number(t.advanceRent) || 0) - used));
+}
+function applyAdvance_(t, items, bills, exceptId) {
+  const rent = items.filter(i => i.k === 'rent').reduce((a, i) => a + Number(i.a || 0), 0), left = advanceLeft_(t, bills, exceptId);
+  const use = Math.min(left, rent);
+  if (use > 0) items.push({ l: 'หักค่าเช่าล่วงหน้า (จ่ายไว้ตอนเข้า)', a: -use, k: 'advuse' });
+}
 function rentItem_(rent, from, to) {
   const days = dayDiff_(from, to) + 1, dim = daysInMonth_(from.slice(0, 7));
   if (days >= dim) return { l: 'ค่าเช่าห้อง ' + monthLabel_(from.slice(0, 7)), a: rent, k: 'rent' };

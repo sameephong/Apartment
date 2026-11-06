@@ -4,12 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>ผู้เช่า · อพาร์ทเม้นท์</title>
+<link rel="preconnect" href="https://script.google.com"><link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=3.0">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<link rel="stylesheet" href="app.css?v=3.2">
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>document.write('<script src="config.js?t=' + Date.now() + '"><\/script>')</script>
-<script src="common.js?v=3.0"></script>
+<script src="common.js?v=3.2"></script>
 <style>
 .pin{letter-spacing:10px;font-size:26px;text-align:center;font-weight:700}
 .hero{border:0;color:#fff}
@@ -95,7 +96,7 @@ function badge(b) {
       }
     } catch (e) { store('tenant_auth'); store('tenant_cache'); AUTH = null; }
   }
-  if (BLD_MANY && BLD) $('#bldLine').innerHTML = ` · ตึกรหัส ${esc(BLD.code)} · <a href="#" onclick="changeBuilding();return false">เปลี่ยนตึก</a>`;
+  if (BLD_MANY && BLD) $('#bldLine').innerHTML = ` · 🏢 ${esc(bLabel(BLD.code))} · <a href="#" onclick="changeBuilding();return false">เปลี่ยนตึก</a>`;
   if (IS_DEMO) $('#demoHint').innerHTML = 'โหมดทดลอง: ห้อง <b>101</b> รหัส <b>111111</b> หรือห้อง <b>102</b> รหัส <b>222222</b>';
   if (qRoom) { $('#lRoom').value = qRoom; $('#lPin').focus(); }
   await loadRooms();
@@ -119,7 +120,7 @@ const F = () => Object.assign({ app: true, slip: true, repair: true, news: true 
 async function loadRooms() {
   try {
     const info = await callApi('publicInfo');
-    $('#aptName').textContent = info.apartmentName;
+    $('#aptName').textContent = info.apartmentName; bInfo(BLD && BLD.code, info);
     if (info.flags && !info.flags.app) return showClosed(info);
     $('#forgot').textContent = 'ลืมรหัส? ติดต่อเจ้าของหอ' + (info.phone ? ' · โทร ' + info.phone : '');
     $('#roomList').innerHTML = info.rooms.map(r => `<option value="${esc(r)}"></option>`).join('');
@@ -274,26 +275,26 @@ async function sendSlip(id) {
 /* ---------- T10 / T11 แจ้งซ่อม ---------- */
 let RSEG = 'open';
 function repairCard(r) {
-  const st = r.status, k = st === 'เสร็จแล้ว' ? 3 : st === 'กำลังซ่อม' ? 2 : 1;
-  const steps = ['แจ้งเรื่องแล้ว', 'กำลังซ่อม', 'เสร็จแล้ว'];
+  const st = r.status, broken = st === 'ซ่อมไม่ได้', k = st === 'เสร็จแล้ว' || broken ? 3 : st === 'กำลังซ่อม' ? 2 : 1;
+  const steps = ['แจ้งเรื่องแล้ว', 'กำลังซ่อม', broken ? 'ซ่อมไม่ได้' : 'เสร็จแล้ว'];
   const log = (r.log && r.log.length ? r.log : [{ at: r.createdAt, s: 'รอดำเนินการ', m: '' }]).slice().reverse();
   return `<div class="card">
-    <div class="row"><b style="font-size:16px">${esc(r.category)}</b><span class="sp"></span><span class="badge ${k === 3 ? 'b-ok' : k === 2 ? 'b-o' : 'b-warn'}">${esc(st)}</span></div>
+    <div class="row"><b style="font-size:16px">${esc(r.category)}</b><span class="sp"></span><span class="badge ${broken ? 'b-bad' : k === 3 ? 'b-ok' : k === 2 ? 'b-o' : 'b-warn'}">${esc(st)}${broken && r.outcome ? ' · ' + esc(r.outcome) : ''}</span></div>
     <div class="row" style="margin:8px 0;flex-wrap:nowrap;align-items:flex-start">${r.photoId ? `<img class="thumb" data-file="${esc(r.photoId)}" onclick="viewPhoto(${q(r.photoId)})" alt="รูปที่แนบ">` : ''}<div style="flex:1">${esc(r.detail)}<div class="muted small">แจ้งเมื่อ ${fmtDateTime(r.createdAt)}</div></div></div>
-    <div style="display:flex;gap:4px;margin:10px 0 4px">${steps.map((x, i) => `<div style="flex:1;height:6px;border-radius:3px;background:${i < k ? (k === 3 ? 'var(--ok)' : 'var(--o)') : '#e5e7eb'}"></div>`).join('')}</div>
+    <div style="display:flex;gap:4px;margin:10px 0 4px">${steps.map((x, i) => `<div style="flex:1;height:6px;border-radius:3px;background:${i < k ? (broken ? 'var(--bad)' : k === 3 ? 'var(--ok)' : 'var(--o)') : '#e5e7eb'}"></div>`).join('')}</div>
     <div style="display:flex;gap:4px" class="small muted">${steps.map((x, i) => `<div style="flex:1;text-align:center;${i === k - 1 ? 'color:var(--ink);font-weight:700' : ''}">${x}</div>`).join('')}</div>
-    ${+r.cost ? `<div class="badge b-warn" style="margin-top:8px">ค่าซ่อม ${money(r.cost)} บาท (ออกบิลแล้ว · ดูในเมนูบิล)</div>` : ''}
+    ${+r.cost ? `<div class="badge b-warn" style="margin-top:8px">${broken ? 'ค่าเสียหาย' : 'ค่าซ่อม'} ${money(r.cost)} บาท (ออกบิลแล้ว · ดูในเมนูบิล)</div>` : ''}
     <div class="muted small" style="font-weight:700;margin:12px 0 6px">ประวัติ</div>
     <ul class="tl">${log.map((e, i) => `<li><div class="dot ${i === 0 ? (e.s === 'เสร็จแล้ว' ? 'done' : 'now') : 'done'}">${e.s === 'เสร็จแล้ว' ? '✓' : e.s === 'กำลังซ่อม' ? '🔧' : '•'}</div><div><b>${e.s === 'รอดำเนินการ' && i === log.length - 1 ? 'แจ้งเรื่องแล้ว' : esc(e.s)}</b><span class="muted small">${fmtDateTime(e.at)}</span>${e.m ? `<div class="small">เจ้าของหอ: “${esc(e.m)}”</div>` : ''}</div></li>`).join('')}</ul>
   </div>`;
 }
 V.repairs = () => {
-  const open = D.repairs.filter(r => r.status !== 'เสร็จแล้ว'), done = D.repairs.filter(r => r.status === 'เสร็จแล้ว');
+  const open = D.repairs.filter(r => r.status === 'รอดำเนินการ' || r.status === 'กำลังซ่อม'), done = D.repairs.filter(r => !open.includes(r));
   const list = RSEG === 'open' ? open : done;
   return {
     title: 'แจ้งซ่อม', sub: 'ห้อง ' + esc(T().room) + ' · ทั้งหมด ' + D.repairs.length + ' เรื่อง',
     html: `${F().repair ? `<button class="btn pri blk lg" style="margin-bottom:12px" onclick="go('newrepair')">+ แจ้งซ่อมใหม่</button>` : `<div class="card" style="text-align:center"><b>แจ้งซ่อมกับเจ้าของหอโดยตรง</b><div class="muted small">เจ้าของหอจะบันทึกเรื่องให้ และติดตามสถานะได้ที่หน้านี้</div>${contactBtns(I())}</div>`}
-      <div class="seg"><button class="${RSEG === 'open' ? 'on' : ''}" onclick="RSEG='open';render()">กำลังดำเนินการ ${open.length}</button><button class="${RSEG === 'done' ? 'on' : ''}" onclick="RSEG='done';render()">ซ่อมเสร็จแล้ว ${done.length}</button></div>
+      <div class="seg"><button class="${RSEG === 'open' ? 'on' : ''}" onclick="RSEG='open';render()">กำลังดำเนินการ ${open.length}</button><button class="${RSEG === 'done' ? 'on' : ''}" onclick="RSEG='done';render()">ปิดงานแล้ว ${done.length}</button></div>
       ${list.map(repairCard).join('') || `<div class="empty">${RSEG === 'open' ? (D.repairs.length ? 'ไม่มีเรื่องที่ค้างอยู่ 👍' : 'ยังไม่เคยแจ้งซ่อม') : 'ยังไม่มีงานที่ซ่อมเสร็จ'}</div>`}`,
     after: () => document.querySelectorAll('img[data-file]').forEach(async im => { try { im.src = await tFile(im.dataset.file); } catch (e) {} }),
   };
