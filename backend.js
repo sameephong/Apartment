@@ -19,7 +19,8 @@ const SCHEMA = {
              'payMethod', 'paidAmount', 'received', 'paidDate', 'receiptNo', 'note', 'paidAt'],
   Slips:    ['id', 'billId', 'room', 'at', 'fileId', 'hash', 'result'],
   Repairs:  ['id', 'createdAt', 'room', 'tenantId', 'name', 'phone', 'category', 'detail', 'photoId',
-             'allowEntry', 'status', 'ownerMsg', 'cost', 'billId', 'updatedAt', 'log'],
+             'allowEntry', 'status', 'ownerMsg', 'cost', 'billId', 'updatedAt', 'log',
+             'source', 'urgent', 'appointAt'],
   News:     ['id', 'createdAt', 'title', 'body'],
 };
 
@@ -58,8 +59,23 @@ const DEFAULT_SETTINGS = [
   ['invSeq', '0', '(ระบบ) เลขที่ใบแจ้งหนี้ล่าสุด'],
   ['rcSeq', '0', '(ระบบ) เลขที่ใบเสร็จล่าสุด'],
   ['fileFolderId', '', '(ระบบ) โฟลเดอร์ Google Drive ที่เก็บรูปสลิป/รูปแจ้งซ่อม'],
+  ['tenantMode', 'shared', 'การใช้งานร่วมกับผู้เช่า: shared = ใช้ร่วมกับผู้เช่า · owner = เจ้าของจัดการเอง'],
+  ['tenantApp', '1', 'ผู้เช่าเข้าแอปดูบิลและประวัติ (1 = เปิด, 0 = ปิด)'],
+  ['tenantSlip', '1', 'ผู้เช่าส่งสลิปในแอป (1/0)'],
+  ['tenantRepair', '1', 'ผู้เช่าแจ้งซ่อมในแอป (1/0)'],
+  ['tenantNews', '1', 'ประกาศถึงผู้เช่าในแอป (1/0)'],
+  ['billLink', '1', 'ส่งลิงก์บิล + QR พร้อมเพย์ทาง LINE (1/0)'],
 ];
 const PRIVATE_SETTINGS = ['adminPassword', 'lineToken', 'invSeq', 'rcSeq', 'fileFolderId'];
+
+/** สิทธิ์ฝั่งผู้เช่า ตามโหมด "เจ้าของจัดการเอง" / "ใช้ร่วมกับผู้เช่า" */
+function tenantFlags_(s) {
+  s = s || getSettings_();
+  const on = k => String(s[k]) !== '0';
+  const app = s.tenantMode !== 'owner' && on('tenantApp');
+  return { mode: s.tenantMode === 'owner' ? 'owner' : 'shared', app: app, slip: app && on('tenantSlip'), repair: app && on('tenantRepair'), news: app && on('tenantNews'), billLink: on('billLink') };
+}
+const TENANT_OFF = 'ระบบผู้เช่าปิดอยู่ · ตึกนี้เจ้าของหอดูแลเอง กรุณาติดต่อเจ้าของหอโดยตรง';
 
 /* ============================ ติดตั้ง ============================ */
 
@@ -124,8 +140,8 @@ const ADMIN_API = {
   checkIn: api_checkIn, saveTenant: api_saveTenant, resetPin: api_setPin, setPin: api_setPin, moveOut: api_moveOut,
   saveMeters: api_saveMeters, previewBills: api_previewBills, generateBills: api_generateBills,
   createBill: api_createBill, updateBill: api_updateBill, deleteBill: api_deleteBill,
-  approveSlip: api_approveSlip, rejectSlip: api_rejectSlip, receiveCash: api_receiveCash, unpay: api_unpay,
-  fileImage: api_fileImage, saveRepair: api_saveRepair,
+  approveSlip: api_approveSlip, rejectSlip: api_rejectSlip, receiveCash: api_receiveCash, recordPayment: api_recordPayment, unpay: api_unpay,
+  fileImage: api_fileImage, saveRepair: api_saveRepair, createRepair: api_createRepair,
   postNews: api_postNews, deleteNews: api_deleteNews,
   saveSettings: api_saveSettings, testLine: api_testLine,
 };
@@ -141,6 +157,10 @@ function handle_(req) {
   if (PUBLIC_API[a]) return Object.assign({ ok: true }, PUBLIC_API[a](req));
   const lockIf = fn => (READ_ONLY[a] || (a === 'moveOut' && !req.confirm)) ? fn() : withLock_(fn);
   if (TENANT_API[a]) {
+    const f = tenantFlags_();
+    if (!f.app) throw new Error(TENANT_OFF);
+    if (a === 'tenantSlip' && !f.slip) throw new Error('การส่งสลิปในแอปปิดอยู่ · ส่งสลิปให้เจ้าของหอทาง LINE ได้เลย');
+    if (a === 'tenantRepair' && !f.repair) throw new Error('การแจ้งซ่อมในแอปปิดอยู่ · กรุณาแจ้งเจ้าของหอโดยตรง');
     const t = tenantAuth_(req);
     return lockIf(() => {
       const r = TENANT_API[a](req, t) || {};
@@ -186,9 +206,10 @@ function tenantAuth_(req) {
 
 function api_publicInfo() {
   const s = getSettings_();
+  const f = tenantFlags_(s);
   return {
-    apartmentName: s.apartmentName, phone: s.phone,
-    rooms: readAll_('Tenants').filter(t => t.status === ST.ACTIVE).map(t => t.room).sort(roomSort_),
+    apartmentName: s.apartmentName, phone: s.phone, ownerLine: s.ownerLine, flags: f,
+    rooms: f.app ? readAll_('Tenants').filter(t => t.status === ST.ACTIVE).map(t => t.room).sort(roomSort_) : [],
   };
 }
 
@@ -497,6 +518,30 @@ function api_receiveCash(req) {
   markPaid_(b, PAY.CASH, b.total, isDate_(req.paidDate) ? req.paidDate : today_(), got);
 }
 
+/** บันทึกรับเงินโดยเจ้าของหอ: โอน / เงินสด / หักเงินมัดจำ · แนบรูปสลิปได้ (ไม่บังคับ) */
+function api_recordPayment(req) {
+  const b = billById_(req.id);
+  if (b.status === ST.PAID) throw new Error('บิลนี้ชำระแล้ว');
+  const method = [PAY.TRANSFER, PAY.CASH, PAY.DEPOSIT].indexOf(req.method) >= 0 ? req.method : PAY.TRANSFER;
+  const got = has_(req.amount) ? Number(req.amount) : b.total;
+  if (!(got >= b.total)) throw new Error('ยอดที่รับ (' + fmtNum_(got) + ') น้อยกว่ายอดบิล (' + fmtNum_(b.total) + ')');
+  let dup = '';
+  if (req.image) {
+    const up = saveImage_(req.image, 'สลิป_' + b.room + '_' + (b.no || b.id));
+    const d = readAll_('Slips').filter(x => x.hash === up.hash)[0];
+    if (d) dup = 'ซ้ำกับสลิปห้อง ' + d.room + ' (' + d.at.slice(0, 10) + ')';
+    if (b.status === ST.REVIEW && b.slipId) setSlipResult_(b.slipId, 'แทนที่ด้วยการบันทึกของเจ้าของหอ');
+    const slip = { id: 'S' + Date.now().toString(36) + rand_(3), billId: b.id, room: b.room, at: now_(), fileId: up.fileId, hash: up.hash, result: dup || 'บันทึกโดยเจ้าของหอ' };
+    writeRow_('Slips', slip);
+    b.slipId = slip.id; b.slipAt = slip.at;
+  } else if (b.status === ST.REVIEW && b.slipId) {
+    setSlipResult_(b.slipId, method === PAY.TRANSFER ? 'อนุมัติ' : 'แทนที่ด้วยการบันทึกของเจ้าของหอ');
+  }
+  const note = String(req.note || '').trim().slice(0, 200);
+  markPaid_(b, method, b.total, isDate_(req.paidDate) ? req.paidDate : today_(), method === PAY.CASH ? got : null, note ? (b.note ? b.note + ' | ' : '') + note : '');
+  return { dup: dup };
+}
+
 function api_unpay(req) {
   const b = billById_(req.id);
   if (b.status !== ST.PAID) throw new Error('บิลนี้ยังไม่ได้ชำระ');
@@ -527,7 +572,8 @@ function api_saveRepair(req) {
   const r = findBy_('Repairs', 'id', String(p.id || ''));
   if (!r) throw new Error('ไม่พบรายการแจ้งซ่อม');
   const before = { status: r.status, ownerMsg: r.ownerMsg };
-  ['status', 'ownerMsg', 'cost'].forEach(k => { if (p[k] !== undefined) r[k] = p[k]; });
+  ['status', 'ownerMsg', 'cost', 'appointAt'].forEach(k => { if (p[k] !== undefined) r[k] = String(p[k]).slice(0, 300); });
+  if (p.urgent !== undefined) r.urgent = p.urgent ? 'ด่วน' : '';
   if (r.status !== before.status || r.ownerMsg !== before.ownerMsg) {
     const log = parseLog_(r);
     log.push({ at: now_(), s: r.status, m: r.ownerMsg !== before.ownerMsg ? r.ownerMsg : '' });
@@ -541,6 +587,27 @@ function api_saveRepair(req) {
   }
   r.updatedAt = now_();
   writeRow_('Repairs', r, r._row);
+}
+
+/** เจ้าของหอบันทึกแจ้งซ่อมเอง (ผู้เช่าโทร/LINE/มาบอก หรือเจ้าของพบเอง) */
+function api_createRepair(req) {
+  const p = req.repair || {}, room = String(p.room || '').trim();
+  if (!findBy_('Rooms', 'room', room)) throw new Error('ไม่พบห้อง ' + room);
+  const detail = String(p.detail || '').trim();
+  if (!detail) throw new Error('กรุณาใส่รายละเอียด');
+  const t = activeTenant_(room);
+  let photoId = '';
+  if (p.image) photoId = saveImage_(p.image, 'แจ้งซ่อม_' + room).fileId;
+  const status = [ST.R_NEW, ST.R_DOING, ST.R_DONE].indexOf(p.status) >= 0 ? p.status : ST.R_NEW;
+  const r = {
+    id: 'R' + Date.now().toString(36) + rand_(2), createdAt: now_(), room: room, tenantId: t ? t.id : '', name: t ? t.name : '',
+    phone: t ? t.phone : '', category: String(p.category || 'อื่นๆ').slice(0, 40), detail: detail.slice(0, 1000), photoId: photoId,
+    allowEntry: p.allowEntry ? 'ได้' : 'ไม่ได้', status: status, ownerMsg: String(p.ownerMsg || '').slice(0, 300), cost: '', billId: '', updatedAt: now_(),
+    source: String(p.source || 'เจ้าของบันทึก').slice(0, 30), urgent: p.urgent ? 'ด่วน' : '', appointAt: String(p.appointAt || '').slice(0, 20),
+  };
+  r.log = JSON.stringify([{ at: r.createdAt, s: status, m: 'บันทึกโดยเจ้าของหอ (' + r.source + ')' }]);
+  writeRow_('Repairs', r);
+  return { id: r.id };
 }
 
 function api_postNews(req) {
@@ -563,6 +630,8 @@ function api_saveSettings(req) {
     if (p[k] === undefined || k === 'invSeq' || k === 'rcSeq' || k === 'fileFolderId') return;
     if ((k === 'adminPassword' || k === 'lineToken') && String(p[k]) === '') return;
     if (k === 'adminPassword' && String(p[k]).length < 4) throw new Error('รหัสผ่านต้องยาวอย่างน้อย 4 ตัว');
+    if (k === 'tenantMode' && ['shared', 'owner'].indexOf(String(p[k])) < 0) return;
+    if (/^(tenantApp|tenantSlip|tenantRepair|tenantNews|billLink)$/.test(k)) p[k] = (p[k] === true || String(p[k]) === '1') ? '1' : '0';
     const ex = rows.filter(r => r.key === k)[0];
     writeRow_('Settings', { key: k, value: String(p[k]).trim(), description: d[2] }, ex && ex._row);
   });
@@ -581,7 +650,7 @@ function tenantView_(t) {
   const repairs = readAll_('Repairs').filter(r => r.tenantId ? r.tenantId === t.id : (r.room === t.room && r.createdAt.slice(0, 10) >= t.startDate))
     .map(r => { const o = strip_(r); delete o.tenantId; if (!o.billId) o.cost = ''; o.log = parseLog_(r); return o; })
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  const news = readAll_('News').map(strip_).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 20);
+  const news = !tenantFlags_().news ? [] : readAll_('News').map(strip_).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 20);
   const room = findBy_('Rooms', 'room', t.room) || {};
   return {
     tenant: { id: t.id, room: t.room, name: t.name, phone: t.phone, startDate: t.startDate, endDate: t.endDate,
@@ -638,6 +707,7 @@ function allData_() {
   const s = getSettings_(), settings = {};
   DEFAULT_SETTINGS.forEach(d => { if (PRIVATE_SETTINGS.indexOf(d[0]) < 0) settings[d[0]] = s[d[0]]; });
   settings.lineConfigured = !!(s.lineToken && s.lineGroupId);
+  settings.flags = tenantFlags_(s);
   return {
     settings,
     rooms: readAll_('Rooms').map(strip_).sort((a, b) => roomSort_(a.room, b.room)),
@@ -656,6 +726,7 @@ function publicSettings_() {
   const keys = ['apartmentName', 'address', 'phone', 'ownerLine', 'promptpay', 'bankInfo', 'cashInfo', 'dueDay', 'waterRate', 'elecRate', 'commonFee'];
   const o = {};
   keys.forEach(k => { o[k] = s[k]; });
+  o.flags = tenantFlags_(s);
   return o;
 }
 

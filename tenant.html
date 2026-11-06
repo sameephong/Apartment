@@ -6,10 +6,10 @@
 <title>ผู้เช่า · อพาร์ทเม้นท์</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=2.6">
+<link rel="stylesheet" href="app.css?v=3.0">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>document.write('<script src="config.js?t=' + Date.now() + '"><\/script>')</script>
-<script src="common.js?v=2.6"></script>
+<script src="common.js?v=3.0"></script>
 <style>
 .pin{letter-spacing:10px;font-size:26px;text-align:center;font-weight:700}
 .hero{border:0;color:#fff}
@@ -31,7 +31,8 @@
     <div class="card" style="text-align:center">
       <div class="ic" style="width:68px;height:68px;font-size:34px;margin:6px auto 8px;background:var(--t);border-radius:20px">🏠</div>
       <b style="font-size:21px" id="aptName">กำลังโหลด…</b><div class="muted">สำหรับผู้เช่า</div>
-      <div style="text-align:left;margin-top:18px">
+      <div id="closedBox" class="hide"></div>
+      <div style="text-align:left;margin-top:18px" id="loginForm">
         <label class="f">เลขห้อง<input id="lRoom" list="roomList" inputmode="numeric" autocomplete="off" placeholder="พิมพ์หรือเลือกเลขห้อง เช่น 101" style="font-size:20px;text-align:center;font-weight:700"><datalist id="roomList"></datalist></label>
         <label class="f">รหัสผู้เช่า (ได้รับจากเจ้าของหอ)<input id="lPin" class="pin" type="password" inputmode="numeric" maxlength="8" autocomplete="current-password" placeholder="••••••"></label>
         <button class="btn pri blk lg" id="lBtn" onclick="login()">เข้าสู่ระบบ</button>
@@ -99,11 +100,27 @@ function badge(b) {
   if (qRoom) { $('#lRoom').value = qRoom; $('#lPin').focus(); }
   await loadRooms();
 })();
+function lineLink(id) { return id ? (/^https?:/.test(id) ? id : 'https://line.me/R/ti/p/' + (id[0] === '@' ? encodeURIComponent(id) : '~' + encodeURIComponent(id))) : ''; }
+function contactBtns(i) {
+  const ln = lineLink(i.ownerLine);
+  return (i.phone ? `<button class="btn pri blk lg" style="margin-top:8px" onclick="callPhone(${q(i.phone)})">📞 โทร ${esc(i.phone)}</button>` : '') +
+    (ln ? `<a class="btn blk lg" style="margin-top:8px;background:#06c755;color:#fff;border-color:#06c755" target="_blank" href="${esc(ln)}">💬 LINE เจ้าของหอ</a>` : '');
+}
+// ระบบผู้เช่าปิด (เจ้าของจัดการเอง) → แสดงช่องทางติดต่อแทนช่องล็อกอิน
+function showClosed(info) {
+  $('#loginForm').classList.add('hide');
+  $('#closedBox').classList.remove('hide');
+  $('#closedBox').innerHTML = `<div class="card" style="margin-top:16px;text-align:center;background:#fff"><div style="font-size:34px">🔑</div><b style="font-size:17px">ตึกนี้เจ้าของหอดูแลเอง</b>
+    <p class="muted" style="line-height:1.7;margin:8px 0 4px">ชำระค่าเช่า แจ้งซ่อม หรือสอบถาม<br>กรุณาติดต่อเจ้าของหอโดยตรง</p>${contactBtns(info)}</div>
+    <p class="muted small" style="line-height:1.6">ได้รับลิงก์บิลทาง LINE?<br>เปิดลิงก์เพื่อดูยอดและสแกนจ่ายได้เลย</p>`;
+}
+const F = () => Object.assign({ app: true, slip: true, repair: true, news: true }, (D && D.info && D.info.flags) || {});
 // ดึงรายชื่อห้องที่มีผู้เช่า (ใช้เป็นตัวช่วยเลือก) · พิมพ์เลขห้องเองได้เสมอ
 async function loadRooms() {
   try {
     const info = await callApi('publicInfo');
     $('#aptName').textContent = info.apartmentName;
+    if (info.flags && !info.flags.app) return showClosed(info);
     $('#forgot').textContent = 'ลืมรหัส? ติดต่อเจ้าของหอ' + (info.phone ? ' · โทร ' + info.phone : '');
     $('#roomList').innerHTML = info.rooms.map(r => `<option value="${esc(r)}"></option>`).join('');
   } catch (e) { if ($('#aptName').textContent === 'กำลังโหลด…') $('#aptName').textContent = 'เข้าสู่ระบบผู้เช่า'; }
@@ -120,7 +137,7 @@ async function login() {
 }
 function logout() { store('tenant_auth'); store('tenant_cache'); location.href = 'tenant.html'; }
 function show() { if (!load(seenKey())) store(seenKey(), addDaysStr(D.serverToday, -3) + ' 00:00'); $('#login').classList.add('hide'); $('#app').classList.remove('hide'); $('#demo').innerHTML = demoBanner('<a href="admin.html">ลองฝั่งเจ้าของหอ</a>'); render(); }
-async function refresh() { syncBadge(true); try { await tApi('tenantData', {}, true); if (!$('#sbg').classList.contains('on')) render(); } catch (e) { if (/PIN|รหัส/.test(e.message)) logout(); } syncBadge(false); }
+async function refresh() { syncBadge(true); try { await tApi('tenantData', {}, true); if (!$('#sbg').classList.contains('on')) render(); } catch (e) { if (/PIN|รหัส|ปิดอยู่/.test(e.message)) logout(); } syncBadge(false); }
 document.addEventListener('visibilitychange', () => { if (!document.hidden && D && !$('#sbg').classList.contains('on')) refresh(); });
 
 /* ---------- การแจ้งเตือน (T13) ---------- */
@@ -208,7 +225,7 @@ V.bill = id => {
       ${b.items.map(x => `<div class="line"><span>${esc(x.l)}</span><span>${money(x.a)}</span></div>`).join('')}<div class="line tot"><span>รวม</span><span>${money(b.total)} บาท</span></div>
       ${paid ? `<div class="muted small">ชำระโดย ${esc(b.payMethod)}${b.note ? ' · ' + esc(b.note) : ''}</div>` : ''}</div>
       ${b.status === 'รอชำระ' && i.promptpay ? `<div class="card" style="text-align:center"><b>สแกนจ่ายพร้อมเพย์</b><div class="qrbox" id="qr"></div><div class="muted small">ยอด ${money(b.total)} บาทใส่ไว้ใน QR แล้ว${IS_DEMO ? '' : ' · <a href="#" onclick="saveQR(event)">บันทึก QR</a>'}</div>${i.bankInfo ? `<div class="muted small" style="margin-top:6px">หรือโอนเข้า ${esc(i.bankInfo)}</div>` : ''}</div>` : ''}
-      ${b.status === 'รอชำระ' && !b.rejectReason ? `<button class="btn pri blk lg" onclick="paySheet(${q(b.id)})">ชำระแล้ว แนบสลิป / จ่ายเงินสด</button>` : ''}
+      ${b.status === 'รอชำระ' && !b.rejectReason ? `<button class="btn pri blk lg" onclick="paySheet(${q(b.id)})">${F().slip ? 'ชำระแล้ว แนบสลิป / จ่ายเงินสด' : 'วิธีชำระเงิน'}</button>` : ''}
       <a class="btn blk" style="margin-top:10px" target="_blank" href="${billUrl(b)}">${paid ? 'เปิดใบเสร็จ (พิมพ์ / PDF)' : 'เปิดบิล (พิมพ์ / PDF)'}</a>`,
     after: () => { if (b.status === 'รอชำระ' && i.promptpay) drawQR($('#qr'), promptPayPayload(i.promptpay, +b.total), 190); },
   };
@@ -231,10 +248,11 @@ function paySheet(id, mode) {
   openSheet(`<h3>ชำระเงิน · ${money(b.total)} บาท</h3><div class="muted small" style="margin-bottom:10px">${esc(billTitle(b))}</div>
     <div class="seg"><button class="${mode === 'transfer' ? 'on' : ''}" onclick="paySheet(${q(id)},'transfer')">โอน / พร้อมเพย์</button><button class="${mode === 'cash' ? 'on' : ''}" onclick="paySheet(${q(id)},'cash')">เงินสด</button></div>
     ${mode === 'transfer' ? `<div class="muted" style="margin-bottom:8px">1. สแกน QR ในบิล หรือโอนเข้า<br><b style="color:var(--ink)">${i.promptpay ? 'พร้อมเพย์ ' + esc(i.promptpay) : ''}${i.promptpay && i.bankInfo ? '<br>' : ''}${esc(i.bankInfo)}</b>${!i.promptpay && !i.bankInfo ? 'ตามบัญชีที่เจ้าของหอแจ้ง' : ''}</div>
-      <div class="muted" style="margin-bottom:6px">2. แนบรูปสลิป</div>
+      ${F().slip ? `<div class="muted" style="margin-bottom:6px">2. แนบรูปสลิป</div>
       <label class="upl" id="slipBox"><input type="file" accept="image/*" style="display:none" onchange="pickSlip(this)"><span style="font-size:30px">📎</span><br>แตะเพื่อเลือกรูปสลิป</label>
       <button class="btn pri blk lg" style="margin-top:12px" id="sBtn" onclick="sendSlip(${q(id)})">ส่งสลิป</button>
-      <div class="muted small" style="text-align:center;margin-top:8px">เจ้าของหอจะตรวจและยืนยันให้</div>`
+      <div class="muted small" style="text-align:center;margin-top:8px">เจ้าของหอจะตรวจและยืนยันให้</div>` : `<div class="muted" style="margin-bottom:6px">2. ส่งรูปสลิปให้เจ้าของหอทาง LINE</div>${contactBtns(i)}
+      <div class="muted small" style="text-align:center;margin-top:8px">เจ้าของหอจะบันทึกการชำระ แล้วใบเสร็จจะขึ้นในแอป</div>`}`
     : `<div style="text-align:center;font-size:44px">💵</div><div class="card" style="background:#f4f6f8;border:0;text-align:center"><b>นำเงินสดมาจ่ายที่เจ้าของหอ</b><div class="muted" style="margin-top:4px;white-space:pre-wrap">${esc(i.cashInfo || '')}</div></div>
       <div class="muted small" style="text-align:center;margin-bottom:12px">เมื่อเจ้าของหอรับเงินแล้ว ใบเสร็จจะเข้ามาในแอปให้อัตโนมัติ</div>
       <div class="row">${i.phone ? `<button class="btn" style="flex:1" onclick="callPhone(${q(i.phone)})">📞 โทรหาหอ</button>` : ''}<button class="btn pri" style="flex:1" onclick="closeSheet()">เข้าใจแล้ว</button></div>`}`);
@@ -274,7 +292,7 @@ V.repairs = () => {
   const list = RSEG === 'open' ? open : done;
   return {
     title: 'แจ้งซ่อม', sub: 'ห้อง ' + esc(T().room) + ' · ทั้งหมด ' + D.repairs.length + ' เรื่อง',
-    html: `<button class="btn pri blk lg" style="margin-bottom:12px" onclick="go('newrepair')">+ แจ้งซ่อมใหม่</button>
+    html: `${F().repair ? `<button class="btn pri blk lg" style="margin-bottom:12px" onclick="go('newrepair')">+ แจ้งซ่อมใหม่</button>` : `<div class="card" style="text-align:center"><b>แจ้งซ่อมกับเจ้าของหอโดยตรง</b><div class="muted small">เจ้าของหอจะบันทึกเรื่องให้ และติดตามสถานะได้ที่หน้านี้</div>${contactBtns(I())}</div>`}
       <div class="seg"><button class="${RSEG === 'open' ? 'on' : ''}" onclick="RSEG='open';render()">กำลังดำเนินการ ${open.length}</button><button class="${RSEG === 'done' ? 'on' : ''}" onclick="RSEG='done';render()">ซ่อมเสร็จแล้ว ${done.length}</button></div>
       ${list.map(repairCard).join('') || `<div class="empty">${RSEG === 'open' ? (D.repairs.length ? 'ไม่มีเรื่องที่ค้างอยู่ 👍' : 'ยังไม่เคยแจ้งซ่อม') : 'ยังไม่มีงานที่ซ่อมเสร็จ'}</div>`}`,
     after: () => document.querySelectorAll('img[data-file]').forEach(async im => { try { im.src = await tFile(im.dataset.file); } catch (e) {} }),
@@ -285,6 +303,7 @@ async function tFile(fileId) { if (!TIMG[fileId]) TIMG[fileId] = (await tApi('te
 async function viewPhoto(fileId) { openSheet('<h3>รูปที่แนบ</h3><div class="empty" id="pvw">กำลังโหลด…</div>'); try { $('#pvw').outerHTML = `<img class="slipimg" src="${await tFile(fileId)}">`; } catch (e) { $('#pvw').textContent = e.message; } }
 V.newrepair = () => {
   RPHOTO = null; CAT = '';
+  if (!F().repair) return V.repairs();
   return {
     title: 'แจ้งซ่อมใหม่', sub: 'ห้อง ' + esc(T().room), back: 'repairs', nav: 'repairs',
     html: `<div class="muted small" style="margin-bottom:6px">ปัญหาอะไร</div><div class="cats" id="cats">${CATS.map(([i, l]) => `<button onclick="CAT=${q(l)};document.querySelectorAll('#cats button').forEach(x=>x.classList.toggle('on',x===this))"><i>${i}</i>${l}</button>`).join('')}</div>
@@ -313,7 +332,7 @@ async function sendRepair() {
 /* ---------- T12 ห้องของฉัน ---------- */
 V.me = () => {
   const t = T(), i = I(), d = t.endDate ? daysBetween(today(), t.endDate) : null;
-  const line = i.ownerLine ? (/^https?:/.test(i.ownerLine) ? i.ownerLine : 'https://line.me/R/ti/p/' + (i.ownerLine[0] === '@' ? encodeURIComponent(i.ownerLine) : '~' + encodeURIComponent(i.ownerLine))) : '';
+  const line = lineLink(i.ownerLine);
   return {
     title: 'ห้องของฉัน', sub: 'ห้อง ' + esc(t.room) + (t.type ? ' · ' + esc(t.type) : ''),
     html: `<div class="card"><h4>สัญญาเช่า</h4>
