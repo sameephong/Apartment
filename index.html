@@ -3,13 +3,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#f2f4f7">
+<meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="ดูแลตึก"><meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="apple-touch-icon.png"><link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <title>ระบบบริหารอพาร์ทเม้นท์</title>
 <link rel="preconnect" href="https://script.google.com"><link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=3.2">
+<link rel="stylesheet" href="app.css?v=3.4">
 <script>document.write('<script src="config.js?t=' + Date.now() + '"><\/script>')</script>
-<script src="common.js?v=3.2"></script>
+<script src="common.js?v=3.4"></script>
 <style>
 .choice{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid var(--line);border-radius:18px;padding:18px;margin-bottom:12px;text-decoration:none;color:inherit}
 .choice:hover{border-color:#9aa3ad}
@@ -30,6 +35,7 @@
     <a class="choice" href="admin.html"><i class="ic" style="background:var(--o-soft)">🔑</i><div><b>เจ้าของหอ</b><span class="muted">ห้อง มิเตอร์ ออกบิล รับเงิน งานซ่อม</span></div></a>
     </div>
     <p class="muted small" style="text-align:center" id="bldLine"></p>
+    <button class="btn blk install-btn hide" style="margin-top:6px" onclick="installApp()">📲 ติดตั้งแอป “ดูแลตึก” ลงเครื่อง</button>
     <div id="hint"></div>
   </div>
 </div>
@@ -56,6 +62,8 @@ if (NEED_BLD) {
   fill(); setTimeout(() => { $id('bSel').value = ''; }, 50); // ไม่เลือกตึกเดิมให้
   codes.forEach(c => fetchBInfo(c).then(j => { if (j) fill(); })); // อัปเดตชื่อตึกล่าสุดที่เจ้าของตั้งไว้
 } else {
+  // เปิดจากไอคอนแอป: เคยเข้าระบบไว้ → ไปหน้านั้นเลย
+  if (new URLSearchParams(location.search).get('source') === 'app') { if (load('owner_pw')) location.replace('admin.html'); else if (load('tenant_auth')) location.replace('tenant.html'); }
   const c = bInfo(BLD && BLD.code); if (c) { tenantBtn(c.app); if (c.name) $id('n').textContent = c.name; }
   if (BLD_MANY) $id('bldLine').innerHTML = `🏢 <b>${esc(bLabel(BLD.code))}</b> · <a href="#" onclick="changeBuilding();return false">เปลี่ยนตึก</a>`;
   callApi('publicInfo').then(i => { bInfo(BLD && BLD.code, i); $id('n').textContent = i.apartmentName; document.title = i.apartmentName; tenantBtn(!(i.flags && i.flags.app === false)); if (BLD_MANY) $id('bldLine').querySelector('b').textContent = i.buildingName || i.apartmentName; }).catch(() => {});

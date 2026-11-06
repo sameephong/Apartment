@@ -98,7 +98,7 @@
     getFileById: id => {
       const f = FILES[id];
       if (!f) throw new Error('ไม่พบไฟล์ (ข้อมูลทดลองอาจถูกล้าง)');
-      return { getBlob: () => ({ getContentType: () => f.mime, getBytes: () => ({ __b64: f.b64 }) }) };
+      return { getBlob: () => ({ getContentType: () => f.mime, getBytes: () => ({ __b64: f.b64 }) }), setTrashed: () => { delete FILES[id]; saveFiles(); } };
     },
   };
 

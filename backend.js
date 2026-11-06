@@ -23,9 +23,10 @@ const SCHEMA = {
              'allowEntry', 'status', 'ownerMsg', 'cost', 'billId', 'updatedAt', 'log',
              'source', 'urgent', 'appointAt', 'outcome'],
   News:     ['id', 'createdAt', 'title', 'body'],
+  Files:    ['id', 'createdAt', 'room', 'tenantId', 'category', 'name', 'mime', 'fileId', 'size', 'note'],
 };
 
-const NUM_KEYS = new Set(['floor', 'rent', 'deposit', 'waterPrev', 'waterCur', 'elecPrev', 'elecCur',
+const NUM_KEYS = new Set(['size', 'floor', 'rent', 'deposit', 'waterPrev', 'waterCur', 'elecPrev', 'elecCur',
   'waterUnits', 'elecUnits', 'total', 'paidAmount', 'received', 'cost', 'advanceRent', 'keyDeposit', 'cardFee', 'refundAmount']);
 
 const ST = {
@@ -147,6 +148,7 @@ const ADMIN_API = {
   createBill: api_createBill, updateBill: api_updateBill, deleteBill: api_deleteBill,
   approveSlip: api_approveSlip, rejectSlip: api_rejectSlip, receiveCash: api_receiveCash, recordPayment: api_recordPayment, unpay: api_unpay,
   fileImage: api_fileImage, saveRepair: api_saveRepair, createRepair: api_createRepair,
+  uploadDoc: api_uploadDoc, deleteDoc: api_deleteDoc, updateDoc: api_updateDoc,
   postNews: api_postNews, deleteNews: api_deleteNews,
   saveSettings: api_saveSettings, testLine: api_testLine,
 };
@@ -604,6 +606,40 @@ function setSlipResult_(id, result) {
 
 function api_fileImage(req) { return { image: fileDataUrl_(String(req.fileId || '')) }; }
 
+/* ============================ เอกสาร / รูปของห้อง (สัญญา บัตร รูปห้อง) ============================ */
+const DOC_CATS = ['สัญญาเช่า', 'เอกสารผู้เช่า', 'รูปห้องตอนเข้า', 'รูปห้องตอนออก', 'อื่นๆ'];
+function api_uploadDoc(req) {
+  const room = String(req.room || '').trim();
+  if (!findBy_('Rooms', 'room', room)) throw new Error('ไม่พบห้อง ' + room);
+  const m = String(req.data || '').match(/^data:([\w.+-]+\/[\w.+-]+);base64,(.+)$/);
+  if (!m) throw new Error('ไฟล์ไม่ถูกต้อง');
+  if (!/^image\/(jpeg|png|webp|heic|heif)$|^application\/pdf$/.test(m[1])) throw new Error('รองรับเฉพาะรูปภาพ และไฟล์ PDF');
+  if (m[2].length > 14 * 1024 * 1024) throw new Error('ไฟล์ใหญ่เกิน 10 MB');
+  const t = req.tenantId ? findBy_('Tenants', 'id', String(req.tenantId)) : activeTenant_(room);
+  const cat = DOC_CATS.indexOf(req.category) >= 0 ? req.category : 'อื่นๆ';
+  const name = String(req.name || cat).replace(/[\\/:*?"<>|]/g, '_').slice(0, 100);
+  const blob = Utilities.newBlob(Utilities.base64Decode(m[2]), m[1], 'ห้อง' + room + '_' + cat + '_' + name);
+  const fileId = fileFolder_().createFile(blob).getId();
+  const doc = { id: 'D' + Date.now().toString(36) + rand_(3), createdAt: now_(), room, tenantId: t ? t.id : '', category: cat, name, mime: m[1],
+    fileId, size: Math.round(m[2].length * 0.75), note: String(req.note || '').slice(0, 200) };
+  writeRow_('Files', doc);
+  return { id: doc.id };
+}
+function api_updateDoc(req) {
+  const d = findBy_('Files', 'id', String(req.id || ''));
+  if (!d) throw new Error('ไม่พบไฟล์');
+  if (req.category !== undefined && DOC_CATS.indexOf(req.category) >= 0) d.category = req.category;
+  if (req.note !== undefined) d.note = String(req.note).slice(0, 200);
+  if (req.name !== undefined && String(req.name).trim()) d.name = String(req.name).trim().slice(0, 100);
+  writeRow_('Files', d, d._row);
+}
+function api_deleteDoc(req) {
+  const d = findBy_('Files', 'id', String(req.id || ''));
+  if (!d) return;
+  try { DriveApp.getFileById(d.fileId).setTrashed(true); } catch (e) { /* ไฟล์ถูกลบไปแล้ว */ }
+  deleteRow_('Files', d._row);
+}
+
 /* ============================ แจ้งซ่อม & ประกาศ ============================ */
 
 function api_saveRepair(req) {
@@ -765,6 +801,7 @@ function allData_() {
     slips: readAll_('Slips').map(x => { const o = strip_(x); delete o.hash; return o; }),
     repairs: readAll_('Repairs').map(r => { const o = strip_(r); o.log = parseLog_(r); return o; }).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     news: readAll_('News').map(strip_).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    docs: readAll_('Files').map(strip_).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     serverToday: today_(), serverNow: now_(),
   };
 }
@@ -967,7 +1004,11 @@ function dropCache_(name) {
 function parseLog_(r) { try { return JSON.parse(r.log || '[]'); } catch (e) { return []; } }
 function sheet_(name) {
   if (MEMO['s:' + name]) return MEMO['s:' + name];
-  const sh = SpreadsheetApp.getActive().getSheetByName(name);
+  let sh = SpreadsheetApp.getActive().getSheetByName(name);
+  if (!sh && SCHEMA[name] && name !== 'Settings') { // ชีตที่เพิ่มในเวอร์ชันใหม่ สร้างให้อัตโนมัติ
+    sh = SpreadsheetApp.getActive().insertSheet(name);
+    sh.getRange(1, 1, 1, SCHEMA[name].length).setValues([SCHEMA[name]]).setFontWeight('bold'); sh.setFrozenRows(1);
+  }
   if (!sh) throw new Error('ไม่พบชีต ' + name + ' — กรุณารัน setup อีกครั้ง');
   MEMO['s:' + name] = sh;
   return sh;

@@ -3,14 +3,19 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f766e">
+<meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="ดูแลตึก"><meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="apple-touch-icon.png"><link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <title>ผู้เช่า · อพาร์ทเม้นท์</title>
 <link rel="preconnect" href="https://script.google.com"><link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=3.2">
+<link rel="stylesheet" href="app.css?v=3.4">
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>document.write('<script src="config.js?t=' + Date.now() + '"><\/script>')</script>
-<script src="common.js?v=3.2"></script>
+<script src="common.js?v=3.4"></script>
 <style>
 .pin{letter-spacing:10px;font-size:26px;text-align:center;font-weight:700}
 .hero{border:0;color:#fff}
@@ -43,6 +48,7 @@
       </div>
     </div>
     <p class="muted small" style="text-align:center"><a href="admin.html">สำหรับเจ้าของหอ</a><span id="bldLine"></span></p>
+    <button class="btn blk install-btn hide" onclick="installApp()">📲 ติดตั้งแอป “ดูแลตึก” ลงเครื่อง</button>
   </div>
   <div id="app" class="hide">
     <div id="demo"></div>
@@ -346,7 +352,9 @@ V.me = () => {
     <div class="card"><h4>ค่าบริการ</h4><div class="muted">น้ำ ${money(i.waterRate)} บาท/หน่วย · ไฟ ${money(i.elecRate)} บาท/หน่วย${+i.commonFee ? ' · ส่วนกลาง ' + money(i.commonFee) + ' บาท/เดือน' : ''}</div></div>
     <div class="card"><h4>ติดต่อเจ้าของหอ</h4><div class="muted small" style="margin-bottom:8px">${esc(i.apartmentName)}${i.address ? '<br>' + esc(i.address) : ''}</div>
       <div class="row">${i.phone ? `<button class="btn" style="flex:1" onclick="callPhone(${q(i.phone)})">📞 โทร ${esc(i.phone)}</button>` : ''}${line ? `<a class="btn ok" style="flex:1" target="_blank" href="${esc(line)}">💬 LINE</a>` : ''}</div></div>
+    <button class="btn blk install-btn" style="margin-bottom:8px" onclick="installApp()">📲 ติดตั้งแอป “ดูแลตึก” ลงเครื่อง</button>
     <button class="btn bad blk" onclick="logout()">ออกจากระบบ</button>`,
+    after: showInstall,
   };
 };
 

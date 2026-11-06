@@ -3,14 +3,19 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2457c5">
+<meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="ดูแลตึก"><meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="apple-touch-icon.png"><link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <title>เจ้าของหอ · ระบบบริหารอพาร์ทเม้นท์</title>
 <link rel="preconnect" href="https://script.google.com"><link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=3.2">
+<link rel="stylesheet" href="app.css?v=3.4">
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>document.write('<script src="config.js?t=' + Date.now() + '"><\/script>')</script>
-<script src="common.js?v=3.2"></script>
+<script src="common.js?v=3.4"></script>
 </head>
 <body class="admin">
 <div class="wrap">
@@ -23,6 +28,7 @@
       <p class="muted" id="loginErr" style="color:var(--bad)"></p>
       <p class="muted" id="demoHint"></p>
     </div>
+    <button class="btn blk install-btn hide" onclick="installApp()">📲 ติดตั้งแอป “ดูแลตึก” ลงเครื่อง</button>
     <p class="muted" style="text-align:center"><span id="tenLink"><a href="tenant.html">สำหรับผู้เช่า</a> · </span><a href="index.html">หน้าแรก</a></p>
   </div>
   <div id="app" class="hide">
@@ -305,7 +311,8 @@ async function checkIn(room) {
   openSheet(`<div style="text-align:center"><div class="ok-ic">✓</div><h3 style="padding:0">เช็คอินห้อง ${esc(room)} แล้ว</h3><p class="muted">${esc(t.name)}${j.billId ? ' · ออกบิลแรกเข้าแล้ว ' + money(billById(j.billId).total) + ' บาท' : ''}</p>
     ${FL().app ? `<div class="card" style="background:var(--o-soft);border:0">รหัสเข้าแอปผู้เช่า<div class="big" style="letter-spacing:4px">${esc(t.pin)}</div></div>
     <button class="btn ok blk lg" onclick="sharePin(${q(t.id)})">ส่งลิงก์ + รหัสให้ผู้เช่าทาง LINE</button>` : ''}
-    ${j.billId ? `<button class="btn ${FL().app ? '' : 'ok lg'} blk" style="margin-top:8px" onclick="shareBill(${q(j.billId)})">ส่งบิลแรกเข้าทาง LINE</button>` : ''}</div>`);
+    ${j.billId ? `<button class="btn ${FL().app ? '' : 'ok lg'} blk" style="margin-top:8px" onclick="shareBill(${q(j.billId)})">ส่งบิลแรกเข้าทาง LINE</button>` : ''}
+    <button class="btn blk" style="margin-top:8px" onclick="docSheet(${q(room)},'สัญญาเช่า',${q(t.id)})">📎 แนบสัญญาเช่า / รูปบัตร / รูปห้อง</button></div>`);
 }
 
 /* ---------- O5 จดมิเตอร์ ---------- */
@@ -672,6 +679,7 @@ async function moveOut(id) {
   const txt = `สรุปการย้ายออก ${S().apartmentName}\nห้อง ${t.room} คุณ${t.name}\n` + c.items.map(i => `${i.l} ${money(i.a)}`).join('\n') + `\n${c.refund ? 'คืนเงินให้ผู้เช่า ' + money(c.refund) : c.owe ? 'ผู้เช่าชำระเพิ่ม ' + money(c.owe) : 'ยอดสุทธิ 0'} บาท\nรายละเอียด: ${billUrl(b)}`;
   setTimeout(() => openSheet(`<div style="text-align:center"><div class="ok-ic">✓</div><h3 style="padding:0">ย้ายออกเรียบร้อย</h3><p class="muted">ห้อง ${esc(t.room)} ว่างแล้ว</p><div class="big" style="color:${c.owe ? 'var(--bad)' : 'var(--ok)'}">${c.refund ? 'คืน ' + money(c.refund) : c.owe ? 'เก็บเพิ่ม ' + money(c.owe) : '0'} บาท</div>${c.refund ? '<p class="muted small">บันทึกไว้ที่หน้า “เงินประกัน” ว่ารอคืนเงิน · กดปุ่มด้านล่างเมื่อโอน/จ่ายคืนแล้ว</p>' : ''}</div>
     ${c.refund ? `<button class="btn blk" style="margin-top:12px" onclick="refundSheet(${q(id)})">💸 บันทึกว่าคืนเงิน ${money(c.refund)} บาทแล้ว</button>` : ''}
+    <button class="btn blk" style="margin-top:8px" onclick="docSheet(${q(t.room)},'รูปห้องตอนออก',${q(id)})">📸 แนบรูปห้องตอนย้ายออก</button>
     <button class="btn ok blk lg" style="margin-top:12px" onclick='openLine(${esc(JSON.stringify(txt))})'>ส่งสรุปให้ผู้เช่าทาง LINE</button>${c.owe ? `<button class="btn blk" style="margin-top:8px" onclick="paySheet(${q(b.id)})">💵 บันทึกรับเงิน</button>` : ''}`), 50);
 }
 
@@ -688,6 +696,7 @@ VIEWS.more = () => ({
       <div class="item tap ${FL().app ? '' : 'hide'}" onclick="navigator.clipboard&&navigator.clipboard.writeText(tenantUrl()).then(()=>toast('คัดลอกลิงก์แล้ว'))"><span style="font-size:20px">🔗</span><span style="flex:1">คัดลอกลิงก์แอปผู้เช่า<div class="muted small" style="word-break:break-all">${esc(tenantUrl())}</div></span></div>
       <a class="item tap" href="tenant.html" style="text-decoration:none;color:inherit"><span style="font-size:20px">🏠</span><span style="flex:1">เปิดหน้าผู้เช่า</span><span class="muted">›</span></a></div>
     ${IS_DEMO ? `<button class="btn blk" style="margin-bottom:10px" onclick="resetDemo()">↺ ล้างข้อมูลทดลอง เริ่มใหม่</button>` : ''}
+    <button class="btn blk install-btn" style="margin-bottom:10px" onclick="installApp()">📲 ติดตั้งแอป “ดูแลตึก” ลงเครื่อง</button>
     ${BLD_MANY ? `<button class="btn blk" style="margin-bottom:10px" onclick="changeBuilding()">🏢 เปลี่ยนตึก (ตอนนี้: ${esc(BLD.code)})</button>` : ''}
     <button class="btn bad blk" onclick="logout()">ออกจากระบบ</button>`,
 });
@@ -812,6 +821,7 @@ const _render0 = render;
 render = function () {
   if (D && (location.hash.slice(1).split('/')[0] !== 'settings')) UI.tm = null;
   _render0();
+  showInstall(); loadDocThumbs();
   if (D && BLD) bInfo(BLD.code, { buildingName: S().buildingName || S().apartmentName, flags: FL() }); // จำชื่อตึกล่าสุดไว้ใช้ในรายการเลือกตึก
 };
 
@@ -849,6 +859,7 @@ function renderSide() {
     ${BLD_MANY ? `<div class="bchip"><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">🏢 <b style="color:#fff">${esc(S().buildingName || S().apartmentName)}</b></span><a onclick="changeBuilding()" style="flex:none;margin-left:8px">เปลี่ยนตึก</a></div>` : ''}
     <div class="mode ${own ? '' : 'sh'}" onclick="go('settings/tenant')" title="เปลี่ยนได้ที่ ตั้งค่า › การใช้งานร่วมกับผู้เช่า">${own ? '🔑 โหมดเจ้าของจัดการเอง' : '👥 ใช้ร่วมกับผู้เช่า'}</div>
     <nav>${items.map(x => typeof x === 'string' ? `<div class="sep">${x}</div>` : `<a class="nv ${x[0] === k ? 'on' : ''}" onclick="go('${x[0]}')"><span>${x[1]}</span>${x[2]}${x[3] ? `<span class="n">${x[3]}</span>` : ''}</a>`).join('')}</nav>
+    <a class="nv install-btn" onclick="installApp()" style="margin-top:10px"><span>📲</span>ติดตั้งแอปลงเครื่อง</a>
     <div class="me"><i>${esc((S().apartmentName || 'อ').trim()[0])}</i><div><b style="color:#fff">เจ้าของหอ</b><div><a onclick="logout()">ออกจากระบบ</a></div></div></div>`;
 }
 function deskTools() {
@@ -977,7 +988,7 @@ function roomPanel(no) {
   const sub = [r.floor ? 'ชั้น ' + r.floor : '', r.type, money(r.rent) + ' ฿/เดือน'].filter(Boolean).map(esc).join(' · ');
   const head = name => `<div class="row" style="flex-wrap:nowrap;gap:12px;margin-bottom:14px"><div style="width:58px;height:58px;border-radius:14px;background:var(--o-soft);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:var(--o);flex:none">${esc(no)}</div><div style="flex:1;min-width:0"><b style="font-size:18px">${name}</b><div class="muted small">${sub}</div></div><span class="pl ${pc}">${esc(st.l)}</span></div>`;
   if (!t) return head(r.status === 'ว่าง' ? 'ห้องว่าง' : 'ห้อง' + esc(r.status)) + (r.note ? `<p class="muted">${esc(r.note)}</p>` : '') +
-    `<button class="btn ok blk lg" onclick="go('room/${encodeURIComponent(no)}')">＋ เช็คอินผู้เช่าใหม่</button><button class="btn blk" style="margin-top:8px" onclick="roomSheet(${q(no)})">✏️ แก้ไขห้อง</button>`;
+    `<button class="btn ok blk lg" onclick="go('room/${encodeURIComponent(no)}')">＋ เช็คอินผู้เช่าใหม่</button><button class="btn blk" style="margin-top:8px" onclick="roomSheet(${q(no)})">✏️ แก้ไขห้อง</button>` + docsHtml(no);
   const bills = D.bills.filter(b => b.tenantId === t.id).slice(0, 3), ob = openBills().filter(b => b.tenantId === t.id), reps = D.repairs.filter(x => x.room === no && repOpen(x));
   const lastM = D.meters.filter(m => m.room === no && (m.waterCur !== '' || m.elecCur !== '')).sort((a, b) => b.month.localeCompare(a.month))[0], dl = t.endDate ? daysBetween(today(), t.endDate) : null;
   return head(esc(t.name)) +
@@ -989,6 +1000,7 @@ function roomPanel(no) {
     <div class="line"><span class="muted">มิเตอร์ล่าสุด</span><span>${lastM ? 'น้ำ ' + money(lastM.waterCur !== '' ? lastM.waterCur : lastM.waterPrev) + ' · ไฟ ' + money(lastM.elecCur !== '' ? lastM.elecCur : lastM.elecPrev) : '-'}</span></div>
     <b style="display:block;margin:14px 0 2px;font-size:14px">บิลล่าสุด</b>${bills.map(b => `<div class="line tap" onclick="billSheet(${q(b.id)})"><span>${esc(billTitle(b))}</span><span>${fmtB(b.total)} ${statusPill(b)}</span></div>`).join('') || '<div class="muted small">ยังไม่มีบิล</div>'}
     <b style="display:block;margin:14px 0 2px;font-size:14px">งานซ่อม</b>${reps.map(x => `<div class="task tap" onclick="repairSheet(${q(x.id)})"><i class="ic" style="background:var(--warn-soft);width:30px;height:30px;font-size:15px">🔧</i><div style="flex:1;min-width:0">${esc(x.category)} · ${esc(x.detail.slice(0, 40))}<div class="muted small">แจ้ง ${ago(x.createdAt)}</div></div><span class="pl ${x.status === 'กำลังซ่อม' ? 'o' : 'warn'}">${esc(x.status)}</span></div>`).join('') || '<div class="muted small">ไม่มีงานค้าง</div>'}
+    ${docsHtml(no)}
     ${ob.length ? `<button class="btn ok blk" style="margin-top:14px" onclick="paySheet(${q(ob[ob.length - 1].id)})">💵 บันทึกรับเงิน ${fmtB(ob[ob.length - 1].total)}</button>` : ''}
     <div class="row" style="flex-wrap:nowrap;margin-top:${ob.length ? 8 : 16}px"><button class="btn" style="flex:1" onclick="go('newbill/${encodeURIComponent(no)}')">🧾 ออกบิล</button><button class="btn" style="flex:1" onclick="tenantSheet(${q(t.id)})">✏️ แก้ไข</button><button class="btn bad" style="flex:1" onclick="go('moveout/${t.id}')">🚪 ย้ายออก</button></div>`;
 }
@@ -1384,6 +1396,84 @@ function refundSheet(id) {
     <label class="f">วันที่คืน<input type="date" id="rfD" value="${today()}"></label>
     <button class="btn ok blk lg" onclick="act('markRefund',{id:${esc(JSON.stringify(id))},date:$('#rfD').value,method:document.querySelector('#rfM .on').dataset.v},'บันทึกว่าคืนเงินแล้ว').then(()=>{closeSheet();render()})">✓ คืนเงินแล้ว</button>`);
 }
+
+/* ---------- เอกสาร / รูปของห้อง: สัญญาเช่า บัตร รูปห้องตอนเข้า-ออก ---------- */
+const DOCCAT = [['สัญญาเช่า', '📄'], ['เอกสารผู้เช่า', '🪪'], ['รูปห้องตอนเข้า', '📷'], ['รูปห้องตอนออก', '📸'], ['อื่นๆ', '📎']];
+const docCatIcon = c => (DOCCAT.find(x => x[0] === c) || ['', '📎'])[1];
+const fmtSize = n => +n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round((+n || 0) / 1024)) + ' KB';
+function docsHtml(no) {
+  const t = tenantOf(no), list = (D.docs || []).filter(d => d.room === no);
+  const cur = list.filter(d => !d.tenantId || (t && d.tenantId === t.id)), old = list.filter(d => !cur.includes(d));
+  const item = d => `<div class="doc tap" onclick="viewDoc(${q(d.id)})" title="${esc(d.name)}">${/^image/.test(d.mime) ? `<img class="dthumb" data-file="${esc(d.fileId)}" alt="">` : '<div class="dthumb pdf">PDF</div>'}<div class="dn">${docCatIcon(d.category)} ${esc(d.category)}</div><div class="dd">${fmtDate(d.createdAt)}</div></div>`;
+  const oldBy = {}; old.forEach(d => { const tt = tenantById(d.tenantId); const k = tt ? tt.name : 'ผู้เช่าเก่า'; (oldBy[k] = oldBy[k] || []).push(d); });
+  return `<div class="row" style="margin:14px 0 6px;flex-wrap:nowrap"><b style="font-size:14px;flex:1">📎 เอกสาร / รูป (${cur.length})</b><button class="btn sm" onclick="docSheet(${q(no)})">＋ แนบไฟล์</button></div>
+    <div class="docs">${cur.map(item).join('') || '<div class="muted small" style="grid-column:1/-1">ยังไม่มีไฟล์ · แนบสัญญาเช่า รูปบัตร หรือรูปห้องได้</div>'}</div>
+    ${Object.keys(oldBy).map(k => `<details style="margin-top:8px"><summary class="muted small" style="cursor:pointer">ผู้เช่าเก่า: ${esc(k)} · ${oldBy[k].length} ไฟล์</summary><div class="docs" style="margin-top:6px">${oldBy[k].map(item).join('')}</div></details>`).join('')}`;
+}
+function loadDocThumbs() { document.querySelectorAll('img.dthumb[data-file]:not([src])').forEach(async im => { try { im.src = await getImg(im.dataset.file); } catch (e) { im.alt = '⚠'; } }); }
+function dataUrlBlob(u) { const [h, b] = u.split(','), mime = (h.match(/data:([^;]+)/) || [])[1] || 'application/octet-stream', bin = atob(b), a = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); return new Blob([a], { type: mime }); }
+async function viewDoc(id) {
+  const d = (D.docs || []).find(x => x.id === id); if (!d) return;
+  const img = /^image/.test(d.mime), tt = tenantById(d.tenantId);
+  openSheet(`<h3>${docCatIcon(d.category)} ${esc(d.category)} · ห้อง ${esc(d.room)}</h3><div class="muted small">${esc(d.name)} · ${fmtDateTime(d.createdAt)} · ${fmtSize(d.size)}${tt ? ' · ' + esc(tt.name) : ''}</div>
+    ${d.note ? `<div class="bubble">${esc(d.note)}</div>` : ''}
+    <div id="dvBox" class="empty">กำลังโหลด…</div>
+    <div class="fl" style="margin-top:10px">ย้ายไปหมวด</div><div class="segb" id="dvCat">${DOCCAT.map(([c, i]) => `<button class="${c === d.category ? 'on' : ''}" onclick="act('updateDoc',{id:${esc(JSON.stringify(id))},category:${esc(JSON.stringify(c))}},'ย้ายหมวดแล้ว').then(()=>{render();viewDoc(${esc(JSON.stringify(id))})})">${i} ${c}</button>`).join('')}</div>
+    <div class="row" style="margin-top:6px"><a class="btn dis" id="dvOpen" target="_blank" rel="noopener">🔍 เปิดเต็ม</a><a class="btn dis" id="dvDl" download="${esc(d.name)}">⬇️ ดาวน์โหลด</a><span class="sp"></span><button class="btn bad" onclick="delDoc(${q(id)})">🗑 ลบ</button></div>`);
+  try {
+    const src = await getImg(d.fileId), url = URL.createObjectURL(dataUrlBlob(src)), box = $('#dvBox'); if (!box) return;
+    box.outerHTML = img ? `<img src="${src}" class="slipimg" style="margin-top:10px" onclick="viewFile(${q(d.fileId)})">`
+      : DESK() ? `<iframe src="${url}" style="width:100%;height:60vh;border:1px solid var(--line);border-radius:10px;margin-top:10px"></iframe>` : `<div class="card" style="text-align:center;margin-top:10px">📄 ไฟล์ PDF · ${fmtSize(d.size)}<div class="muted small">กด “เปิดเต็ม” เพื่ออ่าน</div></div>`;
+    ['#dvOpen', '#dvDl'].forEach(s => { const a = $(s); if (a) { a.href = url; a.classList.remove('dis'); } });
+  } catch (e) { const box = $('#dvBox'); if (box) box.textContent = e.message; }
+}
+async function delDoc(id) { if (!await uiConfirm('ลบไฟล์นี้? (ไฟล์ใน Google Drive จะย้ายไปถังขยะ)', 'ลบ', true)) return; await act('deleteDoc', { id }, 'ลบแล้ว'); closeSheet(); render(); }
+let DC = null;
+function docSheet(room, cat, tenantId) {
+  const t = tenantId ? tenantById(tenantId) : tenantOf(room);
+  DC = { room, tenantId: t ? t.id : '', files: [] };
+  openSheet(`<h3>📎 แนบไฟล์ · ห้อง ${esc(room)}</h3><div class="muted small">${t ? 'ผู้เช่า: ' + esc(t.name) : 'ห้องว่าง · เก็บเป็นไฟล์ของห้อง'}</div>
+    <div class="fl" style="margin-top:12px">ประเภท</div><div class="segb" id="dcCat">${DOCCAT.map(([c, i]) => `<button class="${c === (cat || 'สัญญาเช่า') ? 'on' : ''}" data-v="${c}" onclick="segPick(this)">${i} ${c}</button>`).join('')}</div>
+    <label class="paydrop" id="dcDrop"><input type="file" multiple accept="image/*,application/pdf" style="display:none" onchange="dcPick(this.files);this.value=''"><span style="font-size:28px">📎</span><div style="flex:1"><b>เลือกไฟล์ / ถ่ายรูป</b><div class="muted small">รูปภาพหรือ PDF · เลือกได้หลายไฟล์ · ลากมาวาง หรือกด Ctrl+V</div></div></label>
+    <div id="dcList" style="margin:8px 0"></div>
+    <label class="f">หมายเหตุ (ไม่บังคับ)<input id="dcNote" placeholder="เช่น สัญญา 1 ปี เริ่ม 1 พ.ย. 69"></label>
+    <div class="row" style="justify-content:flex-end"><button class="btn" onclick="DC=null;closeSheet()">ยกเลิก</button><button class="btn pri" id="dcBtn" onclick="dcUpload()" disabled>⬆️ อัปโหลด</button></div>`);
+  const d = $('#dcDrop');
+  d.ondragover = e => { e.preventDefault(); d.classList.add('over'); }; d.ondragleave = () => d.classList.remove('over');
+  d.ondrop = e => { e.preventDefault(); d.classList.remove('over'); dcPick(e.dataTransfer.files); };
+}
+function readAsDataUrl(f) { return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(new Error('อ่านไฟล์ไม่ได้')); r.readAsDataURL(f); }); }
+async function dcPick(files) {
+  if (!DC) return;
+  for (const f of [...files]) {
+    try {
+      if (f.type === 'application/pdf') { if (f.size > 10 * 1048576) { uiAlert(f.name + ' ใหญ่เกิน 10 MB'); continue; } DC.files.push({ name: f.name, mime: f.type, data: await readAsDataUrl(f), size: f.size }); }
+      else if (/^image\//.test(f.type) || /\.(heic|heif|jpe?g|png|webp)$/i.test(f.name)) { let data; try { data = await resizeImage(f, 1800, 0.82); } catch (e) { data = await readAsDataUrl(f); } DC.files.push({ name: (f.name || 'รูป').replace(/\.\w+$/, '') + '.jpg', mime: 'image/jpeg', data, size: Math.round(data.length * 0.75) }); }
+      else uiAlert(f.name + ': รองรับเฉพาะรูปภาพและ PDF');
+    } catch (e) { uiAlert(e.message); }
+  }
+  $('#dcList').innerHTML = DC.files.map((f, i) => `<div class="item" style="padding:6px 0">${/^image/.test(f.mime) ? `<img src="${f.data}" class="shot">` : '<div class="shot" style="display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--bad)">PDF</div>'}<div style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(f.name)}<div class="muted small">${fmtSize(f.size)}</div></div><button class="btn sm" onclick="DC.files.splice(${i},1);dcPick([])">✕</button></div>`).join('');
+  $('#dcBtn').disabled = !DC.files.length; $('#dcBtn').textContent = '⬆️ อัปโหลด' + (DC.files.length ? ' ' + DC.files.length + ' ไฟล์' : '');
+}
+document.addEventListener('paste', e => {
+  if (!DC || !$('#dcDrop') || !$('#sbg').classList.contains('on')) return;
+  const fs = [...((e.clipboardData || {}).items || [])].filter(i => i.kind === 'file').map(i => i.getAsFile()).filter(Boolean);
+  if (fs.length) { e.preventDefault(); dcPick(fs); }
+});
+async function dcUpload() {
+  const cat = document.querySelector('#dcCat .on').dataset.v, note = $('#dcNote').value.trim(), btn = $('#dcBtn'), n = DC.files.length;
+  btn.disabled = true;
+  try {
+    for (let i = 0; i < n; i++) { btn.textContent = `กำลังอัปโหลด ${i + 1}/${n}…`; const f = DC.files[0]; await api('uploadDoc', { room: DC.room, tenantId: DC.tenantId, category: cat, name: f.name, data: f.data, note }, true); DC.files.shift(); }
+    DC = null; closeSheet(); render(); toast('อัปโหลด ' + n + ' ไฟล์แล้ว');
+  } catch (e) { uiAlert('อัปโหลดไม่สำเร็จ: ' + e.message + (DC.files.length < n ? '\nอัปโหลดไปแล้ว ' + (n - DC.files.length) + ' ไฟล์' : '')); dcPick([]); btn.disabled = false; }
+}
+// ใส่ส่วนเอกสารในหน้าห้อง (มือถือ/คอมแบบหน้าเดียว)
+VIEWS.room = no => {
+  const v = M.room(no);
+  if (D.rooms.some(r => r.room === no)) v.html += `<div class="card">${docsHtml(no)}</div>`;
+  return v;
+};
 </script>
 </body>
 </html>

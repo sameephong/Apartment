@@ -60,7 +60,7 @@ function loadScript(src) {
   });
 }
 function demoReady() {
-  if (!_demoReady) _demoReady = loadScript('demo.js?v=3.2').then(() => loadScript('backend.js?v=3.2')).then(() => window.DemoGAS.init());
+  if (!_demoReady) _demoReady = loadScript('demo.js?v=3.4').then(() => loadScript('backend.js?v=3.4')).then(() => window.DemoGAS.init());
   return _demoReady;
 }
 async function callApi(action, payload) {
@@ -231,3 +231,24 @@ function callPhone(num) {
     (navigator.clipboard ? navigator.clipboard.writeText(num) : Promise.reject()).then(() => { b.textContent = 'คัดลอกแล้ว ✓'; }, () => { b.textContent = 'กดค้างที่เบอร์เพื่อคัดลอก'; });
   };
 }
+
+/* ---------- เว็บแอป “ดูแลตึก” (ติดตั้งลงหน้าจอโฮม / Dock) ---------- */
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+let _bip = null;
+const IS_APP = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+const IS_IOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); _bip = e; showInstall(); });
+window.addEventListener('appinstalled', () => { _bip = null; showInstall(); });
+function showInstall() { document.querySelectorAll('.install-btn').forEach(b => b.classList.toggle('hide', IS_APP())); }
+async function installApp() {
+  if (_bip) { _bip.prompt(); try { await _bip.userChoice; } catch (e) {} _bip = null; showInstall(); return; }
+  const ua = navigator.userAgent;
+  let how;
+  if (/Line\//i.test(ua) || /FBAN|FBAV|Instagram/i.test(ua)) how = 'ตอนนี้เปิดอยู่ในแอป LINE/Facebook ซึ่งติดตั้งไม่ได้\n\n1. กดปุ่ม ⋯ มุมขวา\n2. เลือก “เปิดในเบราว์เซอร์” (Safari หรือ Chrome)\n3. แล้วกดปุ่ม “ติดตั้งแอป” อีกครั้ง';
+  else if (IS_IOS) how = 'บน iPhone / iPad (ใช้ Safari)\n\n1. กดปุ่มแชร์ ⬆️ ด้านล่างจอ\n2. เลื่อนลงแล้วกด “เพิ่มไปยังหน้าจอโฮม”\n3. กด “เพิ่ม” — ไอคอน “ดูแลตึก” จะขึ้นที่หน้าจอโฮม';
+  else if (/Macintosh/.test(ua) && /Safari/.test(ua) && !/Chrome|Edg/.test(ua)) how = 'บน Mac (Safari)\n\nเมนู “ไฟล์” → “เพิ่มไปยัง Dock…” → กด “เพิ่ม”';
+  else if (/Android/i.test(ua)) how = 'บน Android (Chrome)\n\nกดเมนู ⋮ มุมขวาบน → “ติดตั้งแอป” หรือ “เพิ่มไปยังหน้าจอหลัก”';
+  else how = 'บนคอม (Chrome / Edge)\n\nกดไอคอน ⊕ ติดตั้ง ที่ท้ายช่องที่อยู่เว็บด้านบน\nหรือเมนู ⋮ → “บันทึกและแชร์” → “ติดตั้งหน้าเว็บนี้เป็นแอป”';
+  uiAlert(how);
+}
+document.addEventListener('DOMContentLoaded', showInstall);
