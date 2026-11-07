@@ -12,10 +12,10 @@
 <link rel="preconnect" href="https://script.google.com"><link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=3.7">
+<link rel="stylesheet" href="app.css?v=4.0">
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>document.write('<script src="config.js?t=' + Date.now() + '"><\/script>')</script>
-<script src="common.js?v=3.7"></script>
+<script src="common.js?v=4.0"></script>
 <style>
 .pin{letter-spacing:10px;font-size:26px;text-align:center;font-weight:700}
 .hero{border:0;color:#fff}
@@ -40,8 +40,8 @@
       <div id="closedBox" class="hide"></div>
       <div style="text-align:left;margin-top:18px" id="loginForm">
         <label class="f">เลขห้อง<input id="lRoom" list="roomList" inputmode="numeric" autocomplete="off" placeholder="พิมพ์หรือเลือกเลขห้อง เช่น 101" style="font-size:20px;text-align:center;font-weight:700"><datalist id="roomList"></datalist></label>
-        <label class="f">รหัสผู้เช่า (ได้รับจากเจ้าของหอ)<input id="lPin" class="pin" type="password" inputmode="numeric" maxlength="8" autocomplete="current-password" placeholder="••••••"></label>
-        <button class="btn pri blk lg" id="lBtn" onclick="login()">เข้าสู่ระบบ</button>
+        <div class="muted small" style="text-align:center;margin-bottom:4px">รหัสผู้เช่า (ได้รับจากเจ้าของหอ)</div>
+        <input type="hidden" id="lPin"><div id="lPad"></div>
         <p class="muted" id="lErr" style="color:var(--bad);text-align:center"></p>
         <p class="muted small" id="demoHint" style="text-align:center"></p>
         <p class="muted small" style="text-align:center" id="forgot"></p>
@@ -104,7 +104,7 @@ function badge(b) {
   }
   if (BLD_MANY && BLD) $('#bldLine').innerHTML = ` · 🏢 ${esc(bLabel(BLD.code))} · <a href="#" onclick="changeBuilding();return false">เปลี่ยนตึก</a>`;
   if (IS_DEMO) $('#demoHint').innerHTML = 'โหมดทดลอง: ห้อง <b>101</b> รหัส <b>111111</b> หรือห้อง <b>102</b> รหัส <b>222222</b>';
-  if (qRoom) { $('#lRoom').value = qRoom; $('#lPin').focus(); }
+  if (qRoom) $('#lRoom').value = qRoom;
   await loadRooms();
 })();
 function lineLink(id) { return id ? (/^https?:/.test(id) ? id : 'https://line.me/R/ti/p/' + (id[0] === '@' ? encodeURIComponent(id) : '~' + encodeURIComponent(id))) : ''; }
@@ -133,14 +133,16 @@ async function loadRooms() {
   } catch (e) { if ($('#aptName').textContent === 'กำลังโหลด…') $('#aptName').textContent = 'เข้าสู่ระบบผู้เช่า'; }
 }
 $('#lRoom').addEventListener('focus', loadRooms, { once: true });
-$('#lPin').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
+const LPAD = pinPad($('#lPad'), { max: 8, goId: 'lBtn', onChange: v => { $('#lPin').value = v; }, onSubmit: () => login() });
+$('#lRoom').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('#lRoom').blur(); } });
+kbFix($('#lRoom'));
 async function login() {
   const room = $('#lRoom').value.trim(), pin = $('#lPin').value.trim();
   if (!room || !/^\d{4,8}$/.test(pin)) { $('#lErr').textContent = 'กรุณาใส่เลขห้องและรหัสผู้เช่า (ตัวเลข 4–8 หลัก)'; return; }
-  $('#lBtn').disabled = true; $('#lBtn').textContent = 'กำลังเข้าสู่ระบบ…'; $('#lErr').textContent = ''; AUTH = { room, pin };
+  $('#lBtn').disabled = true; $('#lBtn').textContent = '…'; $('#lErr').textContent = ''; AUTH = { room, pin };
   try { await tApi('tenantData', {}, true); store('tenant_auth', JSON.stringify(AUTH)); show(); }
-  catch (e) { $('#lErr').textContent = e.message; AUTH = null; }
-  $('#lBtn').disabled = false; $('#lBtn').textContent = 'เข้าสู่ระบบ';
+  catch (e) { $('#lErr').textContent = e.message; AUTH = null; LPAD.shake(); }
+  $('#lBtn').disabled = false; $('#lBtn').textContent = 'เข้า';
 }
 function logout() { store('tenant_auth'); store('tenant_cache'); location.href = 'tenant.html'; }
 function show() { if (!load(seenKey())) store(seenKey(), addDaysStr(D.serverToday, -3) + ' 00:00'); $('#login').classList.add('hide'); $('#app').classList.remove('hide'); $('#demo').innerHTML = demoBanner('<a href="admin.html">ลองฝั่งเจ้าของหอ</a>'); render(); }

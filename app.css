@@ -189,3 +189,16 @@ table.dt{width:100%;border-collapse:collapse;font-size:14px}
   .homegrid{grid-template-columns:minmax(0,1fr);gap:12px}
   .task .btn{white-space:nowrap}
 }
+/* แป้นตัวเลขเข้าสู่ระบบ */
+.pp-card{max-width:420px;margin:0 auto 12px;padding:22px}
+.pp-dots{display:flex;justify-content:center;gap:14px;margin:6px 0 18px;min-height:20px}
+.pp-dots i{width:18px;height:18px;border-radius:50%;border:2px solid #b9c1cc;display:block;transition:background .1s,border-color .1s}
+.pp-dots i.on{background:var(--brand);border-color:var(--brand)}
+.pp-dots.shake{animation:ppshake .35s}
+@keyframes ppshake{20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+.pp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.pp-k{height:64px;border-radius:16px;border:1px solid var(--line);background:#f6f7f9;font-size:28px;font-weight:700;color:var(--ink);cursor:pointer;touch-action:manipulation;-webkit-user-select:none;user-select:none}
+.pp-k:active{background:#e6e9ee;transform:scale(.97)}
+.pp-k.pp-del{font-size:17px}
+.pp-k.pp-go{background:var(--brand);border-color:var(--brand);color:#fff;font-size:20px}
+.pp-k:disabled{opacity:.6}

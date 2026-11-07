@@ -24,10 +24,11 @@ const SCHEMA = {
              'source', 'urgent', 'appointAt', 'outcome'],
   News:     ['id', 'createdAt', 'title', 'body'],
   Files:    ['id', 'createdAt', 'room', 'tenantId', 'category', 'name', 'mime', 'fileId', 'size', 'note'],
+  Expenses: ['id', 'date', 'category', 'amount', 'note', 'files', 'createdAt'],
 };
 
 const NUM_KEYS = new Set(['size', 'floor', 'rent', 'deposit', 'waterPrev', 'waterCur', 'elecPrev', 'elecCur',
-  'waterUnits', 'elecUnits', 'total', 'paidAmount', 'received', 'cost', 'advanceRent', 'keyDeposit', 'cardFee', 'refundAmount']);
+  'waterUnits', 'elecUnits', 'total', 'paidAmount', 'received', 'cost', 'advanceRent', 'keyDeposit', 'cardFee', 'refundAmount', 'amount']);
 
 const ST = {
   OCC: 'มีผู้เช่า', VAC: 'ว่าง', RES: 'จอง', FIX: 'ซ่อม',
@@ -53,6 +54,7 @@ const DEFAULT_SETTINGS = [
   ['dueDay', '5', 'ครบกำหนดชำระ วันที่ ... ของเดือนถัดไป'],
   ['depositMonths', '1', 'เงินประกัน (จำนวนเดือนของค่าเช่า)'],
   ['advanceMonths', '1', 'ค่าเช่าล่วงหน้าตอนเข้า (จำนวนเดือน · ใช้แทนค่าเช่าเดือนแรก)'],
+  ['dailyRate', '0', 'ค่าเช่ารายวัน (บาท/วัน) สำหรับเดือนที่เข้า-ออกไม่เต็มเดือน: ค่าเช่า − วันที่ไม่ได้อยู่ × ราคานี้ · 0 = คิดตามสัดส่วนวัน'],
   ['keyDeposit', '100', 'มัดจำกุญแจ (คืนเมื่อคืนกุญแจตอนย้ายออก)'],
   ['cardFee', '100', 'ค่าคีย์การ์ด (ไม่คืน)'],
   ['contractMonths', '12', 'ระยะสัญญาเริ่มต้น (เดือน)'],
@@ -151,6 +153,8 @@ const ADMIN_API = {
   uploadDoc: api_uploadDoc, deleteDoc: api_deleteDoc, updateDoc: api_updateDoc,
   postNews: api_postNews, deleteNews: api_deleteNews,
   saveSettings: api_saveSettings, testLine: api_testLine,
+  saveExpense: api_saveExpense, deleteExpense: api_deleteExpense, addExpenseFile: api_addExpenseFile, removeExpenseFile: api_removeExpenseFile,
+  clearData: api_clearData, resetRoom: api_resetRoom,
 };
 const NO_DATA = { previewBills: 1, fileImage: 1 }; // คำสั่งที่ไม่ต้องส่งข้อมูลทั้งหมดกลับ
 
@@ -278,7 +282,7 @@ function api_checkIn(req) {
     endDate: isDate_(t.endDate) ? t.endDate : addDays_(addMonths_(start, months), -1),
     deposit: t.deposit === '' || t.deposit == null ? (Number(room.rent) || 0) * (Number(s.depositMonths) || 0) : Number(t.deposit) || 0,
     status: ST.ACTIVE, moveOutDate: '', pin: t.pin ? checkPin_(t.pin) : newPin_(), note: t.note || '', createdAt: now_(),
-    advanceRent: t.firstBill ? rent0 * advMonths : 0, keyDeposit: num(t.keyDeposit, Number(s.keyDeposit) || 0), cardFee: num(t.cardFee, Number(s.cardFee) || 0),
+    advanceRent: t.firstBill && advMonths > 0 ? firstAdvance_(rent0, start, advMonths).a : 0, keyDeposit: num(t.keyDeposit, Number(s.keyDeposit) || 0), cardFee: num(t.cardFee, Number(s.cardFee) || 0),
     contractMonths: months, refundAmount: '', refundStatus: '', refundDate: '',
   };
   writeRow_('Tenants', tenant);
@@ -297,7 +301,7 @@ function api_checkIn(req) {
   let bill = null;
   if (t.firstBill) {
     const items = [];
-    if (tenant.advanceRent > 0) items.push({ l: 'ค่าเช่าล่วงหน้า ' + advMonths + ' เดือน', a: tenant.advanceRent, k: 'advance' });
+    if (tenant.advanceRent > 0) items.push({ l: firstAdvance_(rent0, start, advMonths).l, a: tenant.advanceRent, k: 'advance' });
     else if (rent0 > 0) items.push(rentItem_(rent0, start, monthEnd_(month)));
     if (tenant.deposit > 0) items.push({ l: 'เงินประกัน', a: tenant.deposit, k: 'deposit' });
     if (tenant.keyDeposit > 0) items.push({ l: 'มัดจำกุญแจ (คืนเมื่อคืนกุญแจ)', a: tenant.keyDeposit, k: 'keydep' });
@@ -787,6 +791,91 @@ function api_tenantFile(req, t) {
 
 /* ============================ ข้อมูลรวม (เจ้าของหอ) ============================ */
 
+/* ============================ ค่าใช้จ่ายของตึก ============================ */
+function api_saveExpense(req) {
+  const e = req.id ? findBy_('Expenses', 'id', String(req.id)) : null;
+  if (req.id && !e) throw new Error('ไม่พบรายการ');
+  const amount = Number(req.amount);
+  if (!(amount > 0)) throw new Error('กรุณาใส่จำนวนเงิน');
+  const cat = String(req.category || '').trim().slice(0, 60);
+  if (!cat) throw new Error('กรุณาเลือกประเภทค่าใช้จ่าย');
+  const o = e || { id: 'E' + Date.now().toString(36) + rand_(3), files: '[]', createdAt: now_() };
+  o.date = isDate_(req.date) ? req.date : today_(); o.category = cat; o.amount = round2_(amount); o.note = String(req.note || '').slice(0, 300);
+  writeRow_('Expenses', o, e && e._row);
+  return { id: o.id };
+}
+function api_addExpenseFile(req) {
+  const e = findBy_('Expenses', 'id', String(req.id || ''));
+  if (!e) throw new Error('ไม่พบรายการ');
+  const m = String(req.data || '').match(/^data:([\w.+-]+\/[\w.+-]+);base64,(.+)$/);
+  if (!m || !/^image\/(jpeg|png|webp|heic|heif)$|^application\/pdf$/.test(m[1])) throw new Error('รองรับเฉพาะรูปภาพ และไฟล์ PDF');
+  if (m[2].length > 14 * 1024 * 1024) throw new Error('ไฟล์ใหญ่เกิน 10 MB');
+  const name = String(req.name || 'ไฟล์').replace(/[\\/:*?"<>|]/g, '_').slice(0, 100);
+  const fileId = fileFolder_().createFile(Utilities.newBlob(Utilities.base64Decode(m[2]), m[1], 'ค่าใช้จ่าย_' + e.date + '_' + e.category + '_' + name)).getId();
+  const files = parseJson_(e.files); files.push({ fileId, name, mime: m[1], size: Math.round(m[2].length * 0.75) });
+  e.files = JSON.stringify(files); writeRow_('Expenses', e, e._row);
+}
+function api_removeExpenseFile(req) {
+  const e = findBy_('Expenses', 'id', String(req.id || ''));
+  if (!e) throw new Error('ไม่พบรายการ');
+  const files = parseJson_(e.files); trashFile_(req.fileId);
+  e.files = JSON.stringify(files.filter(f => f.fileId !== req.fileId)); writeRow_('Expenses', e, e._row);
+}
+function api_deleteExpense(req) {
+  const e = findBy_('Expenses', 'id', String(req.id || ''));
+  if (!e) return;
+  parseJson_(e.files).forEach(f => trashFile_(f.fileId));
+  deleteRow_('Expenses', e._row);
+}
+
+/* ============================ ล้างข้อมูล (ก่อนเริ่มใช้จริง / ทีละห้อง) ============================ */
+function billDate_(b) { return b.kind === KIND.MONTH && b.month ? b.month + '-01' : String(b.paidDate || b.createdAt || '').slice(0, 10); }
+function api_clearData(req) {
+  const cut = isDate_(req.before) ? req.before : '';
+  if (!cut) throw new Error('กรุณาเลือกวันที่');
+  const n = { bills: 0, repairs: 0, expenses: 0 };
+  if (req.bills) {
+    const all = bills_(), del = {};
+    all.forEach(b => { if (billDate_(b) < cut) del[b.id] = 1; });
+    // คงค่าเช่าล่วงหน้าที่เหลือของผู้เช่าไว้เท่าเดิม แม้บิลที่เคยหักไปถูกลบ
+    readAll_('Tenants').forEach(t => {
+      if (!(Number(t.advanceRent) > 0)) return;
+      const left = advanceLeft_(t, all), keptUse = advanceLeft_(Object.assign({}, t, { advanceRent: 1e12 }), all.filter(b => !del[b.id]));
+      const na = round2_(left + (1e12 - keptUse));
+      if (na !== Number(t.advanceRent)) { t.advanceRent = na; writeRow_('Tenants', t, t._row); }
+    });
+    n.bills = keepRows_('Bills', b => !del[b.id]);
+    keepRows_('Slips', x => !del[x.billId]);
+    if (!readAll_('Bills').length) setSetting_('invSeq', '0'), setSetting_('rcSeq', '0');
+  }
+  if (req.repairs) n.repairs = keepRows_('Repairs', r => String(r.createdAt).slice(0, 10) >= cut);
+  if (req.expenses) {
+    readAll_('Expenses').filter(e => e.date < cut).forEach(e => parseJson_(e.files).forEach(f => trashFile_(f.fileId)));
+    n.expenses = keepRows_('Expenses', e => e.date >= cut);
+  }
+  return { result: n };
+}
+function api_resetRoom(req) {
+  const room = String(req.room || '');
+  const r = findBy_('Rooms', 'room', room);
+  if (!r) throw new Error('ไม่พบห้อง');
+  const tids = {}; readAll_('Tenants').forEach(t => { if (t.room === room) tids[t.id] = 1; });
+  const billIds = {}; bills_().forEach(b => { if (b.room === room) billIds[b.id] = 1; });
+  const n = { tenants: Object.keys(tids).length, bills: Object.keys(billIds).length, docs: 0 };
+  keepRows_('Tenants', t => t.room !== room);
+  keepRows_('Bills', b => !billIds[b.id]);
+  keepRows_('Slips', x => !billIds[x.billId] && x.room !== room);
+  if (req.docs) { readAll_('Files').filter(d => d.room === room).forEach(d => { trashFile_(d.fileId); n.docs++; }); keepRows_('Files', d => d.room !== room); }
+  if (req.repairs) keepRows_('Repairs', x => x.room !== room);
+  r.status = ST.VAC; writeRow_('Rooms', r, r._row);
+  return { result: n };
+}
+function setSetting_(key, value) {
+  const row = readAll_('Settings').filter(r => r.key === key)[0];
+  const d = DEFAULT_SETTINGS.filter(x => x[0] === key)[0];
+  writeRow_('Settings', { key, value, description: row ? row.description : (d ? d[2] : '') }, row && row._row);
+}
+
 function allData_() {
   const s = getSettings_(), settings = {};
   DEFAULT_SETTINGS.forEach(d => { if (PRIVATE_SETTINGS.indexOf(d[0]) < 0) settings[d[0]] = s[d[0]]; });
@@ -802,6 +891,7 @@ function allData_() {
     repairs: readAll_('Repairs').map(r => { const o = strip_(r); o.log = parseLog_(r); return o; }).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     news: readAll_('News').map(strip_).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     docs: readAll_('Files').map(strip_).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    expenses: readAll_('Expenses').map(x => { const o = strip_(x); o.files = parseJson_(x.files); return o; }).sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt)),
     serverToday: today_(), serverNow: now_(),
   };
 }
@@ -898,7 +988,20 @@ function rentItem_(rent, from, to) {
   const days = dayDiff_(from, to) + 1, dim = daysInMonth_(from.slice(0, 7));
   if (days >= dim) return { l: 'ค่าเช่าห้อง ' + monthLabel_(from.slice(0, 7)), a: rent, k: 'rent' };
   const f = Number(from.slice(8)), tt = Number(to.slice(8)), m = TH_MS[Number(from.slice(5, 7)) - 1];
-  return { l: 'ค่าเช่าห้อง ' + f + '–' + tt + ' ' + m + ' (' + days + ' วัน)', a: Math.round(rent * days / dim), k: 'rent' };
+  return { l: 'ค่าเช่าห้อง ' + f + '–' + tt + ' ' + m + ' (' + days + ' วัน)', a: partRent_(rent, days, dim), k: 'rent' };
+}
+// ค่าเช่าเดือนที่อยู่ไม่เต็มเดือน: ตั้งค่ารายวันไว้ = ค่าเช่า − (วันที่ไม่ได้อยู่ × ค่ารายวัน) · ไม่ตั้ง = ตามสัดส่วนวัน
+function partRent_(rent, days, dim) {
+  const daily = Number(getSettings_().dailyRate) || 0;
+  if (days >= dim) return rent;
+  return daily > 0 ? Math.max(0, Math.min(rent, Math.round(rent - (dim - days) * daily))) : Math.round(rent * days / dim);
+}
+// ค่าเช่าล่วงหน้าตอนเข้า: เข้ากลางเดือน = ค่าเช่าของวันที่เหลือในเดือนนั้น (+ เดือนถัดไปถ้าตั้งไว้มากกว่า 1 เดือน)
+function firstAdvance_(rent, start, months) {
+  const month = start.slice(0, 7), first = rentItem_(rent, start, monthEnd_(month)), part = first.a !== rent || Number(start.slice(8)) > 1;
+  const a = round2_(first.a + rent * Math.max(0, months - 1));
+  const l = part ? 'ค่าเช่าล่วงหน้า ' + first.l.replace('ค่าเช่าห้อง ', '') + (months > 1 ? ' + ' + (months - 1) + ' เดือน' : '') : 'ค่าเช่าล่วงหน้า ' + months + ' เดือน';
+  return { a, l };
 }
 function utilItem_(k, units, prev, cur, s) {
   const rate = Number(s[k + 'Rate']) || 0, min = Number(s[k + 'Min']) || 0;
@@ -1001,6 +1104,19 @@ function dropCache_(name) {
   MEMO['g:' + name] = g;
   try { CacheService.getScriptCache().put('gen:' + name, g, CACHE_TTL); } catch (e) {}
 }
+function parseJson_(v) { try { return JSON.parse(v || '[]') || []; } catch (e) { return []; } }
+// เก็บเฉพาะแถวที่ต้องการ (ลบแถวอื่นทิ้งทีเดียว)
+function keepRows_(name, keep) {
+  const all = readAll_(name), kept = all.filter(keep);
+  if (kept.length === all.length) return 0;
+  const sh = sheet_(name), last = sh.getLastRow(), W = SCHEMA[name].length;
+  if (last >= 2) sh.getRange(2, 1, last - 1, W).clearContent();
+  if (kept.length) sh.getRange(2, 1, kept.length, W).setValues(kept.map(o => SCHEMA[name].map(h => toCell_(h, o[h]))));
+  if (last > kept.length + 2) { try { sh.deleteRows(kept.length + 2, last - kept.length - 1); } catch (e) { /* แถวว่างเหลือไว้ได้ ไม่มีผล */ } }
+  dropCache_(name);
+  return all.length - kept.length;
+}
+function trashFile_(id) { if (!id) return; try { DriveApp.getFileById(id).setTrashed(true); } catch (e) { /* ลบไปแล้ว */ } }
 function parseLog_(r) { try { return JSON.parse(r.log || '[]'); } catch (e) { return []; } }
 function sheet_(name) {
   if (MEMO['s:' + name]) return MEMO['s:' + name];

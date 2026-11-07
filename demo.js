@@ -31,6 +31,7 @@
       return out;
     }
     setFontWeight() { return this; }
+    clearContent() { const rows = DB[this.name]; for (let i = 0; i < this.nr; i++) { const row = rows[this.r - 1 + i]; if (row) for (let j = 0; j < this.nc; j++) row[this.c - 1 + j] = ''; } return this; }
   }
   class Sheet {
     constructor(name) { this.name = name; }
@@ -38,6 +39,7 @@
     getLastRow() { return DB[this.name].length; }
     setFrozenRows() {}
     deleteRow(r) { DB[this.name].splice(r - 1, 1); }
+    deleteRows(r, n) { DB[this.name].splice(r - 1, n); }
   }
   const book = {
     getSheetByName: n => (DB[n] ? new Sheet(n) : null),

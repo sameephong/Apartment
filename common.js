@@ -60,7 +60,7 @@ function loadScript(src) {
   });
 }
 function demoReady() {
-  if (!_demoReady) _demoReady = loadScript('demo.js?v=3.7').then(() => loadScript('backend.js?v=3.7')).then(() => window.DemoGAS.init());
+  if (!_demoReady) _demoReady = loadScript('demo.js?v=4.0').then(() => loadScript('backend.js?v=4.0')).then(() => window.DemoGAS.init());
   return _demoReady;
 }
 async function callApi(action, payload) {
@@ -207,7 +207,7 @@ function uiDialog(msg, opts) {
     const done = v => { w.remove(); res(v); };
     w.querySelector('#dlgOk').onclick = () => done(inp ? inp.value : true);
     const no = w.querySelector('#dlgNo'); if (no) no.onclick = () => done(inp ? null : false);
-    if (inp) { inp.focus(); inp.select(); inp.onkeydown = e => { if (e.key === 'Enter') done(inp.value); }; } else w.querySelector('#dlgOk').focus();
+    if (inp) { kbFix(inp); inp.focus(); inp.select(); inp.onkeydown = e => { if (e.key === 'Enter') done(inp.value); }; } else w.querySelector('#dlgOk').focus();
   });
 }
 function uiAlert(msg) { return uiDialog(msg); }
@@ -252,3 +252,34 @@ async function installApp() {
   uiAlert(how);
 }
 document.addEventListener('DOMContentLoaded', showInstall);
+
+/* ---------- iPhone: แตะช่องกรอกแล้วแป้นพิมพ์ไม่ขึ้น (โดยเฉพาะในแอปบนหน้าจอโฮม) ---------- */
+function kbFix(el) {
+  if (!el || el._kb || !IS_IOS) return; el._kb = 1;
+  if (IS_APP() && el.type === 'password') el.setAttribute('autocomplete', 'off'); // ระบบเติมรหัสอัตโนมัติของ iOS ทำให้แป้นพิมพ์ค้างในแอป
+  el.addEventListener('touchend', e => { e.preventDefault(); el.blur(); el.focus(); try { const n = el.value.length; el.setSelectionRange && el.type !== 'number' && el.setSelectionRange(n, n); } catch (x) {} });
+}
+
+/* ---------- แป้นตัวเลขบนจอ (เข้าสู่ระบบ) — กดง่าย ไม่ต้องรอแป้นพิมพ์มือถือ · คอมพิมพ์เลข/Backspace/Enter ได้ ---------- */
+function pinPad(el, o) {
+  o = Object.assign({ max: 12, dots: 6, go: 'เข้า', goId: '' }, o);
+  let v = '';
+  el.innerHTML = `<div class="pp-dots"></div><div class="pp-grid">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<button type="button" class="pp-k" data-k="${n}">${n}</button>`).join('')}
+    <button type="button" class="pp-k pp-del" data-k="del">ลบ</button><button type="button" class="pp-k" data-k="0">0</button><button type="button" class="pp-k pp-go" data-k="go"${o.goId ? ` id="${o.goId}"` : ''}>${o.go}</button></div>`;
+  const dots = el.querySelector('.pp-dots');
+  const draw = () => { const n = Math.max(o.dots, v.length); dots.innerHTML = Array.from({ length: n }, (_, i) => `<i class="${i < v.length ? 'on' : ''}"></i>`).join(''); if (o.onChange) o.onChange(v); };
+  const press = k => {
+    if (k === 'go') { if (v.length && o.onSubmit) o.onSubmit(v); return; }
+    if (k === 'del') v = v.slice(0, -1); else if (v.length < o.max) v += k;
+    try { navigator.vibrate && navigator.vibrate(8); } catch (e) {}
+    draw();
+  };
+  el.addEventListener('click', e => { const b = e.target.closest('.pp-k'); if (b && !b.disabled) press(b.dataset.k); });
+  document.addEventListener('keydown', e => {
+    if (!el.offsetParent || /INPUT|TEXTAREA|SELECT/.test((document.activeElement || {}).tagName || '') || e.metaKey || e.ctrlKey) return;
+    if (/^\d$/.test(e.key)) press(e.key); else if (e.key === 'Backspace') press('del'); else if (e.key === 'Enter') press('go'); else return;
+    e.preventDefault();
+  });
+  draw();
+  return { get value() { return v; }, clear() { v = ''; draw(); }, shake() { v = ''; draw(); dots.classList.remove('shake'); void dots.offsetWidth; dots.classList.add('shake'); } };
+}
