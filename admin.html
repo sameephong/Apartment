@@ -12,10 +12,10 @@
 <link rel="preconnect" href="https://script.google.com"><link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=4.0">
+<link rel="stylesheet" href="app.css?v=4.4">
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>document.write('<script src="config.js?t=' + Date.now() + '"><\/script>')</script>
-<script src="common.js?v=4.0"></script>
+<script src="common.js?v=4.4"></script>
 </head>
 <body class="admin">
 <div class="wrap">
@@ -213,7 +213,7 @@ function roomSheet(no) {
       <label class="f">ชั้น<input name="floor" type="number" value="${esc(r.floor)}" placeholder="อัตโนมัติ"></label>
       <label class="f">ค่าเช่า/เดือน<input name="rent" type="number" inputmode="numeric" value="${esc(r.rent)}"></label>
       <label class="f">ประเภทห้อง<input name="type" value="${esc(r.type)}" placeholder="เช่น ห้องแอร์"></label></div>
-    ${t ? '' : `<div class="muted small">สถานะห้อง</div><div class="seg" id="rst">${['ว่าง', 'จอง', 'ซ่อม'].map(s => `<button class="${s === r.status ? 'on' : ''}" onclick="segPick(this)">${s}</button>`).join('')}</div>`}
+    ${t || !no ? '' : `<div class="muted small">สถานะห้อง: <b>${esc(r.status)}</b></div><div class="row" style="margin:6px 0 10px">${r.status !== 'ว่าง' ? `<button class="btn sm" style="flex:1" onclick="clearRoomStatus(${q(no)},'ตั้งห้อง ${esc(no)} เป็นว่าง พร้อมให้เช่า?')">ว่าง</button>` : ''}<button class="btn sm" style="flex:1" onclick="bookSheet(${q(no)})">📅 ${r.status === 'จอง' ? 'แก้ไขการจอง' : 'จอง'}</button><button class="btn sm" style="flex:1" onclick="fixSheet(${q(no)})">🔧 ${r.status === 'ซ่อม' ? 'แก้ไขการซ่อม' : 'ซ่อม'}</button></div>`}
     <label class="f">หมายเหตุ<input name="note" value="${esc(r.note)}"></label></div>
     <div class="row"><button class="btn pri" style="flex:2" onclick="saveRoom(${no ? q(no) : 'null'})">บันทึก</button>${no && !t ? `<button class="btn bad" style="flex:1" onclick="delRoom(${q(no)})">ลบห้อง</button>` : ''}</div>`);
 }
@@ -280,12 +280,13 @@ async function savePin(id) {
 }
 
 function checkInForm(r) {
-  const s = S(), st = today(), months = +s.contractMonths === 6 ? 6 : 12, pr = prevReading(r.room, st.slice(0, 7));
+  const s = S(), st = r.status === 'จอง' && /^\d{4}-\d\d-\d\d/.test(r.bookAt || '') ? r.bookAt.slice(0, 10) : today(), months = +s.contractMonths === 6 ? 6 : 12, pr = prevReading(r.room, st.slice(0, 7));
   const end = addDaysStr(addMonthStr(st.slice(0, 7), months) + st.slice(7), -1);
-  return `<div class="card" style="background:var(--o-soft);border:0"><div class="row"><b>สถานะ: ${esc(r.status)}</b>${r.note ? `<span class="muted small">${esc(r.note)}</span>` : ''}</div></div>
+  const bk = r.status === 'จอง' ? r : {};
+  return `${roomStatusCard(r)}${r.note ? `<div class="muted small" style="margin:-4px 2px 10px">หมายเหตุห้อง: ${esc(r.note)}</div>` : ''}
   <div class="card" id="fIn"><h4>เช็คอินผู้เช่าใหม่</h4>
-    <label class="f">ชื่อ-นามสกุล *<input name="name" placeholder="ชื่อผู้เช่า"></label>
-    <div class="g2"><label class="f">เบอร์โทร<input name="phone" inputmode="tel"></label><label class="f">LINE ID<input name="lineId" placeholder="ไม่บังคับ"></label>
+    <label class="f">ชื่อ-นามสกุล *<input name="name" placeholder="ชื่อผู้เช่า" value="${esc(bk.bookName || '')}"></label>
+    <div class="g2"><label class="f">เบอร์โทร<input name="phone" inputmode="tel" value="${esc(bk.bookPhone || '')}"></label><label class="f">LINE ID<input name="lineId" placeholder="ไม่บังคับ"></label>
     <label class="f">เริ่มสัญญา<input name="startDate" type="date" value="${st}" oninput="ciEnd()"></label><label class="f">สิ้นสุดสัญญา<input name="endDate" type="date" value="${end}"></label>
     <div style="grid-column:1/-1;margin:-4px 0 10px"><span class="muted small">ระยะสัญญา</span><div class="segb" id="ciMonths" style="margin:4px 0 0">${[6, 12].map(n => `<button type="button" data-v="${n}" class="${n === months ? 'on' : ''}" onclick="segPick(this);ciEnd()">${n === 12 ? '1 ปี' : n + ' เดือน'}</button>`).join('')}</div><input type="hidden" name="contractMonths" id="ciCm" value="${months}"></div>
     <label class="f">มิเตอร์น้ำวันเข้า<input name="waterStart" type="number" inputmode="numeric" value="${esc(pr.water)}"></label><label class="f">มิเตอร์ไฟวันเข้า<input name="elecStart" type="number" inputmode="numeric" value="${esc(pr.elec)}"></label>
@@ -837,7 +838,7 @@ render = function () {
   if (D && (location.hash.slice(1).split('/')[0] !== 'settings')) UI.tm = null;
   _render0();
   showInstall(); loadDocThumbs();
-  if (D && !DESK() && $('#hd') && !$('#hd .bellbtn')) { const n = bellCount(); $('#hd').insertAdjacentHTML('beforeend', `<button class="pill" onclick="mSearch()" title="ค้นหา" style="flex:none">🔍</button><div style="position:relative;flex:none"><button class="pill bellbtn" onclick="bellToggle(event)" title="การแจ้งเตือน">🔔${n ? `<span class="n">${n}</span>` : ''}</button><div class="bellbox" id="bellBox"></div></div>`); }
+  if (D && !DESK() && $('#hd') && !$('#hd .bellbtn')) { const n = bellCount(); $('#hd').insertAdjacentHTML('beforeend', `<button class="pill rfbtn ic" onclick="manualRefresh(this)" title="รีเฟรชข้อมูล" style="flex:none">⟳</button><button class="pill ic" onclick="mSearch()" title="ค้นหา" style="flex:none">🔍</button><div style="position:relative;flex:none"><button class="pill bellbtn" onclick="bellToggle(event)" title="การแจ้งเตือน">🔔${n ? `<span class="n">${n}</span>` : ''}</button><div class="bellbox" id="bellBox"></div></div>`); }
   if (D && BLD) bInfo(BLD.code, { buildingName: S().buildingName || S().apartmentName, flags: FL() }); // จำชื่อตึกล่าสุดไว้ใช้ในรายการเลือกตึก
 };
 
@@ -881,6 +882,7 @@ function renderSide() {
 function deskTools() {
   const n = bellCount();
   return `<div style="position:relative;width:260px;flex:none"><input id="gq" autocomplete="off" placeholder="🔍 ค้นหาห้อง ผู้เช่า เลขบิล…" style="width:100%;font-size:14px;padding:8px 12px" oninput="gSearch(this.value)" onfocus="gSearch(this.value)" onblur="setTimeout(()=>{const r=$('#gsr');if(r)r.style.display='none'},200)"><div class="gsr" id="gsr"></div></div>
+    <button class="pill rfbtn" style="flex:none;font-size:14px;padding:6px 12px" onclick="manualRefresh(this)" title="ดึงข้อมูลล่าสุด (เช่น ที่หุ้นส่วนบันทึกจากอีกเครื่อง)"><span class="rfi">⟳</span> รีเฟรช</button>
     <div style="position:relative;flex:none"><button class="pill bellbtn" style="font-size:18px;padding:3px 10px" onclick="bellToggle(event)" title="การแจ้งเตือน">🔔${n ? `<span class="n">${n}</span>` : ''}</button><div class="bellbox" id="bellBox"></div></div>`;
 }
 /* ---------- กระดิ่งแจ้งเตือน: กดดูแล้วเป็นสีจาง · ล้างได้ (จำไว้ในเครื่องนี้ แยกตามตึก) ---------- */
@@ -949,14 +951,14 @@ function mSearch() {
 /* ---------- ผังห้อง (ใช้ทั้งหน้าภาพรวมและหน้าผังห้อง) ---------- */
 function roomState(r) {
   const t = tenantOf(r.room);
-  if (!t) return r.status === 'จอง' ? { c: 'book', l: 'จอง' } : r.status === 'ซ่อม' ? { c: 'fix', l: 'ซ่อม' } : { c: 'free', l: 'พร้อมให้เช่า' };
+  if (!t) return r.status === 'จอง' ? { c: 'book', l: r.bookAt ? fmtBook(r.bookAt) : (r.bookName || ''), big: 'จอง' } : r.status === 'ซ่อม' ? { c: 'fix', l: r.fixNote || '', big: 'ซ่อม' } : { c: 'free', l: 'พร้อมให้เช่า' };
   const ob = openBills().filter(b => b.tenantId === t.id), ov = ob.filter(isOverdue);
   if (ov.length) return { c: 'over', l: 'ค้าง ' + Math.max(...ov.map(b => daysBetween(b.dueDate, today()))) + ' วัน', t, col: 'var(--bad)' };
   if (ob.some(b => b.status === 'รออนุมัติ')) return { c: 'due', l: 'สลิปรออนุมัติ', t, col: 'var(--o)' };
   if (ob.length) return { c: 'due', l: OWN() ? 'รอรับเงิน' : 'รอชำระ', t, col: 'var(--warn)' };
   return { c: 'occ', l: 'จ่ายแล้ว', t, col: 'var(--ok)' };
 }
-const LEGEND = `<div class="lgd"><span style="--c:#22c55e">จ่ายแล้ว</span><span style="--c:#f59e0b">รอชำระ</span><span style="--c:#ef4444">ค้างชำระ</span><span style="--c:#cbd5e1">ว่าง</span><span style="--c:#a78bfa">ซ่อม</span><span style="--c:#60a5fa">จอง</span></div>`;
+const LEGEND = `<div class="lgd"><span style="--c:#22c55e">จ่ายแล้ว</span><span style="--c:#f59e0b">รอชำระ</span><span style="--c:#ef4444">ค้างชำระ</span><span style="--c:#cbd5e1">ว่าง</span><span style="--c:#4b5563">ซ่อม</span><span style="--c:#3b82f6">จอง</span></div>`;
 function roomGridHtml(o) {
   const floors = {};
   D.rooms.filter(r => !o.filter || o.filter(r)).forEach(r => (floors[r.floor || '-'] = floors[r.floor || '-'] || []).push(r));
@@ -965,7 +967,7 @@ function roomGridHtml(o) {
   return Object.keys(floors).sort((a, b) => a - b).map(f => `<div style="display:flex;gap:10px;margin-bottom:8px"><div class="muted small" style="width:44px;flex:none;padding-top:${o.big ? 16 : 10}px">ชั้น ${esc(f)}</div>
     <div class="rmg ${o.big ? '' : 'cmp'}" style="flex:1;grid-template-columns:${o.auto ? 'repeat(auto-fill,minmax(70px,1fr))' : 'repeat(' + per + ',minmax(0,1fr))'}">${floors[f].map(r => { const st = roomState(r);
       return `<div class="rm s-${st.c} ${r.room === o.sel ? 'sel' : ''}" style="${o.big ? 'min-height:96px;padding:12px' : ''}" onclick="${o.click}(${q(r.room)})" ondblclick="go('room/${encodeURIComponent(r.room)}')" title="${st.c === 'free' ? 'ดับเบิลคลิกเพื่อเช็คอิน' : 'ดับเบิลคลิกเพื่อเปิดหน้าห้อง'}">
-        <b style="${o.big ? 'font-size:19px' : ''}">${esc(r.room)}</b><div class="nm">${st.t ? esc(st.t.name.split(' ')[0]) : st.c === 'free' ? 'ว่าง' : esc(r.status)}</div><div class="small" style="color:${st.col || 'var(--muted)'}">${esc(st.l)}</div></div>`; }).join('')}</div></div>`).join('')
+        <b style="${o.big ? 'font-size:19px' : ''}">${esc(r.room)}</b>${st.big ? `<div class="nm big">${st.big}</div>` : `<div class="nm">${st.t ? esc(st.t.name.split(' ')[0]) : 'ว่าง'}</div>`}${st.big ? (st.l ? `<div class="sub ${st.c === 'book' ? 'dt' : ''}">${st.c === 'book' ? esc(st.l).replace(' ', '<br>') : esc(st.l)}</div>` : '') : `<div class="small" style="color:${st.col || 'var(--muted)'}">${esc(st.l)}</div>`}</div>`; }).join('')}</div></div>`).join('')
     || '<div class="empty">ยังไม่มีห้องตามเงื่อนไขนี้</div>';
 }
 function selRoom(no) { UI.selRoom = no; render(); }
@@ -1055,9 +1057,9 @@ function roomPanel(no) {
   const r = D.rooms.find(x => x.room === no); if (!r) return '<div class="empty">เลือกห้องทางซ้าย</div>';
   const t = tenantOf(no), st = roomState(r), pc = { occ: 'ok', due: 'warn', over: 'bad', book: 'o' }[st.c] || '';
   const sub = [r.floor ? 'ชั้น ' + r.floor : '', r.type, money(r.rent) + ' ฿/เดือน'].filter(Boolean).map(esc).join(' · ');
-  const head = name => `<div class="row" style="flex-wrap:nowrap;gap:12px;margin-bottom:14px"><div style="width:58px;height:58px;border-radius:14px;background:var(--o-soft);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:var(--o);flex:none">${esc(no)}</div><div style="flex:1;min-width:0"><b style="font-size:18px">${name}</b><div class="muted small">${sub}</div></div><span class="pl ${pc}">${esc(st.l)}</span></div>`;
+  const head = name => `<div class="row" style="flex-wrap:nowrap;gap:12px;margin-bottom:14px"><div style="width:58px;height:58px;border-radius:14px;background:var(--o-soft);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:var(--o);flex:none">${esc(no)}</div><div style="flex:1;min-width:0"><b style="font-size:18px">${name}</b><div class="muted small">${sub}</div></div><span class="pl ${pc}">${esc(st.c === 'fix' ? 'ซ่อม' : st.c === 'book' ? 'จอง ' + st.l : st.l)}</span></div>`;
   if (!t) return head(r.status === 'ว่าง' ? 'ห้องว่าง' : 'ห้อง' + esc(r.status)) + (r.note ? `<p class="muted">${esc(r.note)}</p>` : '') +
-    `<button class="btn ok blk lg" onclick="go('room/${encodeURIComponent(no)}')">＋ เช็คอินผู้เช่าใหม่</button><button class="btn blk" style="margin-top:8px" onclick="roomSheet(${q(no)})">✏️ แก้ไขห้อง</button>` + docsHtml(no) + resetRoomBtn(no);
+    roomStatusCard(r) + `<button class="btn ok blk lg" onclick="go('room/${encodeURIComponent(no)}')">＋ เช็คอินผู้เช่า${r.status === 'จอง' && r.bookName ? ' (คุณ' + esc(r.bookName.split(' ')[0]) + ')' : 'ใหม่'}</button><button class="btn blk" style="margin-top:8px" onclick="roomSheet(${q(no)})">✏️ แก้ไขห้อง</button>` + docsHtml(no) + resetRoomBtn(no);
   const bills = D.bills.filter(b => b.tenantId === t.id).slice(0, 3), ob = openBills().filter(b => b.tenantId === t.id), reps = D.repairs.filter(x => x.room === no && repOpen(x));
   const lastM = D.meters.filter(m => m.room === no && (m.waterCur !== '' || m.elecCur !== '')).sort((a, b) => b.month.localeCompare(a.month))[0], dl = t.endDate ? daysBetween(today(), t.endDate) : null;
   return head(esc(t.name)) +
@@ -1692,6 +1694,71 @@ async function resetRoomRun(no) {
   if (!await uiConfirm('ยืนยันล้างข้อมูลผู้เช่าห้อง ' + no + '?\nลบแล้วกู้คืนไม่ได้', 'ล้างเลย', true)) return;
   await act('resetRoom', { room: no, docs: $('#rrDocs') && $('#rrDocs').checked, repairs: $('#rrRep') && $('#rrRep').checked }, 'ล้างข้อมูลห้อง ' + no + ' แล้ว');
   closeSheet(); render();
+}
+
+/* ---------- ห้องจอง / ห้องซ่อม: รายละเอียดเต็ม ---------- */
+const TH_SHORT_Y = d => String(+d.slice(0, 4) + 543).slice(2);
+function fmtBook(at) { if (!at) return ''; const d = String(at); return d.slice(8, 10) + '/' + d.slice(5, 7) + '/' + TH_SHORT_Y(d) + (d.length > 10 && d.slice(11, 16) ? ' ' + d.slice(11, 16) + 'น.' : ''); }
+function fmtBookLong(at) { if (!at) return '-'; const d = String(at); return fmtDate(d.slice(0, 10)) + (d.length > 10 && d.slice(11, 16) ? ' เวลา ' + d.slice(11, 16) + ' น.' : ''); }
+function roomStatusCard(r) {
+  const no = r.room;
+  if (r.status === 'จอง') {
+    const left = r.bookAt ? daysBetween(today(), r.bookAt.slice(0, 10)) : null;
+    return `<div class="card stc st-book"><div class="row"><b style="font-size:17px;flex:1">📅 ห้องนี้จองแล้ว</b>${left != null ? `<span class="pl ${left < 0 ? 'bad' : left <= 3 ? 'warn' : ''}">${left < 0 ? 'เลยวันเข้า ' + (-left) + ' วัน' : left === 0 ? 'เข้าวันนี้' : 'อีก ' + left + ' วัน'}</span>` : ''}</div>
+      <div class="line"><span class="muted">ผู้จอง</span><b>${esc(r.bookName || '-')}</b></div>
+      <div class="line"><span class="muted">เบอร์โทร</span><span>${r.bookPhone ? `<a class="tap" onclick="callPhone(${q(r.bookPhone)})">📞 ${esc(r.bookPhone)}</a>` : '-'}</span></div>
+      <div class="line"><span class="muted">วันเวลาเข้าอยู่</span><b>${fmtBookLong(r.bookAt)}</b></div>
+      <div class="line"><span class="muted">เงินจอง</span><span>${+r.bookDeposit ? fmtB(r.bookDeposit) : '-'}</span></div>
+      ${r.bookNote ? `<div class="bubble" style="margin-top:8px">${esc(r.bookNote).replace(/\n/g, '<br>')}</div>` : ''}
+      <div class="row" style="margin-top:10px"><button class="btn sm" style="flex:1" onclick="bookSheet(${q(no)})">✏️ แก้ไขการจอง</button><button class="btn sm" style="flex:1;color:var(--bad)" onclick="clearRoomStatus(${q(no)},'ยกเลิกการจองห้อง ${esc(no)}?')">✕ ยกเลิกจอง</button></div></div>`;
+  }
+  if (r.status === 'ซ่อม') {
+    const reps = D.repairs.filter(x => x.room === no && repOpen(x)), days = r.fixSince ? daysBetween(r.fixSince, today()) : null;
+    return `<div class="card stc st-fix"><div class="row"><b style="font-size:17px;flex:1">🔧 ห้องนี้กำลังซ่อม</b>${days != null ? `<span class="pl">${days ? days + ' วันแล้ว' : 'เริ่มวันนี้'}</span>` : ''}</div>
+      <div class="bubble" style="margin:8px 0;font-size:15px">${r.fixNote ? esc(r.fixNote).replace(/\n/g, '<br>') : '<span class="muted">ยังไม่ได้ใส่รายละเอียด</span>'}</div>
+      <div class="line"><span class="muted">เริ่มซ่อม</span><span>${r.fixSince ? fmtDate(r.fixSince) : '-'}</span></div>
+      <div class="line"><span class="muted">คาดว่าเสร็จ</span><span>${r.fixDue ? fmtDate(r.fixDue) : '-'}</span></div>
+      ${reps.length ? `<div class="fl" style="margin-top:8px">งานแจ้งซ่อมของห้องนี้</div>${reps.map(x => `<div class="item tap" onclick="repairSheet(${q(x.id)})"><span>🔧</span><div style="flex:1;min-width:0">${esc(x.category)} · ${esc(String(x.detail || '').slice(0, 50))}</div><span class="pl warn">${esc(x.status)}</span></div>`).join('')}` : ''}
+      <div class="row" style="margin-top:10px"><button class="btn sm" style="flex:1" onclick="fixSheet(${q(no)})">✏️ แก้ไขรายละเอียด</button><button class="btn sm ok" style="flex:1" onclick="clearRoomStatus(${q(no)},'ห้อง ${esc(no)} ซ่อมเสร็จแล้ว พร้อมให้เช่า?')">✓ ซ่อมเสร็จ</button></div></div>`;
+  }
+  return `<div class="row" style="margin-bottom:10px"><button class="btn" style="flex:1" onclick="bookSheet(${q(no)})">📅 บันทึกการจอง</button><button class="btn" style="flex:1" onclick="fixSheet(${q(no)})">🔧 ตั้งเป็นห้องซ่อม</button></div>`;
+}
+function bookSheet(no) {
+  const r = D.rooms.find(x => x.room === no) || {}, at = r.bookAt || '', d = at.slice(0, 10) || today(), t = at.slice(11, 16) || '12:00';
+  openSheet(`<h3>📅 ${r.status === 'จอง' ? 'แก้ไขการจอง' : 'บันทึกการจอง'} · ห้อง ${esc(no)}</h3><div id="fBook">
+    <div class="g2"><label class="f">ชื่อผู้จอง *<input name="bookName" value="${esc(r.bookName || '')}" placeholder="ชื่อ-นามสกุล"></label><label class="f">เบอร์โทร<input name="bookPhone" inputmode="tel" value="${esc(r.bookPhone || '')}"></label>
+    <label class="f">วันที่เข้าอยู่ *<input name="d" type="date" value="${d}"></label><label class="f">เวลา<input name="t" type="time" value="${t}"></label>
+    <label class="f">เงินจอง (บาท)<input name="bookDeposit" type="number" inputmode="numeric" value="${esc(r.bookDeposit || '')}" placeholder="0"></label></div>
+    <label class="f">รายละเอียดเพิ่มเติม<textarea name="bookNote" rows="3" placeholder="เช่น จองผ่าน LINE · ขอห้องชั้นบน · มากับแฟน 2 คน">${esc(r.bookNote || '')}</textarea></label></div>
+    <div class="row" style="justify-content:flex-end"><button class="btn" onclick="closeSheet()">ยกเลิก</button><button class="btn pri" onclick="saveBook(${q(no)})">บันทึกการจอง</button></div>`);
+}
+async function saveBook(no) {
+  const o = formObj('#fBook'); if (!o.bookName) return uiAlert('กรุณาใส่ชื่อผู้จอง'); if (!o.d) return uiAlert('กรุณาเลือกวันที่เข้าอยู่');
+  await act('saveRoom', { room: { room: no, status: 'จอง', bookName: o.bookName, bookPhone: o.bookPhone, bookAt: o.d + (o.t ? ' ' + o.t : ''), bookDeposit: o.bookDeposit, bookNote: o.bookNote }, isNew: false }, 'บันทึกการจองแล้ว');
+  closeSheet(); render();
+}
+function fixSheet(no) {
+  const r = D.rooms.find(x => x.room === no) || {};
+  openSheet(`<h3>🔧 ${r.status === 'ซ่อม' ? 'แก้ไขรายละเอียดการซ่อม' : 'ตั้งเป็นห้องซ่อม'} · ห้อง ${esc(no)}</h3><div id="fFix">
+    <label class="f">ซ่อมอะไรอยู่ *<textarea name="fixNote" rows="4" placeholder="เช่น ทาสีใหม่ทั้งห้อง · เปลี่ยนก๊อกน้ำ · แอร์รั่ว รอช่าง">${esc(r.fixNote || '')}</textarea></label>
+    <div class="g2"><label class="f">เริ่มซ่อม<input name="fixSince" type="date" value="${r.fixSince || today()}"></label><label class="f">คาดว่าเสร็จ<input name="fixDue" type="date" value="${r.fixDue || ''}"></label></div></div>
+    <div class="row" style="justify-content:flex-end"><button class="btn" onclick="closeSheet()">ยกเลิก</button><button class="btn pri" onclick="saveFix(${q(no)})">บันทึก</button></div>`);
+}
+async function saveFix(no) {
+  const o = formObj('#fFix'); if (!o.fixNote) return uiAlert('กรุณาใส่รายละเอียดว่าซ่อมอะไร');
+  await act('saveRoom', { room: { room: no, status: 'ซ่อม', fixNote: o.fixNote, fixSince: o.fixSince, fixDue: o.fixDue }, isNew: false }, 'บันทึกแล้ว');
+  closeSheet(); render();
+}
+async function clearRoomStatus(no, msg) { if (!await uiConfirm(msg)) return; await act('saveRoom', { room: { room: no, status: 'ว่าง' }, isNew: false }, 'ห้อง ' + no + ' พร้อมให้เช่าแล้ว'); closeSheet(); render(); }
+
+/* ---------- ปุ่มรีเฟรช: ดึงข้อมูลล่าสุดจาก Google Sheet ---------- */
+let RF_BUSY = false;
+async function manualRefresh(btn) {
+  if (RF_BUSY) return; RF_BUSY = true;
+  document.querySelectorAll('.rfbtn').forEach(b => b.classList.add('spin'));
+  try { await api('getAll', {}, true); closeSheet(); render(); toast('อัปเดตข้อมูลล่าสุดแล้ว · ' + new Date().toTimeString().slice(0, 5) + ' น.'); }
+  catch (e) { uiAlert('รีเฟรชไม่สำเร็จ: ' + e.message); }
+  finally { RF_BUSY = false; document.querySelectorAll('.rfbtn').forEach(b => b.classList.remove('spin')); }
 }
 </script>
 </body>

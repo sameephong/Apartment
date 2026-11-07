@@ -9,7 +9,8 @@
 
 const SCHEMA = {
   Settings: ['key', 'value', 'description'],
-  Rooms:    ['room', 'floor', 'type', 'rent', 'status', 'note'],
+  Rooms:    ['room', 'floor', 'type', 'rent', 'status', 'note',
+             'bookName', 'bookPhone', 'bookAt', 'bookDeposit', 'bookNote', 'fixNote', 'fixSince', 'fixDue'],
   Tenants:  ['id', 'room', 'name', 'phone', 'lineId', 'startDate', 'endDate', 'deposit',
              'status', 'moveOutDate', 'pin', 'note', 'createdAt',
              'advanceRent', 'keyDeposit', 'cardFee', 'contractMonths', 'refundAmount', 'refundStatus', 'refundDate'],
@@ -28,7 +29,7 @@ const SCHEMA = {
 };
 
 const NUM_KEYS = new Set(['size', 'floor', 'rent', 'deposit', 'waterPrev', 'waterCur', 'elecPrev', 'elecCur',
-  'waterUnits', 'elecUnits', 'total', 'paidAmount', 'received', 'cost', 'advanceRent', 'keyDeposit', 'cardFee', 'refundAmount', 'amount']);
+  'waterUnits', 'elecUnits', 'total', 'paidAmount', 'received', 'cost', 'advanceRent', 'keyDeposit', 'cardFee', 'refundAmount', 'amount', 'bookDeposit']);
 
 const ST = {
   OCC: 'มีผู้เช่า', VAC: 'ว่าง', RES: 'จอง', FIX: 'ซ่อม',
@@ -232,6 +233,7 @@ function api_getBill(req) {
 
 /* ============================ ห้อง ============================ */
 
+const ROOM_BOOK = ['bookName', 'bookPhone', 'bookAt', 'bookDeposit', 'bookNote'], ROOM_FIX = ['fixNote', 'fixSince', 'fixDue'];
 function api_saveRoom(req) {
   const r = req.room || {};
   r.room = String(r.room || '').trim();
@@ -242,6 +244,10 @@ function api_saveRoom(req) {
   const m = Object.assign({ floor: guessFloor_(r.room), type: '', rent: 0, status: ST.VAC, note: '' }, ex || {}, r);
   if (activeTenant_(m.room)) m.status = ST.OCC;
   else if (m.status === ST.OCC) m.status = ST.VAC;
+  if (m.status !== ST.RES) ROOM_BOOK.forEach(k => { m[k] = ''; });
+  if (m.status !== ST.FIX) ROOM_FIX.forEach(k => { m[k] = ''; });
+  if (m.status === ST.FIX && !isDate_(m.fixSince)) m.fixSince = today_();
+  ['bookName', 'bookPhone', 'bookNote', 'fixNote'].forEach(k => { m[k] = String(m[k] || '').slice(0, 500); });
   writeRow_('Rooms', m, ex && ex._row);
 }
 
@@ -287,6 +293,7 @@ function api_checkIn(req) {
   };
   writeRow_('Tenants', tenant);
   room.status = ST.OCC;
+  ROOM_BOOK.concat(ROOM_FIX).forEach(k => { room[k] = ''; });
   writeRow_('Rooms', room, room._row);
 
   const month = start.slice(0, 7);
