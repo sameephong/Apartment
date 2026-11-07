@@ -211,3 +211,11 @@ table.dt{width:100%;border-collapse:collapse;font-size:14px}
 .rmg:not(.cmp) .rm .sub.dt{font-size:10.5px;letter-spacing:-.3px}
 @keyframes rfspin{to{transform:rotate(360deg)}}.rfbtn.spin{pointer-events:none;opacity:.75}.rfbtn.spin.ic,.rfbtn.spin .rfi{display:inline-block;animation:rfspin .8s linear infinite}
 .rfbtn.ic{font-size:20px;font-weight:700;line-height:1}@media (max-width:420px){#hd .pill.ic{padding-left:10px;padding-right:10px}}
+
+/* ซ่อมหนัก (สีน้ำตาลเข้ม) */
+.s-heavy{background:#4A2C17;border-color:#3A2211;border-left:4px solid #24140A;color:#F3E6D8}
+.rm.s-heavy b{color:#fff!important}
+.rm.s-heavy .nm.big,.rmg.cmp .rm.s-heavy .nm.big{color:#fff!important;font-size:13.5px!important;letter-spacing:-.2px;overflow:visible;text-overflow:clip;white-space:nowrap}
+.rm.s-heavy .sub{color:#E8D5C0!important}
+.seg.fixlv button.hv.on{background:#4A2C17;color:#fff}
+.st-heavy{border-left:4px solid #4A2C17}

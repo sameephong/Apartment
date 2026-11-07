@@ -12,7 +12,7 @@
 <link rel="preconnect" href="https://script.google.com"><link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=4.4">
+<link rel="stylesheet" href="app.css?v=4.5">
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>document.write('<script src="config.js?t=' + Date.now() + '"><\/script>')</script>
 <script src="common.js?v=4.4"></script>
@@ -191,15 +191,15 @@ VIEWS.home = () => {
 VIEWS.rooms = () => {
   const floors = {};
   D.rooms.forEach(r => (floors[r.floor || '-'] = floors[r.floor || '-'] || []).push(r));
-  const cls = { 'มีผู้เช่า': 'background:var(--ok-soft);border-color:#bfe3cb', 'จอง': 'background:var(--warn-soft);border-color:#f1d3a7', 'ซ่อม': 'background:var(--bad-soft);border-color:#f2c4c4' };
+  const cls = { 'มีผู้เช่า': 'background:var(--ok-soft);border-color:#bfe3cb', 'จอง': 'background:var(--warn-soft);border-color:#f1d3a7', 'ซ่อม': 'background:var(--bad-soft);border-color:#f2c4c4', 'ซ่อมหนัก': 'background:#4A2C17;border-color:#24140A;color:#fff' };
   return {
     title: 'ผังห้อง', sub: D.rooms.length + ' ห้อง · มีผู้เช่า ' + active().length, right: `<button class="pill" onclick="roomSheet()">+ ห้อง</button>`,
-    html: `<div class="row small muted" style="gap:12px;margin-bottom:8px"><span>🟩 มีผู้เช่า</span><span>⬜ ว่าง</span><span>🟧 จอง</span><span>🟥 ซ่อม</span><span><b style="color:var(--bad)">●</b> ค้างจ่าย</span><span><b style="color:var(--o)">●</b> รออนุมัติ</span></div>
+    html: `<div class="row small muted" style="gap:12px;margin-bottom:8px"><span>🟩 มีผู้เช่า</span><span>⬜ ว่าง</span><span>🟧 จอง</span><span>🟥 ซ่อม</span><span>🟫 ซ่อมหนัก</span><span><b style="color:var(--bad)">●</b> ค้างจ่าย</span><span><b style="color:var(--o)">●</b> รออนุมัติ</span></div>
     ${Object.keys(floors).sort((a, b) => a - b).map(f => `<div class="muted small" style="font-weight:700;margin:10px 0 6px">ชั้น ${esc(f)}</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:7px">${floors[f].map(r => {
         const t = tenantOf(r.room), ob = openBills().filter(b => b.room === r.room && (!t || b.tenantId === t.id));
         const dot = ob.some(b => b.status === 'รออนุมัติ') ? 'var(--o)' : ob.some(isOverdue) ? 'var(--bad)' : ob.length ? 'var(--warn)' : '';
-        return `<div class="tap" onclick="go('room/${encodeURIComponent(r.room)}')" style="position:relative;border:1px solid var(--line);border-radius:11px;padding:7px 8px;background:#fff;min-height:62px;${cls[r.status] || ''}">
+        return `<div class="tap" onclick="go('room/${encodeURIComponent(r.room)}')" style="position:relative;border:1px solid var(--line);border-radius:11px;padding:7px 8px;background:#fff;min-height:62px;${cls[r.status === 'ซ่อม' && r.fixLevel === 'หนัก' ? 'ซ่อมหนัก' : r.status] || ''}">
           ${dot ? `<span style="position:absolute;top:6px;right:6px;width:10px;height:10px;border-radius:50%;background:${dot}"></span>` : ''}
           <b style="font-size:16px">${esc(r.room)}</b><div class="small muted" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t ? esc(t.name.split(' ')[0]) : esc(r.status)}</div></div>`;
       }).join('')}</div>`).join('') || '<div class="empty">ยังไม่มีห้อง · กด “+ ห้อง” หรือสร้างหลายห้องในเมนูเพิ่มเติม › ตั้งค่า</div>'}`,
@@ -951,14 +951,14 @@ function mSearch() {
 /* ---------- ผังห้อง (ใช้ทั้งหน้าภาพรวมและหน้าผังห้อง) ---------- */
 function roomState(r) {
   const t = tenantOf(r.room);
-  if (!t) return r.status === 'จอง' ? { c: 'book', l: r.bookAt ? fmtBook(r.bookAt) : (r.bookName || ''), big: 'จอง' } : r.status === 'ซ่อม' ? { c: 'fix', l: r.fixNote || '', big: 'ซ่อม' } : { c: 'free', l: 'พร้อมให้เช่า' };
+  if (!t) return r.status === 'จอง' ? { c: 'book', l: r.bookAt ? fmtBook(r.bookAt) : (r.bookName || ''), big: 'จอง' } : r.status === 'ซ่อม' ? (r.fixLevel === 'หนัก' ? { c: 'heavy', l: r.fixNote || '', big: 'ซ่อมหนัก' } : { c: 'fix', l: r.fixNote || '', big: 'ซ่อม' }) : { c: 'free', l: 'พร้อมให้เช่า' };
   const ob = openBills().filter(b => b.tenantId === t.id), ov = ob.filter(isOverdue);
   if (ov.length) return { c: 'over', l: 'ค้าง ' + Math.max(...ov.map(b => daysBetween(b.dueDate, today()))) + ' วัน', t, col: 'var(--bad)' };
   if (ob.some(b => b.status === 'รออนุมัติ')) return { c: 'due', l: 'สลิปรออนุมัติ', t, col: 'var(--o)' };
   if (ob.length) return { c: 'due', l: OWN() ? 'รอรับเงิน' : 'รอชำระ', t, col: 'var(--warn)' };
   return { c: 'occ', l: 'จ่ายแล้ว', t, col: 'var(--ok)' };
 }
-const LEGEND = `<div class="lgd"><span style="--c:#22c55e">จ่ายแล้ว</span><span style="--c:#f59e0b">รอชำระ</span><span style="--c:#ef4444">ค้างชำระ</span><span style="--c:#cbd5e1">ว่าง</span><span style="--c:#4b5563">ซ่อม</span><span style="--c:#3b82f6">จอง</span></div>`;
+const LEGEND = `<div class="lgd"><span style="--c:#22c55e">จ่ายแล้ว</span><span style="--c:#f59e0b">รอชำระ</span><span style="--c:#ef4444">ค้างชำระ</span><span style="--c:#cbd5e1">ว่าง</span><span style="--c:#4b5563">ซ่อม</span><span style="--c:#4A2C17">ซ่อมหนัก</span><span style="--c:#3b82f6">จอง</span></div>`;
 function roomGridHtml(o) {
   const floors = {};
   D.rooms.filter(r => !o.filter || o.filter(r)).forEach(r => (floors[r.floor || '-'] = floors[r.floor || '-'] || []).push(r));
@@ -1057,7 +1057,7 @@ function roomPanel(no) {
   const r = D.rooms.find(x => x.room === no); if (!r) return '<div class="empty">เลือกห้องทางซ้าย</div>';
   const t = tenantOf(no), st = roomState(r), pc = { occ: 'ok', due: 'warn', over: 'bad', book: 'o' }[st.c] || '';
   const sub = [r.floor ? 'ชั้น ' + r.floor : '', r.type, money(r.rent) + ' ฿/เดือน'].filter(Boolean).map(esc).join(' · ');
-  const head = name => `<div class="row" style="flex-wrap:nowrap;gap:12px;margin-bottom:14px"><div style="width:58px;height:58px;border-radius:14px;background:var(--o-soft);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:var(--o);flex:none">${esc(no)}</div><div style="flex:1;min-width:0"><b style="font-size:18px">${name}</b><div class="muted small">${sub}</div></div><span class="pl ${pc}">${esc(st.c === 'fix' ? 'ซ่อม' : st.c === 'book' ? 'จอง ' + st.l : st.l)}</span></div>`;
+  const head = name => `<div class="row" style="flex-wrap:nowrap;gap:12px;margin-bottom:14px"><div style="width:58px;height:58px;border-radius:14px;background:var(--o-soft);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:var(--o);flex:none">${esc(no)}</div><div style="flex:1;min-width:0"><b style="font-size:18px">${name}</b><div class="muted small">${sub}</div></div><span class="pl ${pc}">${esc(st.c === 'fix' ? 'ซ่อม' : st.c === 'heavy' ? 'ซ่อมหนัก' : st.c === 'book' ? 'จอง ' + st.l : st.l)}</span></div>`;
   if (!t) return head(r.status === 'ว่าง' ? 'ห้องว่าง' : 'ห้อง' + esc(r.status)) + (r.note ? `<p class="muted">${esc(r.note)}</p>` : '') +
     roomStatusCard(r) + `<button class="btn ok blk lg" onclick="go('room/${encodeURIComponent(no)}')">＋ เช็คอินผู้เช่า${r.status === 'จอง' && r.bookName ? ' (คุณ' + esc(r.bookName.split(' ')[0]) + ')' : 'ใหม่'}</button><button class="btn blk" style="margin-top:8px" onclick="roomSheet(${q(no)})">✏️ แก้ไขห้อง</button>` + docsHtml(no) + resetRoomBtn(no);
   const bills = D.bills.filter(b => b.tenantId === t.id).slice(0, 3), ob = openBills().filter(b => b.tenantId === t.id), reps = D.repairs.filter(x => x.room === no && repOpen(x));
@@ -1714,7 +1714,8 @@ function roomStatusCard(r) {
   }
   if (r.status === 'ซ่อม') {
     const reps = D.repairs.filter(x => x.room === no && repOpen(x)), days = r.fixSince ? daysBetween(r.fixSince, today()) : null;
-    return `<div class="card stc st-fix"><div class="row"><b style="font-size:17px;flex:1">🔧 ห้องนี้กำลังซ่อม</b>${days != null ? `<span class="pl">${days ? days + ' วันแล้ว' : 'เริ่มวันนี้'}</span>` : ''}</div>
+    const hv = r.fixLevel === 'หนัก';
+    return `<div class="card stc st-fix ${hv ? 'st-heavy' : ''}"><div class="row"><b style="font-size:17px;flex:1">${hv ? '🧱 ห้องนี้ซ่อมหนัก' : '🔧 ห้องนี้กำลังซ่อม'}</b>${days != null ? `<span class="pl">${days ? days + ' วันแล้ว' : 'เริ่มวันนี้'}</span>` : ''}</div>
       <div class="bubble" style="margin:8px 0;font-size:15px">${r.fixNote ? esc(r.fixNote).replace(/\n/g, '<br>') : '<span class="muted">ยังไม่ได้ใส่รายละเอียด</span>'}</div>
       <div class="line"><span class="muted">เริ่มซ่อม</span><span>${r.fixSince ? fmtDate(r.fixSince) : '-'}</span></div>
       <div class="line"><span class="muted">คาดว่าเสร็จ</span><span>${r.fixDue ? fmtDate(r.fixDue) : '-'}</span></div>
@@ -1740,13 +1741,15 @@ async function saveBook(no) {
 function fixSheet(no) {
   const r = D.rooms.find(x => x.room === no) || {};
   openSheet(`<h3>🔧 ${r.status === 'ซ่อม' ? 'แก้ไขรายละเอียดการซ่อม' : 'ตั้งเป็นห้องซ่อม'} · ห้อง ${esc(no)}</h3><div id="fFix">
+    <label class="f" style="margin-bottom:4px">ระดับการซ่อม</label><div class="seg fixlv" style="margin-bottom:6px"><button class="${r.fixLevel === 'หนัก' ? '' : 'on'}" data-lv="" onclick="segPick(this)">🔧 ซ่อมทั่วไป</button><button class="hv ${r.fixLevel === 'หนัก' ? 'on' : ''}" data-lv="หนัก" onclick="segPick(this)">🧱 ซ่อมหนัก</button></div><p class="muted small" style="margin:0 0 8px">ซ่อมหนัก = ใช้เวลานาน ปล่อยเช่าไม่ได้ เช่น รีโนเวททั้งห้อง น้ำรั่วซึม เปลี่ยนพื้น</p>
     <label class="f">ซ่อมอะไรอยู่ *<textarea name="fixNote" rows="4" placeholder="เช่น ทาสีใหม่ทั้งห้อง · เปลี่ยนก๊อกน้ำ · แอร์รั่ว รอช่าง">${esc(r.fixNote || '')}</textarea></label>
     <div class="g2"><label class="f">เริ่มซ่อม<input name="fixSince" type="date" value="${r.fixSince || today()}"></label><label class="f">คาดว่าเสร็จ<input name="fixDue" type="date" value="${r.fixDue || ''}"></label></div></div>
     <div class="row" style="justify-content:flex-end"><button class="btn" onclick="closeSheet()">ยกเลิก</button><button class="btn pri" onclick="saveFix(${q(no)})">บันทึก</button></div>`);
 }
 async function saveFix(no) {
   const o = formObj('#fFix'); if (!o.fixNote) return uiAlert('กรุณาใส่รายละเอียดว่าซ่อมอะไร');
-  await act('saveRoom', { room: { room: no, status: 'ซ่อม', fixNote: o.fixNote, fixSince: o.fixSince, fixDue: o.fixDue }, isNew: false }, 'บันทึกแล้ว');
+  const lv = (document.querySelector('.fixlv button.on') || {}).dataset; const fixLevel = lv && lv.lv === 'หนัก' ? 'หนัก' : '';
+  await act('saveRoom', { room: { room: no, status: 'ซ่อม', fixNote: o.fixNote, fixSince: o.fixSince, fixDue: o.fixDue, fixLevel }, isNew: false }, 'บันทึกแล้ว');
   closeSheet(); render();
 }
 async function clearRoomStatus(no, msg) { if (!await uiConfirm(msg)) return; await act('saveRoom', { room: { room: no, status: 'ว่าง' }, isNew: false }, 'ห้อง ' + no + ' พร้อมให้เช่าแล้ว'); closeSheet(); render(); }
