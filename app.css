@@ -219,3 +219,17 @@ table.dt{width:100%;border-collapse:collapse;font-size:14px}
 .rm.s-heavy .sub{color:#E8D5C0!important}
 .seg.fixlv button.hv.on{background:#4A2C17;color:#fff}
 .st-heavy{border-left:4px solid #4A2C17}
+
+/* อุปกรณ์ประจำห้อง */
+.itl{font-size:14px;padding:3px 0}.itl.bad b{color:var(--bad)}.itl.warn b{color:var(--warn)}
+.itrow{display:grid;grid-template-columns:110px 1fr;gap:4px 8px;align-items:center;padding:8px 0;border-bottom:1px solid #eef0f2}
+.itrow .itn{font-weight:700;font-size:15px}.itrow .itb{display:flex;gap:4px}.itrow .itnote{grid-column:1/-1;padding:6px 9px;font-size:14px}
+.itb button{flex:1;border:1.5px solid #d5d9df;background:#fff;border-radius:9px;padding:7px 2px;font-size:13px;cursor:pointer;white-space:nowrap}
+.itb button.on.ok{background:var(--ok-soft);border-color:var(--ok);color:var(--ok);font-weight:700}.itb button.on.bad{background:var(--bad-soft);border-color:var(--bad);color:var(--bad);font-weight:700}.itb button.on.warn{background:var(--warn-soft);border-color:var(--warn);color:var(--warn);font-weight:700}
+@media (max-width:420px){.itrow{grid-template-columns:1fr}.itb button{font-size:12.5px}}
+
+/* ผลค้นหาแยกตามห้อง */
+.fgrp{border:1px solid var(--line);border-radius:12px;margin:8px 0;overflow:hidden;background:#fff}
+.fhd{display:flex;align-items:center;gap:8px;padding:9px 12px;background:#f6f8fb;border-bottom:1px solid var(--line);font-size:15px}
+.fhit{padding:8px 12px;border-bottom:1px solid #f0f1f3;font-size:14.5px}.fhit:last-child{border:0}.fhit:hover{background:#f8faff}
+mark{background:#fde68a;color:inherit;border-radius:3px;padding:0 1px}

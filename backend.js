@@ -10,7 +10,7 @@
 const SCHEMA = {
   Settings: ['key', 'value', 'description'],
   Rooms:    ['room', 'floor', 'type', 'rent', 'status', 'note',
-             'bookName', 'bookPhone', 'bookAt', 'bookDeposit', 'bookNote', 'fixNote', 'fixSince', 'fixDue'],
+             'bookName', 'bookPhone', 'bookAt', 'bookDeposit', 'bookNote', 'fixNote', 'fixSince', 'fixDue', 'fixLevel', 'items'],
   Tenants:  ['id', 'room', 'name', 'phone', 'lineId', 'startDate', 'endDate', 'deposit',
              'status', 'moveOutDate', 'pin', 'note', 'createdAt',
              'advanceRent', 'keyDeposit', 'cardFee', 'contractMonths', 'refundAmount', 'refundStatus', 'refundDate'],
@@ -72,6 +72,7 @@ const DEFAULT_SETTINGS = [
   ['tenantApp', '1', 'ผู้เช่าเข้าแอปดูบิลและประวัติ (1 = เปิด, 0 = ปิด)'],
   ['tenantSlip', '1', 'ผู้เช่าส่งสลิปในแอป (1/0)'],
   ['tenantRepair', '1', 'ผู้เช่าแจ้งซ่อมในแอป (1/0)'],
+  ['roomItems', 'เตียง,ที่นอน,ตู้เสื้อผ้า,โต๊ะ,เก้าอี้,แอร์,พัดลม,ตู้เย็น,เครื่องทำน้ำอุ่น,ผ้าม่าน,มุ้งลวด,ทีวี', 'รายการอุปกรณ์ประจำห้อง (คั่นด้วยจุลภาค)'],
   ['tenantNews', '1', 'ประกาศถึงผู้เช่าในแอป (1/0)'],
   ['billLink', '1', 'ส่งลิงก์บิล + QR พร้อมเพย์ทาง LINE (1/0)'],
 ];
@@ -155,7 +156,7 @@ const ADMIN_API = {
   postNews: api_postNews, deleteNews: api_deleteNews,
   saveSettings: api_saveSettings, testLine: api_testLine,
   saveExpense: api_saveExpense, deleteExpense: api_deleteExpense, addExpenseFile: api_addExpenseFile, removeExpenseFile: api_removeExpenseFile,
-  clearData: api_clearData, resetRoom: api_resetRoom,
+  clearData: api_clearData, resetRoom: api_resetRoom, saveRoomItems: api_saveRoomItems, bulkRoomItems: api_bulkRoomItems,
 };
 const NO_DATA = { previewBills: 1, fileImage: 1 }; // คำสั่งที่ไม่ต้องส่งข้อมูลทั้งหมดกลับ
 
@@ -233,7 +234,7 @@ function api_getBill(req) {
 
 /* ============================ ห้อง ============================ */
 
-const ROOM_BOOK = ['bookName', 'bookPhone', 'bookAt', 'bookDeposit', 'bookNote'], ROOM_FIX = ['fixNote', 'fixSince', 'fixDue'];
+const ROOM_BOOK = ['bookName', 'bookPhone', 'bookAt', 'bookDeposit', 'bookNote'], ROOM_FIX = ['fixNote', 'fixSince', 'fixDue', 'fixLevel'];
 function api_saveRoom(req) {
   const r = req.room || {};
   r.room = String(r.room || '').trim();
@@ -860,6 +861,41 @@ function api_clearData(req) {
     readAll_('Expenses').filter(e => e.date < cut).forEach(e => parseJson_(e.files).forEach(f => trashFile_(f.fileId)));
     n.expenses = keepRows_('Expenses', e => e.date >= cut);
   }
+  return { result: n };
+}
+/* ============================ อุปกรณ์ประจำห้อง (มี / ขาด / ชำรุด) ============================ */
+const ITEM_ST = ['มี', 'ขาด', 'ชำรุด'];
+function cleanItems2_(obj) {
+  const out = {};
+  Object.keys(obj || {}).slice(0, 60).forEach(k => {
+    const name = String(k).trim().slice(0, 40), v = obj[k] || {};
+    if (!name) return;
+    const st = ITEM_ST.indexOf(v.s) >= 0 ? v.s : '', n = String(v.n || '').trim().slice(0, 200);
+    if (st || n) out[name] = { s: st, n };
+  });
+  return out;
+}
+function parseItems_(r) { try { return JSON.parse(r.items || '{}') || {}; } catch (e) { return {}; } }
+function api_saveRoomItems(req) {
+  const r = findBy_('Rooms', 'room', String(req.room || ''));
+  if (!r) throw new Error('ไม่พบห้อง');
+  r.items = JSON.stringify(Object.assign({}, req.merge ? parseItems_(r) : {}, cleanItems2_(req.items)));
+  writeRow_('Rooms', r, r._row);
+}
+// ตั้งสถานะอุปกรณ์ทีละหลายห้อง (เช่น ทุกห้องที่ยังไม่ตรวจ = มี)
+function api_bulkRoomItems(req) {
+  const st = ITEM_ST.indexOf(req.s) >= 0 ? req.s : '', names = (req.names || []).map(x => String(x).trim()).filter(Boolean);
+  if (!st || !names.length) throw new Error('ข้อมูลไม่ครบ');
+  const want = req.rooms ? new Set(req.rooms.map(String)) : null;
+  const rows = readAll_('Rooms'), sh = sheet_('Rooms'), col = SCHEMA.Rooms.indexOf('items') + 1;
+  let n = 0;
+  rows.forEach(r => {
+    if (want && !want.has(r.room)) return;
+    const it = parseItems_(r); let ch = false;
+    names.forEach(k => { if (req.onlyBlank && it[k] && it[k].s) return; it[k] = { s: st, n: (it[k] && it[k].n) || '' }; ch = true; });
+    if (ch) { sh.getRange(r._row, col, 1, 1).setValues([[toCell_('items', JSON.stringify(it))]]); n++; }
+  });
+  dropCache_('Rooms');
   return { result: n };
 }
 function api_resetRoom(req) {
