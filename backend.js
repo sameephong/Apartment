@@ -10,7 +10,7 @@
 const SCHEMA = {
   Settings: ['key', 'value', 'description'],
   Rooms:    ['room', 'floor', 'type', 'rent', 'status', 'note',
-             'bookName', 'bookPhone', 'bookAt', 'bookDeposit', 'bookNote', 'fixNote', 'fixSince', 'fixDue', 'fixLevel', 'items'],
+             'bookName', 'bookPhone', 'bookAt', 'bookDeposit', 'bookNote', 'fixNote', 'fixSince', 'fixDue', 'fixLevel', 'items', 'cleanStatus', 'cleanNote', 'cleanSince', 'cleanLast'],
   Tenants:  ['id', 'room', 'name', 'phone', 'lineId', 'startDate', 'endDate', 'deposit',
              'status', 'moveOutDate', 'pin', 'note', 'createdAt',
              'advanceRent', 'keyDeposit', 'cardFee', 'contractMonths', 'refundAmount', 'refundStatus', 'refundDate'],
@@ -156,7 +156,7 @@ const ADMIN_API = {
   postNews: api_postNews, deleteNews: api_deleteNews,
   saveSettings: api_saveSettings, testLine: api_testLine,
   saveExpense: api_saveExpense, deleteExpense: api_deleteExpense, addExpenseFile: api_addExpenseFile, removeExpenseFile: api_removeExpenseFile,
-  clearData: api_clearData, resetRoom: api_resetRoom, saveRoomItems: api_saveRoomItems, bulkRoomItems: api_bulkRoomItems,
+  clearData: api_clearData, resetRoom: api_resetRoom, saveRoomItems: api_saveRoomItems, setClean: api_setClean, bulkRoomItems: api_bulkRoomItems,
 };
 const NO_DATA = { previewBills: 1, fileImage: 1 }; // คำสั่งที่ไม่ต้องส่งข้อมูลทั้งหมดกลับ
 
@@ -415,7 +415,7 @@ function api_moveOut(req) {
   if (req.note) t.note = (t.note ? t.note + ' | ' : '') + req.note;
   writeRow_('Tenants', t, t._row);
   const r = findBy_('Rooms', 'room', t.room);
-  if (r) { r.status = ST.VAC; writeRow_('Rooms', r, r._row); }
+  if (r) { r.status = ST.VAC; r.cleanStatus = 'รอทำ'; r.cleanSince = today_(); r.cleanNote = 'ทำความสะอาดหลังผู้เช่าย้ายออก'; writeRow_('Rooms', r, r._row); }
   return { calc, billId: bill.id };
 }
 
@@ -863,6 +863,21 @@ function api_clearData(req) {
   }
   return { result: n };
 }
+/* ============================ สถานะทำความสะอาด ============================ */
+// on = true: สั่งทำความสะอาด (รอทำ) · on = false: ทำเสร็จแล้ว (บันทึกวันที่ทำล่าสุด)
+function api_setClean(req) {
+  const rooms = [].concat(req.rooms || req.room || []).map(String);
+  if (!rooms.length) throw new Error('ไม่พบห้อง');
+  let n = 0;
+  readAll_('Rooms').forEach(r => {
+    if (rooms.indexOf(r.room) < 0) return;
+    if (req.on) { r.cleanStatus = 'รอทำ'; r.cleanSince = isDate_(req.date) ? req.date : today_(); r.cleanNote = String(req.note || '').slice(0, 300); }
+    else { r.cleanStatus = ''; r.cleanNote = ''; r.cleanSince = ''; r.cleanLast = isDate_(req.date) ? req.date : today_(); }
+    writeRow_('Rooms', r, r._row); n++;
+  });
+  return { result: n };
+}
+
 /* ============================ อุปกรณ์ประจำห้อง (มี / ขาด / ชำรุด) ============================ */
 const ITEM_ST = ['มี', 'ขาด', 'ชำรุด'];
 function cleanItems2_(obj) {

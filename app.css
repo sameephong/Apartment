@@ -233,3 +233,16 @@ table.dt{width:100%;border-collapse:collapse;font-size:14px}
 .fhd{display:flex;align-items:center;gap:8px;padding:9px 12px;background:#f6f8fb;border-bottom:1px solid var(--line);font-size:15px}
 .fhit{padding:8px 12px;border-bottom:1px solid #f0f1f3;font-size:14.5px}.fhit:last-child{border:0}.fhit:hover{background:#f8faff}
 mark{background:#fde68a;color:inherit;border-radius:3px;padding:0 1px}
+
+/* ทำความสะอาด (ม่วง) */
+.s-clean{background:#f3e8ff;border-color:#d8b4fe;border-left:4px solid #9333ea}
+.rm.s-clean .nm.big,.rmg.cmp .rm.s-clean .nm.big{color:#7e22ce;font-size:13px!important;white-space:normal;line-height:1.25;overflow:visible}
+.rm.s-clean .sub{color:#6b21a8}
+.clb{font-size:12px;margin-left:3px;vertical-align:2px}
+.st-clean{background:#faf5ff;border-color:#e9d5ff;border-left-color:#9333ea}
+.rpick{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px;max-height:44vh;overflow:auto}
+.rpick label{display:flex;align-items:center;gap:5px;border:1px solid var(--line);border-radius:9px;padding:7px 8px;font-weight:700;cursor:pointer}
+.rpick label:has(input:checked){background:#f3e8ff;border-color:#9333ea}
+.rm{position:relative}.rm .nw{white-space:nowrap;display:inline-block}
+.clb{position:absolute;top:5px;right:6px;font-size:13px;margin:0}
+.rm.s-clean .nm.big,.rmg.cmp .rm.s-clean .nm.big{font-size:12px!important;letter-spacing:-.3px}
