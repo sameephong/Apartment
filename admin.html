@@ -12,10 +12,10 @@
 <link rel="preconnect" href="https://script.google.com"><link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=5.0">
+<link rel="stylesheet" href="app.css?v=5.1">
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>document.write('<script src="config.js?t=' + Date.now() + '"><\/script>')</script>
-<script src="common.js?v=5.0"></script>
+<script src="common.js?v=5.1"></script>
 </head>
 <body class="admin">
 <div class="wrap">
@@ -2019,12 +2019,17 @@ function lineTenantSection() {
     <div class="row" style="margin:4px 0 10px;flex-wrap:wrap"><button class="btn ${rich ? '' : 'pri'}" onclick="setupRich()">${rich ? '🔄 ติดตั้งเมนู LINE ใหม่' : '📲 ติดตั้งเมนูด้านล่างแชท LINE'}</button><span class="muted small">${rich ? '✅ ติดตั้งแล้ว ' + rich + ' ชุด (ผู้เช่า/ลูกค้า × ไทย/English)' : 'ต้องอัปโหลดรูป richmenu-*.jpg ขึ้น GitHub ก่อน'}</span></div>
     <div class="fl">🔔 แจ้งเตือนถึงผู้เช่า (นับโควตาข้อความ)</div>${T_NOTI.map(([k, i, l, d]) => ck(k, i, l, d)).join('')}
     <div class="g2" style="margin-top:10px;${DESK() ? '' : 'grid-template-columns:1fr'}"><label class="f">ข้อมูลห้องสำหรับลูกค้าที่สนใจ (ไทย)<textarea id="tGi" rows="3" placeholder="เช่น ห้องแอร์ 22 ตร.ม. เฟอร์นิเจอร์ครบ ฟรี Wi-Fi ใกล้ BTS รามคำแหง">${esc(s.guestInfo || '')}</textarea></label><label class="f">Room info for prospects (English)<textarea id="tGiEn" rows="3" placeholder="e.g. 22 sqm, air-con, fully furnished, free Wi-Fi">${esc(s.guestInfoEn || '')}</textarea></label></div>
+    <div class="fl" style="margin-top:6px">📞 ติดต่อ / 📍 แผนที่ (แสดงในเมนูลูกค้า)</div>
+    <div class="g2" style="${DESK() ? '' : 'grid-template-columns:1fr'}"><label class="f">เบอร์โทรหลัก (ปุ่มกดโทร)<input id="tTel1" value="${esc(s.lineTel1 || '')}" inputmode="tel"></label><label class="f">เบอร์โทรที่ 2<input id="tTel2" value="${esc(s.lineTel2 || '')}" inputmode="tel"></label>
+      <label class="f">ที่อยู่ (การ์ดติดต่อ)<input id="tAddr" value="${esc(s.lineAddr || '')}"></label><label class="f">ข้อความแผนที่<input id="tMapT" value="${esc(s.mapText || '')}"></label>
+      <label class="f" style="grid-column:1/-1">ลิงก์ Google Maps<input id="tMapU" value="${esc(s.mapUrl || '')}" placeholder="https://maps.app.goo.gl/…"></label></div>
+    <div class="muted small" style="margin:-2px 0 10px">💡 ห้องว่างแสดงค่าเช่า ค่าน้ำ ค่าไฟ และค่าแรกเข้า จากหน้า ตั้งค่า › ค่าน้ำ/ค่าไฟ และ ค่าแรกเข้า/เงินประกัน · นัดดูห้อง: ลูกค้ากรอกฟอร์ม แล้วแจ้งเข้ากลุ่ม (ติ๊ก “ลูกค้าขอนัดดูห้อง” ด้านบนด้วย)</div>
     ${linked.length ? `<details><summary style="cursor:pointer;font-weight:700;padding:4px 0">รายชื่อ LINE ที่ผูกแล้ว (${linked.length})</summary>${linked.sort((a, b) => a.room.localeCompare(b.room, undefined, { numeric: true })).map(u => `<div class="item" style="padding:6px 0"><b style="width:48px">${esc(u.room)}</b><div style="flex:1;min-width:0">${esc(u.displayName || 'LINE')} <span class="pl">${u.lang === 'en' ? 'EN' : 'ไทย'}</span></div><button class="btn sm" onclick="unlinkLine(${q(u.userId)})">ยกเลิกผูก</button></div>`).join('')}</details>` : ''}
     <div class="row" style="margin-top:8px"><button class="btn pri" onclick="saveTenantLine()">บันทึกส่วนผู้เช่า</button></div></div>`;
 }
 async function saveTenantLine() {
   const v = [...document.querySelectorAll('.tnot:checked')].map(x => x.value).join(','), id = $('#tOaId').value.trim();
-  await act('saveSettings', { settings: { appUrl: new URL(withB('bill.html'), location.href).href, lineOaId: id && id[0] !== '@' ? '@' + id : id, tNotify: v, guestInfo: $('#tGi').value.trim(), guestInfoEn: $('#tGiEn').value.trim() } }, 'บันทึกแล้ว');
+  await act('saveSettings', { settings: { appUrl: new URL(withB('bill.html'), location.href).href, lineOaId: id && id[0] !== '@' ? '@' + id : id, tNotify: v, guestInfo: $('#tGi').value.trim(), guestInfoEn: $('#tGiEn').value.trim(), lineTel1: $('#tTel1').value.trim(), lineTel2: $('#tTel2').value.trim(), lineAddr: $('#tAddr').value.trim(), mapText: $('#tMapT').value.trim(), mapUrl: $('#tMapU').value.trim() } }, 'บันทึกแล้ว');
   render();
 }
 async function setupRich() {

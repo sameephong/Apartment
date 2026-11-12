@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#15803d">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<title>นัดดูห้อง</title>
+<link rel="preconnect" href="https://script.google.com"><link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="app.css?v=5.1">
+<script>document.write('<script src="config.js?t=' + Date.now() + '"><\/script>')</script>
+<script src="common.js?v=5.1"></script>
+<style>
+.g2{grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important}.g2 .f,.g2 input{min-width:0;max-width:100%;box-sizing:border-box}input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;width:100%;min-width:0}
+body{--brand:#15803d;--brand-soft:#e5f4ea}
+.wrapv{max-width:480px;margin:0 auto;padding:18px 16px 40px}
+.head{display:flex;gap:12px;align-items:center;margin-bottom:14px}.head img{width:52px;height:52px;border-radius:14px}
+.head b{font-size:19px;display:block}.lang{margin-left:auto;font-size:13px}
+label.f input,label.f textarea{font-size:17px;padding:12px}
+.ok{text-align:center;padding:26px 10px}.ok .ic{width:70px;height:70px;border-radius:50%;background:var(--ok-soft);color:var(--ok);font-size:38px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px}
+.hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
+</style>
+</head>
+<body>
+<div id="demo"></div>
+<div class="wrapv" id="app"><p class="muted">กำลังโหลด…</p></div>
+<script>
+document.getElementById('demo').innerHTML = demoBanner();
+const EN = new URLSearchParams(location.search).get('lang') === 'en';
+const T = EN ? { title: 'Book a viewing', sub: 'Fill in your details and we will contact you to confirm', name: 'Your name', phone: 'Phone number', date: 'Date', time: 'Time', note: 'Note (optional)', noteP: 'e.g. budget, move-in date, number of people', send: 'Confirm', sending: 'Sending…', okT: 'Request sent', okD: 'The owner will contact you shortly to confirm. You can close this page.', call: 'Or call', sw: 'ภาษาไทย' }
+  : { title: 'นัดดูห้อง', sub: 'กรอกข้อมูลแล้วกดยืนยัน เจ้าของตึกจะติดต่อกลับเพื่อยืนยันนัด', name: 'ชื่อ', phone: 'เบอร์โทร', date: 'วันที่', time: 'เวลา', note: 'หมายเหตุ (ไม่บังคับ)', noteP: 'เช่น งบประมาณ วันที่จะเข้าอยู่ จำนวนผู้พัก', send: 'ยืนยันนัดดูห้อง', sending: 'กำลังส่ง…', okT: 'ส่งคำขอนัดดูห้องแล้ว', okD: 'เจ้าของตึกจะติดต่อกลับเพื่อยืนยันนัดโดยเร็วครับ ปิดหน้านี้ได้เลย', call: 'หรือโทร', sw: 'English' };
+if (EN) document.documentElement.lang = 'en';
+document.title = T.title;
+let INFO = {};
+function swLang() { const u = new URL(location.href); if (EN) u.searchParams.delete('lang'); else u.searchParams.set('lang', 'en'); location.href = u.href; }
+function draw() {
+  const d = new Date(Date.now() + 864e5), ds = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  const today = new Date().toISOString().slice(0, 10);
+  document.getElementById('app').innerHTML = `<div class="head"><img src="icon-192.png" alt=""><div><b>${esc(INFO.buildingName || INFO.apartmentName || '')}</b><span class="muted">📅 ${T.title}</span></div><a class="lang tap" onclick="swLang()">🌐 ${T.sw}</a></div>
+    <div class="card"><p class="muted" style="margin-top:0">${T.sub}</p>
+      <form id="fv" onsubmit="send(event)" autocomplete="on">
+        <label class="f">${T.name} *<input id="vName" name="name" autocomplete="name" required maxlength="60"></label>
+        <label class="f">${T.phone} *<input id="vPhone" name="phone" type="tel" inputmode="tel" autocomplete="tel" required placeholder="08x-xxx-xxxx"></label>
+        <div class="g2"><label class="f">${T.date} *<input id="vDate" type="date" required min="${today}" value="${ds}"></label><label class="f">${T.time} *<input id="vTime" type="time" required value="18:00"></label></div>
+        <label class="f">${T.note}<textarea id="vNote" rows="2" maxlength="300" placeholder="${T.noteP}"></textarea></label>
+        <input class="hp" id="vHp" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <div id="vErr" style="color:var(--bad);font-size:14px;margin-bottom:8px"></div>
+        <button class="btn pri blk lg" id="vBtn" type="submit">✅ ${T.send}</button>
+      </form></div>
+    ${INFO.tel1 ? `<p class="muted" style="text-align:center">${T.call} <a href="tel:${esc(String(INFO.tel1).replace(/[^\d+]/g, ''))}"><b>${esc(INFO.tel1)}</b></a>${INFO.tel2 ? ' · <a href="tel:' + esc(String(INFO.tel2).replace(/[^\d+]/g, '')) + '">' + esc(INFO.tel2) + '</a>' : ''}</p>` : ''}`;
+}
+async function send(e) {
+  e.preventDefault();
+  const b = document.getElementById('vBtn'), er = document.getElementById('vErr'); er.textContent = '';
+  b.disabled = true; b.textContent = T.sending;
+  try {
+    await callApi('requestViewing', { name: vName.value.trim(), phone: vPhone.value.trim(), at: vDate.value + ' ' + vTime.value, note: vNote.value.trim(), hp: vHp.value, lang: EN ? 'en' : 'th' });
+    document.getElementById('app').innerHTML = `<div class="card ok"><div class="ic">✓</div><h2 style="margin:0 0 6px">${T.okT}</h2><p class="muted">${T.okD}</p>
+      <p style="margin-top:14px">👤 ${esc(vName.value)}<br>📞 ${esc(vPhone.value)}<br>🕒 ${esc(vDate.value)} ${esc(vTime.value)}</p></div>`;
+  } catch (x) { er.textContent = x.message; b.disabled = false; b.textContent = '✅ ' + T.send; }
+}
+(async () => { try { INFO = await callApi('publicInfo', {}); } catch (e) {} draw(); })();
+</script>
+</body>
+</html>

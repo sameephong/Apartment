@@ -3,7 +3,7 @@
  * - ไฟล์ที่มี ?v= (css/js): ใช้ตัวที่จำไว้ทันที (เปลี่ยนเวอร์ชันเมื่ออัปเดต)
  * - config.js: ดึงใหม่ก่อนเสมอ
  * - ข้อมูลจาก Google Apps Script: ไม่แตะ (ส่งตรงทุกครั้ง) */
-const CACHE = 'dulaetuek-v5.0';
+const CACHE = 'dulaetuek-v5.1';
 const CORE = ['./', './index.html', './admin.html', './tenant.html', './bill.html', './manifest.json', './icon-192.png', './icon-512.png', './apple-touch-icon.png', './favicon-32.png'];
 
 self.addEventListener('install', e => {
