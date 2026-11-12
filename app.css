@@ -246,3 +246,9 @@ mark{background:#fde68a;color:inherit;border-radius:3px;padding:0 1px}
 .rm{position:relative}.rm .nw{white-space:nowrap;display:inline-block}
 .clb{position:absolute;top:5px;right:6px;font-size:13px;margin:0}
 .rm.s-clean .nm.big,.rmg.cmp .rm.s-clean .nm.big{font-size:12px!important;letter-spacing:-.3px}
+
+/* QR ผูก LINE ทุกห้อง (ปรินท์ได้) */
+.qrgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.qrc{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:4px;break-inside:avoid}
+.qrbox2{margin:6px 0}
+@media print{body.admin #app{padding-left:0!important}.side,.noprint,.hd .pill{display:none!important}.qrgrid{grid-template-columns:repeat(3,1fr)}.qrc{border:1px dashed #999}}

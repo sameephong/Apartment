@@ -12,10 +12,10 @@
 <link rel="preconnect" href="https://script.google.com"><link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=4.9">
+<link rel="stylesheet" href="app.css?v=5.0">
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>document.write('<script src="config.js?t=' + Date.now() + '"><\/script>')</script>
-<script src="common.js?v=4.9"></script>
+<script src="common.js?v=5.0"></script>
 </head>
 <body class="admin">
 <div class="wrap">
@@ -327,6 +327,7 @@ async function checkIn(room) {
     ${FL().app ? `<div class="card" style="background:var(--o-soft);border:0">รหัสเข้าแอปผู้เช่า<div class="big" style="letter-spacing:4px">${esc(t.pin)}</div></div>
     <button class="btn ok blk lg" onclick="sharePin(${q(t.id)})">ส่งลิงก์ + รหัสให้ผู้เช่าทาง LINE</button>` : ''}
     ${j.billId ? `<button class="btn ${FL().app ? '' : 'ok lg'} blk" style="margin-top:8px" onclick="shareBill(${q(j.billId)})">ส่งบิลแรกเข้าทาง LINE</button>` : ''}
+    ${S().lineOaId ? `<button class="btn blk" style="margin-top:8px" onclick="lineQrSheet(${q(t.id)})">📱 QR ผูก LINE ผู้เช่า</button>` : ''}
     <button class="btn blk" style="margin-top:8px" onclick="docSheet(${q(room)},'สัญญาเช่า',${q(t.id)})">📎 แนบสัญญาเช่า / รูปบัตร / รูปห้อง</button></div>`);
 }
 
@@ -825,10 +826,10 @@ VIEWS.tenants = () => {
 /* ---------- ประกาศ ---------- */
 VIEWS.news = () => ({
   title: 'ประกาศถึงผู้เช่า', sub: FL().news ? 'ขึ้นในแอปผู้เช่าทุกห้อง' : 'ประกาศในแอปปิดอยู่ · ส่งทาง LINE แทน', back: 'more', nav: 'more',
-  html: `${FL().news ? '' : '<div class="card" style="background:var(--warn-soft);border:0">ระบบผู้เช่าปิดการแสดงประกาศในแอป — กด “ส่งประกาศ” แล้วเลือกกลุ่ม LINE ของผู้เช่าเพื่อส่งต่อ</div>'}<div class="card" id="fNews"><label class="f">หัวข้อ<input name="title" placeholder="เช่น แจ้งปิดน้ำซ่อมท่อ"></label><label class="f">รายละเอียด<textarea name="body" rows="3"></textarea></label><button class="btn pri blk" onclick="postNews()">ส่งประกาศ</button></div>
+  html: `${FL().news ? '' : '<div class="card" style="background:var(--warn-soft);border:0">ระบบผู้เช่าปิดการแสดงประกาศในแอป — กด “ส่งประกาศ” แล้วเลือกกลุ่ม LINE ของผู้เช่าเพื่อส่งต่อ</div>'}<div class="card" id="fNews"><label class="f">หัวข้อ<input name="title" placeholder="เช่น แจ้งปิดน้ำซ่อมท่อ"></label><label class="f">รายละเอียด<textarea name="body" rows="3"></textarea></label>${S().lineConfigured && (D.lineUsers || []).some(u => u.tenantId) ? `<label class="trow" style="cursor:pointer"><input type="checkbox" id="nLine" checked style="width:20px;height:20px;flex:none"><div style="flex:1"><b>ส่งเข้า LINE ผู้เช่าด้วย</b><div class="muted small">${(D.lineUsers || []).filter(u => u.tenantId).length} คนที่ผูก LINE แล้ว · นับโควตาข้อความ</div></div></label><label class="f">เฉพาะชั้น (เว้นว่าง = ทุกชั้น)<input id="nFloors" placeholder="เช่น 2,3"></label>` : ''}<button class="btn pri blk" onclick="postNews()">ส่งประกาศ</button></div>
     ${D.news.map(n => `<div class="card"><div class="row"><b style="flex:1">${esc(n.title)}</b><button class="btn sm bad" onclick="delNews(${q(n.id)})">ลบ</button></div><div class="muted small">${fmtDateTime(n.createdAt)}</div><div style="margin-top:6px;white-space:pre-wrap">${esc(n.body)}</div></div>`).join('')}`,
 });
-async function postNews() { const o = formObj('#fNews'); if (!o.title) return uiAlert('กรุณาใส่หัวข้อ'); const w = FL().news ? null : preOpen(); try { await act('postNews', o, 'บันทึกประกาศแล้ว'); } catch (e) { if (w) w.close(); return; } if (w) lineTo(w, '📢 ' + o.title + '\n' + o.body + '\n— ' + S().apartmentName); render(); }
+async function postNews() { const o = formObj('#fNews'); if (!o.title) return uiAlert('กรุณาใส่หัวข้อ'); const nl = $('#nLine'); if (nl && nl.checked) { o.line = true; o.floors = ($('#nFloors').value || '').split(/[,\s]+/).filter(Boolean); } const w = FL().news || o.line ? null : preOpen(); try { const j = await act('postNews', o, 'บันทึกประกาศแล้ว'); if (o.line && j.result) toast('ส่งเข้า LINE ผู้เช่า ' + j.result.sent + ' คน'); } catch (e) { if (w) w.close(); return; } if (w) lineTo(w, '📢 ' + o.title + '\n' + o.body + '\n— ' + S().apartmentName); render(); }
 async function delNews(id) { if (!await uiConfirm('ลบประกาศนี้?')) return; await act('deleteNews', { id }, 'ลบแล้ว'); render(); }
 </script>
 <script>
@@ -1077,7 +1078,7 @@ function roomPanel(no) {
     <div class="line"><span class="muted">มิเตอร์ล่าสุด</span><span>${lastM ? 'น้ำ ' + money(lastM.waterCur !== '' ? lastM.waterCur : lastM.waterPrev) + ' · ไฟ ' + money(lastM.elecCur !== '' ? lastM.elecCur : lastM.elecPrev) : '-'}</span></div>
     <b style="display:block;margin:14px 0 2px;font-size:14px">บิลล่าสุด</b>${bills.map(b => `<div class="line tap" onclick="billSheet(${q(b.id)})"><span>${esc(billTitle(b))}</span><span>${fmtB(b.total)} ${statusPill(b)}</span></div>`).join('') || '<div class="muted small">ยังไม่มีบิล</div>'}
     <b style="display:block;margin:14px 0 2px;font-size:14px">งานซ่อม</b>${reps.map(x => `<div class="task tap" onclick="repairSheet(${q(x.id)})"><i class="ic" style="background:var(--warn-soft);width:30px;height:30px;font-size:15px">🔧</i><div style="flex:1;min-width:0">${esc(x.category)} · ${esc(x.detail.slice(0, 40))}<div class="muted small">แจ้ง ${ago(x.createdAt)}</div></div><span class="pl ${x.status === 'กำลังซ่อม' ? 'o' : 'warn'}">${esc(x.status)}</span></div>`).join('') || '<div class="muted small">ไม่มีงานค้าง</div>'}
-    ${cleanCard(no)}${itemsCard(no)}${docsHtml(no)}
+    ${lineCard(no)}${cleanCard(no)}${itemsCard(no)}${docsHtml(no)}
     ${ob.length ? `<button class="btn ok blk" style="margin-top:14px" onclick="paySheet(${q(ob[ob.length - 1].id)})">💵 บันทึกรับเงิน ${fmtB(ob[ob.length - 1].total)}</button>` : ''}
     <div class="row" style="flex-wrap:nowrap;margin-top:${ob.length ? 8 : 16}px"><button class="btn" style="flex:1" onclick="go('newbill/${encodeURIComponent(no)}')">🧾 ออกบิล</button><button class="btn" style="flex:1" onclick="tenantSheet(${q(t.id)})">✏️ แก้ไข</button><button class="btn bad" style="flex:1" onclick="go('moveout/${t.id}')">🚪 ย้ายออก</button></div>` + resetRoomBtn(no);
 }
@@ -1572,7 +1573,7 @@ async function dcUpload() {
 // ใส่ส่วนเอกสารในหน้าห้อง (มือถือ/คอมแบบหน้าเดียว)
 VIEWS.room = no => {
   const v = M.room(no);
-  if (D.rooms.some(r => r.room === no)) v.html += `<div class="card">${cleanCard(no)}</div><div class="card">${itemsCard(no)}</div><div class="card">${docsHtml(no)}</div>` + resetRoomBtn(no);
+  if (D.rooms.some(r => r.room === no)) v.html += (tenantOf(no) ? `<div class="card">${lineCard(no)}</div>` : '') + `<div class="card">${cleanCard(no)}</div><div class="card">${itemsCard(no)}</div><div class="card">${docsHtml(no)}</div>` + resetRoomBtn(no);
   return v;
 };
 
@@ -1971,7 +1972,7 @@ const BOT_CMDS = [['ซ่อม', '🔧', 'แจ้งซ่อม / ซ่อ
   ['ทำความสะอาด', '🧹', 'ทำความสะอาด', 'ทำความสะอาด 102 · สะอาดแล้ว 102'], ['อุปกรณ์', '🛏️', 'อุปกรณ์ห้อง', 'ขาด 204 เตียง · ชำรุด 204 ตู้ · มีแล้ว 204 เตียง'], ['โน้ต', '📝', 'หมายเหตุห้อง', 'โน้ต 305 ฝ้าร้าว'],
   ['จอง', '📅', 'บันทึกการจอง', 'จอง 301 สมชาย 0812345678 23/11 20:00'], ['ถาม', '🔎', 'ถามข้อมูล / ค้นหา', 'ห้อง 204 · ค้างจ่าย · ห้องว่าง · ค้น ฝ้า']];
 const BOT_NOTI = [['morning', '📋', 'สรุปเช้า 8 โมง', 'ค้างจ่าย งานซ่อม ห้องรอทำความสะอาด ผู้จองที่เข้าวันนี้'], ['slip', '🧾', 'ผู้เช่าส่งสลิป', ''], ['repair', '🔧', 'ผู้เช่าแจ้งซ่อมในแอป', ''],
-  ['moveout', '🚪', 'ผู้เช่าย้ายออก', ''], ['checkin', '🔑', 'เช็คอินผู้เช่าใหม่', ''], ['paid', '💵', 'รับเงินแล้ว (บันทึกจากหน้าเว็บ)', 'ส่งทุกครั้งที่บันทึกรับเงิน'], ['rent', '🏦', 'เตือนจ่ายค่าเช่าตึก', 'ตามวันที่ตั้งไว้ข้างล่าง']];
+  ['moveout', '🚪', 'ผู้เช่าย้ายออก', ''], ['checkin', '🔑', 'เช็คอินผู้เช่าใหม่', ''], ['paid', '💵', 'รับเงินแล้ว (บันทึกจากหน้าเว็บ)', 'ส่งทุกครั้งที่บันทึกรับเงิน'], ['rent', '🏦', 'เตือนจ่ายค่าเช่าตึก', 'ตามวันที่ตั้งไว้ข้างล่าง'], ['view', '📅', 'ลูกค้าขอนัดดูห้อง (LINE OA)', '']];
 function lineContent() {
   const s = S(), on = s.botOn !== '0', cmds = String(s.botCmds == null ? BOT_CMDS.map(x => x[0]).join(',') : s.botCmds).split(','), no = String(s.botNotify == null ? 'morning,slip,repair,moveout,checkin' : s.botNotify).split(',');
   const ck = (cls, k, onv, i, l, d) => `<label class="trow" style="cursor:pointer"><input type="checkbox" class="${cls}" value="${k}" ${onv ? 'checked' : ''} style="width:20px;height:20px;flex:none"><span style="font-size:18px">${i}</span><div style="flex:1;min-width:0"><b>${l}</b>${d ? `<div class="muted small">${esc(d)}</div>` : ''}</div></label>`;
@@ -1991,6 +1992,7 @@ function lineContent() {
           <div class="muted small" style="margin-top:6px">ข้อความคุยกันทั่วไป บอทไม่ตอบ · พิมพ์ “คำสั่ง” ในกลุ่มเพื่อดูวิธีใช้</div></div>
         <div><div class="fl" style="margin-top:${DESK() ? 0 : 14}px">🔔 แจ้งเตือนเข้ากลุ่ม</div>${BOT_NOTI.map(([k, i, l, d]) => ck('bnot', k, no.includes(k), i, l, d)).join('')}
           <div class="g2" style="margin-top:8px"><label class="f">วันที่เตือนจ่ายค่าเช่าตึก<input id="bRentDays" value="${esc(s.rentDays == null ? '10,20' : s.rentDays)}" placeholder="10,20"></label><label class="f">ข้อความเตือน<input id="bRentText" value="${esc(s.rentText == null ? 'จ่ายค่าเช่าตึก' : s.rentText)}" placeholder="จ่ายค่าเช่าตึกป้าป้อม 37,500"></label></div></div></div>
+      ${lineTenantSection()}
       <div class="fl" style="margin-top:14px">🗂️ จดข้อความในกลุ่ม (ใช้กับคำสั่ง “ค้น”)</div>
       <div class="trow"><input type="checkbox" id="bLog" ${s.botLog !== '0' ? 'checked' : ''} style="width:20px;height:20px;flex:none"><div style="flex:1"><b>จดข้อความในกลุ่มลง Google Sheet</b><div class="muted small">เก็บในชีต ChatLog ของคุณเอง · เริ่มจดตั้งแต่บอทเข้ากลุ่ม</div></div>
         <label class="f" style="margin:0;width:120px">เก็บย้อนหลัง (วัน)<input id="bLogDays" type="number" value="${esc(s.botLogDays || 180)}"></label></div>
@@ -1998,9 +2000,77 @@ function lineContent() {
 }
 async function saveBot() {
   const v = c => [...document.querySelectorAll('.' + c + ':checked')].map(x => x.value).join(',');
-  await act('saveSettings', { settings: { botCmds: v('bcmd'), botNotify: v('bnot'), rentDays: $('#bRentDays').value.trim(), rentText: $('#bRentText').value.trim(), botLog: $('#bLog').checked ? '1' : '0', botLogDays: String(+$('#bLogDays').value || 180) } }, 'บันทึกการตั้งค่าบอทแล้ว');
+  await act('saveSettings', { settings: { appUrl: new URL(withB('bill.html'), location.href).href, botCmds: v('bcmd'), botNotify: v('bnot'), rentDays: $('#bRentDays').value.trim(), rentText: $('#bRentText').value.trim(), botLog: $('#bLog').checked ? '1' : '0', botLogDays: String(+$('#bLogDays').value || 180) } }, 'บันทึกการตั้งค่าบอทแล้ว');
   render();
 }
+
+/* ---------- LINE OA ฝั่งผู้เช่า: ผูก LINE ด้วย QR · ภาษาไทย/อังกฤษ · เมนูด้านล่างแชท ---------- */
+const T_NOTI = [['bill', '🧾', 'บิลออกแล้ว', 'แจ้งยอดและวันครบกำหนด'], ['remind', '⏰', 'เตือนก่อนครบกำหนด 1 วัน + เลยกำหนด 1/3/7 วัน', 'เฉพาะห้องที่ยังไม่จ่าย'], ['repair', '🛠️', 'อัปเดตงานซ่อม', 'นัดช่าง / ซ่อมเสร็จ'], ['paid', '✅', 'ยืนยันรับเงิน / สลิปไม่ผ่าน', 'พร้อมเลขใบเสร็จ']];
+function regLinkF(t, lang) { const id = String(S().lineOaId || '').trim(); if (!id || !t) return ''; return 'https://line.me/R/oaMessage/' + encodeURIComponent(id[0] === '@' ? id : '@' + id) + '/?' + encodeURIComponent((lang === 'en' ? 'register ' : 'ลงทะเบียน ') + t.room + ' ' + t.pin); }
+function lineTenantSection() {
+  const s = S(), tn = String(s.tNotify == null ? 'bill,remind,repair,paid' : s.tNotify).split(','), lu = (D.lineUsers || []), linked = lu.filter(u => u.tenantId), rooms = new Set(linked.map(u => u.room));
+  const act_ = active().length, rich = (() => { try { return Object.keys(JSON.parse(s.richIds || '{}')).length; } catch (e) { return 0; } })();
+  const ck = (k, i, l, d) => `<label class="trow" style="cursor:pointer"><input type="checkbox" class="tnot" value="${k}" ${tn.includes(k) ? 'checked' : ''} style="width:20px;height:20px;flex:none"><span style="font-size:18px">${i}</span><div style="flex:1;min-width:0"><b>${l}</b>${d ? `<div class="muted small">${esc(d)}</div>` : ''}</div></label>`;
+  return `<div style="border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:16px">
+    <div class="row" style="margin-bottom:6px"><b style="font-size:16px;flex:1">👥 ผู้เช่า / ลูกค้าใน LINE OA</b><span class="pl ${rooms.size ? 'ok' : ''}">ผูก LINE แล้ว ${rooms.size}/${act_} ห้อง</span></div>
+    <div class="muted small" style="margin-bottom:10px">ผู้เช่าสแกน QR ของห้องเพื่อผูก LINE → ดูบิล ส่งสลิป แจ้งซ่อม รับแจ้งเตือนเฉพาะห้อง · ลูกค้าที่ยังไม่ได้เช่าเห็นเมนูห้องว่าง / นัดดูห้อง · เลือกภาษาไทยหรือ English ได้</div>
+    <div class="g2" style="${DESK() ? '' : 'grid-template-columns:1fr'}"><label class="f">LINE OA ID ของตึก<input id="tOaId" value="${esc(s.lineOaId || '')}" placeholder="@942xsawg"></label>
+      <div class="f" style="display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap"><button class="btn" onclick="go('lineqr')" ${s.lineOaId ? '' : 'disabled'}>🖨️ QR ผูก LINE ทุกห้อง</button><button class="btn" onclick="lineQuota()">📊 โควตาข้อความ</button></div></div>
+    <div class="row" style="margin:4px 0 10px;flex-wrap:wrap"><button class="btn ${rich ? '' : 'pri'}" onclick="setupRich()">${rich ? '🔄 ติดตั้งเมนู LINE ใหม่' : '📲 ติดตั้งเมนูด้านล่างแชท LINE'}</button><span class="muted small">${rich ? '✅ ติดตั้งแล้ว ' + rich + ' ชุด (ผู้เช่า/ลูกค้า × ไทย/English)' : 'ต้องอัปโหลดรูป richmenu-*.jpg ขึ้น GitHub ก่อน'}</span></div>
+    <div class="fl">🔔 แจ้งเตือนถึงผู้เช่า (นับโควตาข้อความ)</div>${T_NOTI.map(([k, i, l, d]) => ck(k, i, l, d)).join('')}
+    <div class="g2" style="margin-top:10px;${DESK() ? '' : 'grid-template-columns:1fr'}"><label class="f">ข้อมูลห้องสำหรับลูกค้าที่สนใจ (ไทย)<textarea id="tGi" rows="3" placeholder="เช่น ห้องแอร์ 22 ตร.ม. เฟอร์นิเจอร์ครบ ฟรี Wi-Fi ใกล้ BTS รามคำแหง">${esc(s.guestInfo || '')}</textarea></label><label class="f">Room info for prospects (English)<textarea id="tGiEn" rows="3" placeholder="e.g. 22 sqm, air-con, fully furnished, free Wi-Fi">${esc(s.guestInfoEn || '')}</textarea></label></div>
+    ${linked.length ? `<details><summary style="cursor:pointer;font-weight:700;padding:4px 0">รายชื่อ LINE ที่ผูกแล้ว (${linked.length})</summary>${linked.sort((a, b) => a.room.localeCompare(b.room, undefined, { numeric: true })).map(u => `<div class="item" style="padding:6px 0"><b style="width:48px">${esc(u.room)}</b><div style="flex:1;min-width:0">${esc(u.displayName || 'LINE')} <span class="pl">${u.lang === 'en' ? 'EN' : 'ไทย'}</span></div><button class="btn sm" onclick="unlinkLine(${q(u.userId)})">ยกเลิกผูก</button></div>`).join('')}</details>` : ''}
+    <div class="row" style="margin-top:8px"><button class="btn pri" onclick="saveTenantLine()">บันทึกส่วนผู้เช่า</button></div></div>`;
+}
+async function saveTenantLine() {
+  const v = [...document.querySelectorAll('.tnot:checked')].map(x => x.value).join(','), id = $('#tOaId').value.trim();
+  await act('saveSettings', { settings: { appUrl: new URL(withB('bill.html'), location.href).href, lineOaId: id && id[0] !== '@' ? '@' + id : id, tNotify: v, guestInfo: $('#tGi').value.trim(), guestInfoEn: $('#tGiEn').value.trim() } }, 'บันทึกแล้ว');
+  render();
+}
+async function setupRich() {
+  if (!await uiConfirm('ติดตั้งเมนูด้านล่างแชท LINE OA ทั้ง 4 ชุด?\n(ผู้เช่า/ลูกค้า × ไทย/English)\nต้องอัปโหลดไฟล์ richmenu-*.jpg ขึ้น GitHub แล้ว')) return;
+  await act('saveSettings', { settings: { appUrl: new URL(withB('bill.html'), location.href).href } });
+  const j = await act('setupRichMenu', { base: new URL('.', location.href).href }); toast('ติดตั้งเมนูแล้ว ' + j.result.menus + ' ชุด · ผู้เช่า ' + j.result.tenants + ' คน'); render();
+}
+async function lineQuota() { try { const j = await api('lineQuota', {}); const r = j.result; uiAlert(r.type === 'limited' ? `📊 ข้อความที่ระบบส่งเอง (push) เดือนนี้\nใช้ไป ${money(r.used)} / ${money(r.limit)} ข้อความ\nเหลือ ${money(Math.max(0, r.limit - r.used))}\n\nข้อความที่บอทตอบกลับ ไม่นับโควตา` : `📊 ใช้ไป ${money(r.used)} ข้อความเดือนนี้ (แพ็กเกจไม่จำกัด)`); } catch (e) { uiAlert(e.message); } }
+async function unlinkLine(uid) { if (!await uiConfirm('ยกเลิกการผูก LINE นี้กับห้อง?\nผู้เช่าจะกลับไปเห็นเมนูลูกค้าทั่วไป และไม่ได้รับแจ้งเตือนของห้อง', 'ยกเลิกผูก', true)) return; await act('unlinkLine', { userId: uid }, 'ยกเลิกแล้ว'); render(); }
+function lineCard(no) {
+  const t = tenantOf(no); if (!t) return '';
+  const us = (D.lineUsers || []).filter(u => u.tenantId === t.id);
+  if (!S().lineOaId) return '';
+  return `<div class="row" style="margin:12px 0 0;flex-wrap:nowrap"><span class="small" style="flex:1;min-width:0">📱 LINE: ${us.length ? us.map(u => `<b>${esc(u.displayName || 'ผูกแล้ว')}</b> <span class="pl ok">${u.lang === 'en' ? 'EN' : 'ไทย'}</span>`).join(' ') : '<span class="muted">ยังไม่ผูก LINE</span>'}</span><button class="btn sm" onclick="lineQrSheet(${q(t.id)})">QR ผูก LINE</button></div>`;
+}
+let LQ = { lang: 'th' };
+function lineQrSheet(tid) {
+  const t = tenantById(tid); if (!t) return;
+  LQ.tid = tid;
+  openSheet(`<h3>📱 QR ผูก LINE · ห้อง ${esc(t.room)}</h3><div class="muted small" style="margin-top:-4px">${esc(t.name)} · ให้ผู้เช่าสแกนด้วยกล้องมือถือ แล้วกด “ส่ง” ในแชท LINE ทำครั้งเดียว</div>
+    <div class="segb" style="margin:10px 0"><button class="${LQ.lang === 'th' ? 'on' : ''}" onclick="LQ.lang='th';lineQrSheet(${q(tid)})">🇹🇭 ภาษาไทย</button><button class="${LQ.lang === 'en' ? 'on' : ''}" onclick="LQ.lang='en';lineQrSheet(${q(tid)})">🇬🇧 English</button></div>
+    <div style="text-align:center"><div id="lqBox" style="display:inline-block;padding:10px;background:#fff;border-radius:12px"></div>
+      <div style="font-weight:700;margin-top:4px">${LQ.lang === 'en' ? 'Room ' + esc(t.room) + ' · Scan to connect LINE' : 'ห้อง ' + esc(t.room) + ' · สแกนเพื่อผูก LINE'}</div>
+      <div class="muted small">${LQ.lang === 'en' ? 'Tap “Add friend” if asked, then tap Send' : 'ถ้ายังไม่ได้แอด กด “เพิ่มเพื่อน” แล้วกด ส่ง'}</div></div>
+    <div class="row" style="margin-top:12px;flex-wrap:wrap"><button class="btn ok" style="flex:1" onclick="lineQrShare()">💬 ส่งลิงก์ให้ผู้เช่าทาง LINE</button><button class="btn" style="flex:1" onclick="lineQrSave()">⬇️ บันทึกรูป QR</button></div>`);
+  drawQR($('#lqBox'), regLinkF(t, LQ.lang), 220);
+}
+function lineQrShare() { const t = tenantById(LQ.tid); openLine(LQ.lang === 'en' ? `Hi! Please connect your LINE to Room ${t.room} at ${S().buildingName || S().apartmentName}:\n${regLinkF(t, 'en')}\nTap the link, add friend if asked, then tap Send. You can then view bills, send slips and report repairs in LINE.` : `สวัสดีครับ ผูก LINE กับห้อง ${t.room} ของ${S().buildingName || S().apartmentName} ได้ที่ลิงก์นี้\n${regLinkF(t, 'th')}\nกดลิงก์ → เพิ่มเพื่อน (ถ้ายังไม่ได้แอด) → กดส่ง\nจากนั้นดูบิล ส่งสลิป แจ้งซ่อม ได้ใน LINE เลยครับ`); }
+function lineQrSave() {
+  const t = tenantById(LQ.tid), src = $('#lqBox canvas') || $('#lqBox img'); if (!src) return;
+  const c = document.createElement('canvas'), W = 600, H = 720, x = c.getContext('2d'); c.width = W; c.height = H;
+  x.fillStyle = '#fff'; x.fillRect(0, 0, W, H); x.drawImage(src, 90, 60, 420, 420);
+  x.fillStyle = '#111'; x.textAlign = 'center'; x.font = 'bold 40px sans-serif'; x.fillText((LQ.lang === 'en' ? 'Room ' : 'ห้อง ') + t.room, W / 2, 545);
+  x.font = '26px sans-serif'; x.fillStyle = '#444'; x.fillText(LQ.lang === 'en' ? 'Scan to connect LINE' : 'สแกนเพื่อผูก LINE ของห้อง', W / 2, 595); x.fillText(S().buildingName || S().apartmentName, W / 2, 640);
+  const a = document.createElement('a'); a.href = c.toDataURL('image/png'); a.download = 'QR-LINE-ห้อง' + t.room + '.png'; document.body.appendChild(a); a.click(); a.remove();
+}
+VIEWS.lineqr = () => {
+  const ts = active().sort((a, b) => a.room.localeCompare(b.room, undefined, { numeric: true })), linked = new Set((D.lineUsers || []).filter(u => u.tenantId).map(u => u.tenantId));
+  const only = UI.lqOnly !== false, list = only ? ts.filter(t => !linked.has(t.id)) : ts;
+  return { title: 'QR ผูก LINE ทุกห้อง', sub: 'ปรินท์แจกผู้เช่า · ยังไม่ผูก ' + ts.filter(t => !linked.has(t.id)).length + ' ห้อง', back: 'settings/line', nav: 'more', wide: true,
+    right: `<button class="pill" onclick="window.print()">🖨️ ปรินท์</button>`,
+    html: `<div class="row noprint" style="margin-bottom:10px"><div class="segb" style="margin:0;flex:1"><button class="${only ? 'on' : ''}" onclick="UI.lqOnly=true;render()">เฉพาะห้องที่ยังไม่ผูก</button><button class="${only ? '' : 'on'}" onclick="UI.lqOnly=false;render()">ทุกห้อง</button></div><button class="btn pri" onclick="window.print()">🖨️ ปรินท์</button></div>
+      <div class="qrgrid">${list.map(t => `<div class="qrc"><b style="font-size:20px">ห้อง ${esc(t.room)}</b><div class="muted small">${esc(t.name)}</div><div class="qrbox2" data-t="${esc(t.id)}"></div>
+        <div style="font-size:12.5px;line-height:1.45">สแกนเพื่อผูก LINE ห้อง ${esc(t.room)}<br>เพิ่มเพื่อน → กดส่ง<br><span class="muted">Scan to connect LINE · Add friend → Send</span></div></div>`).join('') || '<div class="empty">ทุกห้องผูก LINE แล้ว 🎉</div>'}</div>`,
+    after: () => document.querySelectorAll('.qrbox2').forEach(el => drawQR(el, regLinkF(tenantById(el.dataset.t), 'th'), 150)) };
+};
 </script>
 </body>
 </html>

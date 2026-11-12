@@ -14,7 +14,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>document.write('<script src="config.js?t=' + Date.now() + '"><\/script>')</script>
-<script src="common.js?v=4.9"></script>
+<script src="common.js?v=5.0"></script>
 <style>
 body{margin:0;background:#eef0f3;font-family:'Sarabun',system-ui,sans-serif;color:#1f2933}
 .paper{max-width:520px;margin:16px auto;background:#fff;border-radius:14px;padding:24px 22px;position:relative;box-shadow:0 1px 3px rgba(0,0,0,.08)}
@@ -45,26 +45,34 @@ tr.total td{font-weight:700;font-size:19px;border-bottom:0;padding-top:12px}
 <script>
 document.getElementById('demo').innerHTML = demoBanner();
 if (IS_DEMO) document.getElementById('btns').innerHTML = '<span style="color:#6b7280;font-size:13px">ปุ่มพิมพ์ / บันทึก PDF ใช้ได้เมื่อติดตั้งระบบจริง</span>';
+const EN = new URLSearchParams(location.search).get('lang') === 'en';
+const L = EN ? { inv: 'Invoice', rc: 'Receipt', no: 'No.', room: 'Room', tenant: 'Tenant', item: 'Item', paidOn: 'Paid on', due: 'Due date', ref: 'Invoice ref.', by: 'Paid by', amt: 'Amount (THB)', total: 'Total', baht: 'THB', paid: 'PAID', scan: 'Scan to pay with PromptPay', pp: 'PromptPay', slipHint: 'After paying, send the slip in LINE', cash: 'Cash', recv: 'Received', change: 'Change', tel: 'Tel', print: 'Print / Save PDF', bad: 'Invalid link', loading: 'Loading…' }
+  : { inv: 'ใบแจ้งหนี้', rc: 'ใบเสร็จรับเงิน', no: 'เลขที่', room: 'ห้อง', tenant: 'ผู้เช่า', item: 'รายการ', paidOn: 'วันที่ชำระ', due: 'ครบกำหนด', ref: 'อ้างอิงใบแจ้งหนี้', by: 'ชำระโดย', amt: 'จำนวนเงิน (บาท)', total: 'รวมทั้งสิ้น', baht: 'บาท', paid: 'ชำระแล้ว', scan: 'สแกนจ่ายด้วยพร้อมเพย์', pp: 'พร้อมเพย์', slipHint: '', cash: 'เงินสด', recv: 'รับเงิน', change: 'ทอน', tel: 'โทร', print: 'พิมพ์ / บันทึก PDF', bad: 'ลิงก์ไม่ถูกต้อง', loading: 'กำลังโหลด…' };
+const MEN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const dL = d => !d ? '-' : EN ? (+d.slice(8, 10)) + ' ' + MEN[+d.slice(5, 7) - 1] + ' ' + d.slice(0, 4) : fmtDate(d);
+const tL = b => !EN ? billTitle(b) : b.kind === 'รายเดือน' ? 'Monthly bill ' + MEN[+b.month.slice(5, 7) - 1] + ' ' + b.month.slice(0, 4) : ({ 'พิเศษ': 'Extra charge', 'แรกเข้า': 'Move-in', 'ย้ายออก': 'Move-out' })[b.kind] || b.kind;
+const mL = m => !EN ? m : ({ 'โอน/พร้อมเพย์': 'Transfer / PromptPay', 'เงินสด': 'Cash', 'หักเงินมัดจำ': 'Deducted from deposit' })[m] || m;
+if (EN) { document.documentElement.lang = 'en'; const bb = document.querySelector('#btns .btn'); if (bb) bb.textContent = L.print; }
 (async function () {
   const p = document.getElementById('p'), token = new URLSearchParams(location.search).get('t');
-  if (!token) { p.innerHTML = '<p>ลิงก์ไม่ถูกต้อง</p>'; return; }
+  if (!token) { p.innerHTML = '<p>' + L.bad + '</p>'; return; }
   try {
     const { bill: b, info: i } = await callApi('getBill', { token });
     const paid = b.status === 'ชำระแล้ว';
-    document.title = (paid ? 'ใบเสร็จ ' + b.receiptNo : 'ใบแจ้งหนี้ ' + b.no) + ' ห้อง ' + b.room;
-    p.innerHTML = `${paid ? '<div class="stamp">ชำระแล้ว</div>' : ''}
-      <div class="top"><div style="flex:1"><h1>${esc(i.apartmentName)}</h1><div class="muted">${esc(i.address)}${i.phone ? '<br>โทร ' + esc(i.phone) : ''}</div></div>
-        <div class="doc"><b>${paid ? 'ใบเสร็จรับเงิน' : 'ใบแจ้งหนี้'}</b><span class="muted">${paid ? 'เลขที่ ' + esc(b.receiptNo) : 'เลขที่ ' + esc(b.no)}</span></div></div>
-      <div class="meta"><div><span class="muted">ห้อง</span> <b>${esc(b.room)}</b></div><div><span class="muted">ผู้เช่า</span> ${esc(b.tenantName)}</div>
-        <div><span class="muted">รายการ</span> ${esc(billTitle(b))}</div><div><span class="muted">${paid ? 'วันที่ชำระ' : 'ครบกำหนด'}</span> ${fmtDate(paid ? b.paidDate : b.dueDate)}</div>
-        ${paid ? `<div><span class="muted">อ้างอิงใบแจ้งหนี้</span> ${esc(b.no)}</div><div><span class="muted">ชำระโดย</span> ${esc(b.payMethod)}</div>` : ''}</div>
-      <table><tr><th>รายการ</th><th class="r">จำนวนเงิน (บาท)</th></tr>
+    document.title = (paid ? L.rc + ' ' + b.receiptNo : L.inv + ' ' + b.no) + ' · ' + L.room + ' ' + b.room;
+    p.innerHTML = `${paid ? '<div class="stamp">' + L.paid + '</div>' : ''}
+      <div class="top"><div style="flex:1"><h1>${esc(i.apartmentName)}</h1><div class="muted">${esc(i.address)}${i.phone ? '<br>' + L.tel + ' ' + esc(i.phone) : ''}</div></div>
+        <div class="doc"><b>${paid ? L.rc : L.inv}</b><span class="muted">${L.no} ${esc(paid ? b.receiptNo : b.no)}</span></div></div>
+      <div class="meta"><div><span class="muted">${L.room}</span> <b>${esc(b.room)}</b></div><div><span class="muted">${L.tenant}</span> ${esc(b.tenantName)}</div>
+        <div><span class="muted">${L.item}</span> ${esc(tL(b))}</div><div><span class="muted">${paid ? L.paidOn : L.due}</span> ${dL(paid ? b.paidDate : b.dueDate)}</div>
+        ${paid ? `<div><span class="muted">${L.ref}</span> ${esc(b.no)}</div><div><span class="muted">${L.by}</span> ${esc(mL(b.payMethod))}</div>` : ''}</div>
+      <table><tr><th>${L.item}</th><th class="r">${L.amt}</th></tr>
         ${b.items.map(x => `<tr><td>${esc(x.l)}</td><td class="r">${money(x.a)}</td></tr>`).join('')}
-        <tr class="total"><td>รวมทั้งสิ้น</td><td class="r">${money(b.total)} บาท</td></tr></table>
-      ${paid ? `${b.received ? `<p class="muted">รับเงิน ${money(b.received)} บาท · ทอน ${money(b.received - b.total)} บาท</p>` : ''}${b.note ? `<p class="muted">${esc(b.note)}</p>` : ''}<p class="muted" style="margin-top:24px;text-align:right">ผู้รับเงิน ............................................<br>${esc(i.apartmentName)}</p>`
-        : `${i.promptpay || i.bankInfo ? `<div class="pay">${i.promptpay ? `<b>สแกนจ่ายด้วยพร้อมเพย์</b><br><div id="qr"></div><div class="muted">พร้อมเพย์ ${esc(i.promptpay)} · ${money(b.total)} บาท</div>` : ''}
-          ${i.bankInfo ? `<p style="margin:8px 0 0">${esc(i.bankInfo)}</p>` : ''}<p class="muted" style="margin:8px 0 0">${i.flags && !i.flags.slip ? 'โอนแล้วส่งรูปสลิปให้เจ้าของหอทาง LINE' + (i.phone ? ' หรือโทร ' + esc(i.phone) : '') : `โอนแล้วส่งสลิปในแอปผู้เช่า · <a href="${withB('tenant.html?room=' + encodeURIComponent(b.room))}">เปิดแอปผู้เช่า</a>`}</p></div>` : ''}
-          ${i.cashInfo ? `<p class="muted">เงินสด: ${esc(i.cashInfo)}</p>` : ''}`}`;
+        <tr class="total"><td>${L.total}</td><td class="r">${money(b.total)} ${L.baht}</td></tr></table>
+      ${paid ? `${b.received ? `<p class="muted">${L.recv} ${money(b.received)} · ${L.change} ${money(b.received - b.total)} ${L.baht}</p>` : ''}${b.note && !EN ? `<p class="muted">${esc(b.note)}</p>` : ''}`
+        : `${i.promptpay || i.bankInfo ? `<div class="pay">${i.promptpay ? `<b>${L.scan}</b><br><div id="qr"></div><div class="muted">${L.pp} ${esc(i.promptpay)} · ${money(b.total)} ${L.baht}</div>` : ''}
+          ${i.bankInfo ? `<p style="margin:8px 0 0">${esc(i.bankInfo)}</p>` : ''}<p class="muted" style="margin:8px 0 0">${EN ? L.slipHint : i.flags && !i.flags.slip ? 'โอนแล้วส่งรูปสลิปให้เจ้าของหอทาง LINE' + (i.phone ? ' หรือโทร ' + esc(i.phone) : '') : `โอนแล้วส่งสลิปในแอปผู้เช่า · <a href="${withB('tenant.html?room=' + encodeURIComponent(b.room))}">เปิดแอปผู้เช่า</a>`}</p></div>` : ''}
+          ${i.cashInfo && !EN ? `<p class="muted">เงินสด: ${esc(i.cashInfo)}</p>` : ''}`}`;
     if (!paid && i.promptpay) drawQR(document.getElementById('qr'), promptPayPayload(i.promptpay, +b.total), 200);
   } catch (e) { p.innerHTML = '<p>' + esc(e.message) + '</p>'; }
 })();
