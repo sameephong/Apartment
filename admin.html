@@ -12,10 +12,10 @@
 <link rel="preconnect" href="https://script.google.com"><link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=5.1">
+<link rel="stylesheet" href="app.css?v=5.2">
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>document.write('<script src="config.js?t=' + Date.now() + '"><\/script>')</script>
-<script src="common.js?v=5.1"></script>
+<script src="common.js?v=5.2"></script>
 </head>
 <body class="admin">
 <div class="wrap">
@@ -705,6 +705,7 @@ VIEWS.more = () => ({
   html: `<div class="card" style="padding:2px 14px"><div class="item tap" onclick="go('profile')"><span style="font-size:20px">🏢</span><span style="flex:1">ข้อมูลหอ<div class="muted small">${esc(S().apartmentName)} · ${esc(S().phone || 'ยังไม่ใส่เบอร์')}</div></span><span class="muted">›</span></div>
     <div class="item tap" onclick="go('settings/tenant')"><span style="font-size:20px">👥</span><span style="flex:1">การใช้งานร่วมกับผู้เช่า<div class="muted small">${OWN() ? '🔑 เจ้าของจัดการเอง' : '👥 ใช้ร่วมกับผู้เช่า'}</div></span><span class="muted">›</span></div>
     <div class="item tap" onclick="go('deposits')"><span style="font-size:20px">💰</span><span style="flex:1">เงินประกัน<div class="muted small">ห้องที่ถือเงินประกัน · รอคืนเงิน ${D.tenants.filter(t => t.refundStatus === 'รอคืนเงิน').length} คน</div></span><span class="muted">›</span></div>
+    <div class="item tap" onclick="go('viewings')"><span style="font-size:20px">📅</span><span style="flex:1">นัดดูห้อง<div class="muted small">ลูกค้าที่ขอนัดดูห้องจาก LINE OA · ยืนยัน/ยกเลิกนัด</div></span>${(D.viewings || []).filter(v => v.status === 'ใหม่').length ? `<span class="pl warn">${(D.viewings || []).filter(v => v.status === 'ใหม่').length}</span>` : ''}<span class="muted">›</span></div>
     <div class="item tap" onclick="go('clean')"><span style="font-size:20px">🧹</span><span style="flex:1">ทำความสะอาด<div class="muted small">ห้องที่รอทำความสะอาด · ส่งรายการให้แม่บ้าน</div></span><span class="muted">›</span></div>
     <div class="item tap" onclick="go('find')"><span style="font-size:20px">🔎</span><span style="flex:1">ค้นหา / อุปกรณ์ห้อง<div class="muted small">ห้องไหนขาดเตียง ตู้ · ค้นทุกข้อมูลที่บันทึกไว้</div></span><span class="muted">›</span></div>
     <div class="item tap" onclick="go('expenses')"><span style="font-size:20px">💸</span><span style="flex:1">ค่าใช้จ่าย / กำไรของตึก<div class="muted small">ค่าเช่าตึก ค่าแม่บ้าน ค่าช่าง · แนบใบเสร็จได้</div></span><span class="muted">›</span></div>
@@ -835,6 +836,7 @@ async function delNews(id) { if (!await uiConfirm('ลบประกาศน�
 <script>
 /* ===================== v3 · หน้าจอคอม/Mac + โหมดเจ้าของจัดการเอง ===================== */
 window.matchMedia('(min-width:1024px)').addEventListener('change', () => { if (D) { closeSheet(); render(); } });
+const APP_FRONT = '5.2';
 const M = Object.assign({}, VIEWS); // หน้ามือถือเดิม
 const _render0 = render;
 render = function () {
@@ -842,6 +844,7 @@ render = function () {
   _render0();
   showInstall(); loadDocThumbs();
   if (D && !DESK() && $('#hd') && !$('#hd .bellbtn')) { const n = bellCount(); $('#hd').insertAdjacentHTML('beforeend', `<button class="pill rfbtn ic" onclick="manualRefresh(this)" title="รีเฟรชข้อมูล" style="flex:none">⟳</button><button class="pill ic" onclick="mSearch()" title="ค้นหา" style="flex:none">🔍</button><div style="position:relative;flex:none"><button class="pill bellbtn" onclick="bellToggle(event)" title="การแจ้งเตือน">🔔${n ? `<span class="n">${n}</span>` : ''}</button><div class="bellbox" id="bellBox"></div></div>`); }
+  if (D && D.ver !== APP_FRONT && !$('#verWarn') && $('#view')) $('#view').insertAdjacentHTML('afterbegin', `<div id="verWarn" class="card" style="background:var(--warn-soft);border-color:var(--warn);font-size:14px">⚠️ <b>โค้ด Apps Script ยังเป็นเวอร์ชันเก่า</b> (${esc(D.ver || 'ก่อน 5.2')} · หน้าเว็บ ${APP_FRONT}) — ฟังก์ชันใหม่บางอย่าง เช่น ฟอร์มนัดดูห้อง จะยังใช้ไม่ได้<br>วางโค้ดใหม่ใน Code.gs → รัน setup → <b>Deploy › จัดการการทำให้ใช้งานได้ › แก้ไข › เวอร์ชันใหม่</b></div>`);
   if (D && BLD) bInfo(BLD.code, { buildingName: S().buildingName || S().apartmentName, flags: FL() }); // จำชื่อตึกล่าสุดไว้ใช้ในรายการเลือกตึก
 };
 
@@ -873,7 +876,7 @@ function renderSide() {
   const items = [['home', '📊', 'ภาพรวม'], ['rooms', '🏠', 'ผังห้อง'], ['meters', '💧', 'จดมิเตอร์'],
     ['bills', '🧾', own ? 'บิล / รับเงิน' : 'บิล / การเงิน', own ? c.open : c.over],
     (!own && (f.slip || c.review)) ? ['approve', '✅', 'อนุมัติสลิป', c.review] : null,
-    ['repairs', '🔧', 'งานซ่อม', c.rep], 'จัดการ', ['tenants', '👥', 'ผู้เช่า / สัญญา'], ['deposits', '💰', 'เงินประกัน', D.tenants.filter(t => t.refundStatus === 'รอคืนเงิน').length], ['expenses', '💸', 'ค่าใช้จ่าย / กำไร'], ['clean', '🧹', 'ทำความสะอาด', D.rooms.filter(r => r.cleanStatus === 'รอทำ').length || ''], ['find', '🔎', 'ค้นหา / อุปกรณ์ห้อง', itemIssueRooms() || ''], f.app ? ['pins', '🔐', 'รหัสผู้เช่า'] : null,
+    ['repairs', '🔧', 'งานซ่อม', c.rep], 'จัดการ', ['tenants', '👥', 'ผู้เช่า / สัญญา'], ['deposits', '💰', 'เงินประกัน', D.tenants.filter(t => t.refundStatus === 'รอคืนเงิน').length], ['expenses', '💸', 'ค่าใช้จ่าย / กำไร'], ['viewings', '📅', 'นัดดูห้อง', (D.viewings || []).filter(v => v.status === 'ใหม่').length || ''], ['clean', '🧹', 'ทำความสะอาด', D.rooms.filter(r => r.cleanStatus === 'รอทำ').length || ''], ['find', '🔎', 'ค้นหา / อุปกรณ์ห้อง', itemIssueRooms() || ''], f.app ? ['pins', '🔐', 'รหัสผู้เช่า'] : null,
     ['news', '📢', 'ประกาศ'], ['report', '📈', 'รายงาน'], ['settings', '⚙️', 'ตั้งค่า'], ['more', '☰', 'เพิ่มเติม']].filter(Boolean);
   $('#side').innerHTML = `<div class="brand"><i>🏢</i><div style="min-width:0"><b>${esc(S().apartmentName)}</b><small>ระบบบริหารอพาร์ทเม้นท์</small></div></div>
     ${BLD_MANY ? `<div class="bchip"><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">🏢 <b style="color:#fff">${esc(S().buildingName || S().apartmentName)}</b></span><a onclick="changeBuilding()" style="flex:none;margin-left:8px">เปลี่ยนตึก</a></div>` : ''}
@@ -896,6 +899,7 @@ function bellItems() {
     .forEach(b => L.push({ k: 'slip:' + b.id + ':' + b.slipAt, i: '🧾', bg: 'var(--o-soft)', t: `สลิปรออนุมัติ · ห้อง ${esc(b.room)}`, d: `${esc((b.tenantName || '').split(' ')[0])} · ${fmtB(b.total)} · ส่งเมื่อ ${ago(b.slipAt)}`, a: `UI.apId=${q(b.id)};go('approve')` }));
   D.bills.filter(isOverdue).sort((a, b) => a.dueDate.localeCompare(b.dueDate))
     .forEach(b => L.push({ k: 'over:' + b.id, i: '⚠️', bg: 'var(--bad-soft)', t: `ห้อง ${esc(b.room)} ค้างชำระ ${daysBetween(b.dueDate, today())} วัน`, d: `${esc(billTitle(b))} · ${fmtB(b.total)} · ครบกำหนด ${fmtDate(b.dueDate)}`, a: `billSheet(${q(b.id)})` }));
+  (D.viewings || []).filter(v => v.status === 'ใหม่').forEach(v => L.push({ k: 'vw:' + v.id, i: '📅', bg: 'var(--ok-soft)', t: `ขอนัดดูห้อง · ${esc(v.name)}`, d: `${esc(v.phone || '')} · ${esc(vwAt(v.at) || v.note.slice(0, 40))} · ${ago(v.createdAt)}`, a: `vwSheet(${q(v.id)})` }));
   D.repairs.filter(r => r.status === 'รอดำเนินการ').forEach(r => L.push({ k: 'rep:' + r.id, i: '🔧', bg: 'var(--warn-soft)', t: `แจ้งซ่อมใหม่ · ห้อง ${esc(r.room)}`, d: `${esc(r.category)} · ${esc(r.detail.slice(0, 50))} · ${ago(r.createdAt)}`, a: `repairSheet(${q(r.id)})` }));
   return L;
 }
@@ -1972,7 +1976,7 @@ const BOT_CMDS = [['ซ่อม', '🔧', 'แจ้งซ่อม / ซ่อ
   ['ทำความสะอาด', '🧹', 'ทำความสะอาด', 'ทำความสะอาด 102 · สะอาดแล้ว 102'], ['อุปกรณ์', '🛏️', 'อุปกรณ์ห้อง', 'ขาด 204 เตียง · ชำรุด 204 ตู้ · มีแล้ว 204 เตียง'], ['โน้ต', '📝', 'หมายเหตุห้อง', 'โน้ต 305 ฝ้าร้าว'],
   ['จอง', '📅', 'บันทึกการจอง', 'จอง 301 สมชาย 0812345678 23/11 20:00'], ['ถาม', '🔎', 'ถามข้อมูล / ค้นหา', 'ห้อง 204 · ค้างจ่าย · ห้องว่าง · ค้น ฝ้า']];
 const BOT_NOTI = [['morning', '📋', 'สรุปเช้า 8 โมง', 'ค้างจ่าย งานซ่อม ห้องรอทำความสะอาด ผู้จองที่เข้าวันนี้'], ['slip', '🧾', 'ผู้เช่าส่งสลิป', ''], ['repair', '🔧', 'ผู้เช่าแจ้งซ่อมในแอป', ''],
-  ['moveout', '🚪', 'ผู้เช่าย้ายออก', ''], ['checkin', '🔑', 'เช็คอินผู้เช่าใหม่', ''], ['paid', '💵', 'รับเงินแล้ว (บันทึกจากหน้าเว็บ)', 'ส่งทุกครั้งที่บันทึกรับเงิน'], ['rent', '🏦', 'เตือนจ่ายค่าเช่าตึก', 'ตามวันที่ตั้งไว้ข้างล่าง'], ['view', '📅', 'ลูกค้าขอนัดดูห้อง (LINE OA)', '']];
+  ['moveout', '🚪', 'ผู้เช่าย้ายออก', ''], ['checkin', '🔑', 'เช็คอินผู้เช่าใหม่', ''], ['paid', '💵', 'รับเงินแล้ว (บันทึกจากหน้าเว็บ)', 'ส่งทุกครั้งที่บันทึกรับเงิน'], ['rent', '🏦', 'เตือนจ่ายค่าเช่าตึก', 'ตามวันที่ตั้งไว้ข้างล่าง']];
 function lineContent() {
   const s = S(), on = s.botOn !== '0', cmds = String(s.botCmds == null ? BOT_CMDS.map(x => x[0]).join(',') : s.botCmds).split(','), no = String(s.botNotify == null ? 'morning,slip,repair,moveout,checkin' : s.botNotify).split(',');
   const ck = (cls, k, onv, i, l, d) => `<label class="trow" style="cursor:pointer"><input type="checkbox" class="${cls}" value="${k}" ${onv ? 'checked' : ''} style="width:20px;height:20px;flex:none"><span style="font-size:18px">${i}</span><div style="flex:1;min-width:0"><b>${l}</b>${d ? `<div class="muted small">${esc(d)}</div>` : ''}</div></label>`;
@@ -2076,6 +2080,39 @@ VIEWS.lineqr = () => {
         <div style="font-size:12.5px;line-height:1.45">สแกนเพื่อผูก LINE ห้อง ${esc(t.room)}<br>เพิ่มเพื่อน → กดส่ง<br><span class="muted">Scan to connect LINE · Add friend → Send</span></div></div>`).join('') || '<div class="empty">ทุกห้องผูก LINE แล้ว 🎉</div>'}</div>`,
     after: () => document.querySelectorAll('.qrbox2').forEach(el => drawQR(el, regLinkF(tenantById(el.dataset.t), 'th'), 150)) };
 };
+
+/* ---------- นัดดูห้อง (จากฟอร์มลูกค้า / LINE OA) ---------- */
+const VW_ST = { 'ใหม่': ['รอยืนยัน', 'warn'], 'ยืนยันแล้ว': ['ยืนยันแล้ว', 'ok'], 'ดูแล้ว': ['ดูห้องแล้ว', ''], 'ยกเลิก': ['ยกเลิก', 'bad'] };
+function vwAt(at) { const m = String(at || '').match(/^(\d{4})-(\d{2})-(\d{2})\s*(\d{1,2}:\d{2})?/); return m ? Number(m[3]) + '/' + Number(m[2]) + '/' + String(Number(m[1]) + 543).slice(-2) + (m[4] ? ' ' + m[4] + ' น.' : '') : String(at || ''); }
+function vwPill(v) { const s = VW_ST[v.status] || VW_ST['ใหม่']; return `<span class="pl ${s[1]}">${s[0]}</span>`; }
+VIEWS.viewings = () => {
+  const all = D.viewings || [], key = v => (v.at || v.createdAt || ''), t = today();
+  const open = all.filter(v => v.status === 'ใหม่' || (v.status === 'ยืนยันแล้ว' && (!v.at || v.at.slice(0, 10) >= t))).sort((a, b) => key(a).localeCompare(key(b)));
+  const past = all.filter(v => open.indexOf(v) < 0).slice(0, 30);
+  const row = v => `<div class="item tap" onclick="vwSheet(${q(v.id)})"><span style="font-size:20px">📅</span><div style="flex:1;min-width:0"><b>${esc(v.name)}</b> <span class="muted small">${esc(v.phone || '')}</span><div class="muted small">🕒 ${esc(vwAt(v.at) || '-')} · ${esc(v.source || '')}${v.userId ? ' · 💬 LINE' : ''}${v.note ? ' · ' + esc(v.note.slice(0, 40)) : ''}</div></div>${vwPill(v)}</div>`;
+  return { title: 'นัดดูห้อง', sub: 'รอยืนยัน ' + all.filter(v => v.status === 'ใหม่').length + ' นัด', back: DESK() ? '' : 'more', nav: 'more',
+    html: `<div class="card"><h4>📅 นัดที่กำลังจะถึง / รอยืนยัน (${open.length})</h4>${open.map(row).join('') || '<div class="empty">ยังไม่มีนัดดูห้อง</div>'}</div>
+      ${past.length ? `<div class="card"><h4>ที่ผ่านมา</h4>${past.map(row).join('')}</div>` : ''}
+      <div class="muted small" style="padding:0 4px">ลูกค้ากรอกฟอร์มจากเมนู LINE OA › นัดดูห้อง · ระบบแจ้งเข้ากลุ่ม LINE ทุกครั้ง · ถ้าลูกค้ากด “บันทึกนัดไว้ในแชท LINE” (มี 💬 LINE) เมื่อกดยืนยัน/ยกเลิก ระบบจะส่งแจ้งลูกค้าใน LINE ให้อัตโนมัติ</div>` };
+};
+function vwSheet(id) {
+  const v = (D.viewings || []).find(x => x.id === id); if (!v) return;
+  const tel = String(v.phone || '').replace(/[^\d+]/g, ''), b = (st, l, c) => `<button class="btn ${c || ''}" ${v.status === st ? 'disabled' : ''} onclick="vwSet(${q(id)},${q(st)})">${l}</button>`;
+  const d = String(v.at || '').match(/^(\d{4}-\d{2}-\d{2})\s*(\d{1,2}:\d{2})?/) || [];
+  openSheet(`<div class="row" style="margin-bottom:8px"><h3 style="margin:0;flex:1">📅 นัดดูห้อง · ${esc(v.id)}</h3>${vwPill(v)}</div>
+    <div class="card" style="margin-bottom:10px"><div class="line"><span>ชื่อ</span><b>${esc(v.name)}</b></div><div class="line"><span>เบอร์โทร</span><b>${tel ? `<a href="tel:${esc(tel)}">${esc(v.phone)}</a>` : '-'}</b></div>
+      <div class="line"><span>วันเวลา</span><b>${esc(vwAt(v.at) || '-')}</b></div><div class="line"><span>ช่องทาง</span><span>${esc(v.source || '')}${v.lang === 'en' ? ' · English' : ''}${v.userId ? ' · 💬 LINE ' + esc(v.lineName || '') : ''}</span></div>
+      ${v.note ? `<div class="line"><span>หมายเหตุ</span><span style="text-align:right">${esc(v.note)}</span></div>` : ''}<div class="line"><span>ส่งคำขอ</span><span class="muted">${esc(ago(v.createdAt))}</span></div></div>
+    <div class="g2"><label class="f">เลื่อนวัน<input type="date" id="vwD" value="${esc(d[1] || '')}"></label><label class="f">เวลา<input type="time" id="vwT" value="${esc(d[2] || '')}"></label></div>
+    <div class="row" style="flex-wrap:wrap;gap:8px">${tel ? `<a class="btn" href="tel:${esc(tel)}">📞 โทร</a>` : ''}${b('ยืนยันแล้ว', '✅ ยืนยันนัด', 'ok')}${b('ดูแล้ว', '👀 ดูห้องแล้ว')}${b('ยกเลิก', '✖ ยกเลิก')}<span class="sp"></span><button class="btn" onclick="vwDel(${q(id)})">🗑</button></div>
+    ${v.userId ? '<div class="muted small" style="margin-top:8px">กดยืนยัน/ยกเลิก ระบบจะส่งการ์ดแจ้งลูกค้าใน LINE ให้ (ใช้โควต้า 1 ข้อความ)</div>' : '<div class="muted small" style="margin-top:8px">ลูกค้าไม่ได้ผูกแชท LINE — โทรยืนยันกับลูกค้าโดยตรง</div>'}`);
+}
+async function vwSet(id, status) {
+  const d = $('#vwD').value, t = $('#vwT').value, v = (D.viewings || []).find(x => x.id === id), at = d ? d + (t ? ' ' + t : '') : (v && v.at) || '';
+  const j = await act('saveViewing', { id, status, at }, status === 'ยืนยันแล้ว' ? 'ยืนยันนัดแล้ว' : 'บันทึกแล้ว');
+  if (j && j.sent) toast('ส่งแจ้งลูกค้าใน LINE แล้ว'); closeSheet(); render();
+}
+async function vwDel(id) { if (!(await uiConfirm('ลบนัดนี้?'))) return; await act('deleteViewing', { id }, 'ลบแล้ว'); closeSheet(); render(); }
 </script>
 </body>
 </html>

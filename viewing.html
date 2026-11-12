@@ -8,9 +8,9 @@
 <title>นัดดูห้อง</title>
 <link rel="preconnect" href="https://script.google.com"><link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=5.1">
+<link rel="stylesheet" href="app.css?v=5.2">
 <script>document.write('<script src="config.js?t=' + Date.now() + '"><\/script>')</script>
-<script src="common.js?v=5.1"></script>
+<script src="common.js?v=5.2"></script>
 <style>
 .g2{grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important}.g2 .f,.g2 input{min-width:0;max-width:100%;box-sizing:border-box}input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;width:100%;min-width:0}
 body{--brand:#15803d;--brand-soft:#e5f4ea}
@@ -28,8 +28,8 @@ label.f input,label.f textarea{font-size:17px;padding:12px}
 <script>
 document.getElementById('demo').innerHTML = demoBanner();
 const EN = new URLSearchParams(location.search).get('lang') === 'en';
-const T = EN ? { title: 'Book a viewing', sub: 'Fill in your details and we will contact you to confirm', name: 'Your name', phone: 'Phone number', date: 'Date', time: 'Time', note: 'Note (optional)', noteP: 'e.g. budget, move-in date, number of people', send: 'Confirm', sending: 'Sending…', okT: 'Request sent', okD: 'The owner will contact you shortly to confirm. You can close this page.', call: 'Or call', sw: 'ภาษาไทย' }
-  : { title: 'นัดดูห้อง', sub: 'กรอกข้อมูลแล้วกดยืนยัน เจ้าของตึกจะติดต่อกลับเพื่อยืนยันนัด', name: 'ชื่อ', phone: 'เบอร์โทร', date: 'วันที่', time: 'เวลา', note: 'หมายเหตุ (ไม่บังคับ)', noteP: 'เช่น งบประมาณ วันที่จะเข้าอยู่ จำนวนผู้พัก', send: 'ยืนยันนัดดูห้อง', sending: 'กำลังส่ง…', okT: 'ส่งคำขอนัดดูห้องแล้ว', okD: 'เจ้าของตึกจะติดต่อกลับเพื่อยืนยันนัดโดยเร็วครับ ปิดหน้านี้ได้เลย', call: 'หรือโทร', sw: 'English' };
+const T = EN ? { title: 'Book a viewing', sub: 'Fill in your details and we will contact you to confirm', name: 'Your name', phone: 'Phone number', date: 'Date', time: 'Time', note: 'Note (optional)', noteP: 'e.g. budget, move-in date, number of people', send: 'Confirm', sending: 'Sending…', okT: 'Request sent', okD: 'The owner will contact you shortly to confirm.', code: 'Ref', chat: '💬 Save this booking in LINE chat', chatD: 'Tap, then press Send — you will get a confirmation card in the chat', upd: 'The booking system is being updated. Please call us to book a viewing.', call: 'Or call', sw: 'ภาษาไทย' }
+  : { title: 'นัดดูห้อง', sub: 'กรอกข้อมูลแล้วกดยืนยัน เจ้าของตึกจะติดต่อกลับเพื่อยืนยันนัด', name: 'ชื่อ', phone: 'เบอร์โทร', date: 'วันที่', time: 'เวลา', note: 'หมายเหตุ (ไม่บังคับ)', noteP: 'เช่น งบประมาณ วันที่จะเข้าอยู่ จำนวนผู้พัก', send: 'ยืนยันนัดดูห้อง', sending: 'กำลังส่ง…', okT: 'ส่งคำขอนัดดูห้องแล้ว', okD: 'เจ้าของตึกจะติดต่อกลับเพื่อยืนยันนัดโดยเร็วครับ', code: 'รหัสนัด', chat: '💬 บันทึกนัดไว้ในแชท LINE', chatD: 'กดแล้วกด “ส่ง” ในแชท จะได้การ์ดยืนยันนัดเก็บไว้ดูได้ตลอด', upd: 'ระบบนัดดูห้องกำลังปรับปรุง กรุณาโทรนัดได้เลยครับ', call: 'หรือโทร', sw: 'English' };
 if (EN) document.documentElement.lang = 'en';
 document.title = T.title;
 let INFO = {};
@@ -55,10 +55,14 @@ async function send(e) {
   const b = document.getElementById('vBtn'), er = document.getElementById('vErr'); er.textContent = '';
   b.disabled = true; b.textContent = T.sending;
   try {
-    await callApi('requestViewing', { name: vName.value.trim(), phone: vPhone.value.trim(), at: vDate.value + ' ' + vTime.value, note: vNote.value.trim(), hp: vHp.value, lang: EN ? 'en' : 'th' });
+    const j = await callApi('requestViewing', { name: vName.value.trim(), phone: vPhone.value.trim(), at: vDate.value + ' ' + vTime.value, note: vNote.value.trim(), hp: vHp.value, lang: EN ? 'en' : 'th' });
     document.getElementById('app').innerHTML = `<div class="card ok"><div class="ic">✓</div><h2 style="margin:0 0 6px">${T.okT}</h2><p class="muted">${T.okD}</p>
-      <p style="margin-top:14px">👤 ${esc(vName.value)}<br>📞 ${esc(vPhone.value)}<br>🕒 ${esc(vDate.value)} ${esc(vTime.value)}</p></div>`;
-  } catch (x) { er.textContent = x.message; b.disabled = false; b.textContent = '✅ ' + T.send; }
+      <p style="margin-top:14px">${j.id ? `${T.code} <b style="font-size:20px;letter-spacing:1px">${esc(j.id)}</b><br>` : ''}👤 ${esc(vName.value)}<br>📞 ${esc(vPhone.value)}<br>🕒 ${esc(fmtAt(vDate.value, vTime.value))}</p>
+      ${j.chat ? `<a class="btn pri blk lg" style="margin-top:8px;text-decoration:none" href="${esc(j.chat)}">${T.chat}</a><p class="muted small" style="margin:8px 0 0">${T.chatD}</p>` : ''}</div>`;
+    if (j.chat && /Line\//i.test(navigator.userAgent)) setTimeout(() => { location.href = j.chat; }, 1500); // เปิดจากในแอป LINE: พากลับไปที่แชทพร้อมข้อความยืนยัน
+  } catch (x) { er.innerHTML = esc(/ไม่รู้จักคำสั่ง|Unknown action/.test(x.message) ? T.upd : x.message) + (INFO.tel1 ? ` <a href="tel:${esc(String(INFO.tel1).replace(/[^\d+]/g, ''))}"><b>📞 ${esc(INFO.tel1)}</b></a>` : ''); b.disabled = false; b.textContent = '✅ ' + T.send; }
+}
+function fmtAt(d, t) { const m = String(d).match(/^(\d{4})-(\d{2})-(\d{2})$/); if (!m) return d + ' ' + t; return Number(m[3]) + '/' + Number(m[2]) + '/' + (EN ? m[1] : String(Number(m[1]) + 543).slice(-2)) + ' ' + t + (EN ? '' : ' น.');
 }
 (async () => { try { INFO = await callApi('publicInfo', {}); } catch (e) {} draw(); })();
 </script>
