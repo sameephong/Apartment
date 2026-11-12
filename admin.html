@@ -12,10 +12,10 @@
 <link rel="preconnect" href="https://script.google.com"><link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=4.8">
+<link rel="stylesheet" href="app.css?v=4.9">
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>document.write('<script src="config.js?t=' + Date.now() + '"><\/script>')</script>
-<script src="common.js?v=4.8"></script>
+<script src="common.js?v=4.9"></script>
 </head>
 <body class="admin">
 <div class="wrap">
@@ -1400,7 +1400,7 @@ async function nrSave(line) {
 }
 
 /* ---------- ตั้งค่า (แท็บซ้าย) ---------- */
-const SET_TABS = [['profile', '🏢', 'ข้อมูลหอ'], ['rates', '💧', 'ค่าน้ำ / ค่าไฟ'], ['movein', '🔑', 'ค่าแรกเข้า / เงินประกัน'], ['rooms', '🏠', 'ห้องพัก'], ['pay', '💳', 'การรับชำระเงิน'], ['tenant', '👥', 'การใช้งานร่วมกับผู้เช่า'], ['line', '💬', 'LINE แจ้งเตือน'], ['pw', '🔒', 'รหัสผ่าน'], ['items', '🛏️', 'อุปกรณ์ประจำห้อง'], ['data', '🧹', 'ล้างข้อมูล / เริ่มใช้จริง']];
+const SET_TABS = [['profile', '🏢', 'ข้อมูลหอ'], ['rates', '💧', 'ค่าน้ำ / ค่าไฟ'], ['movein', '🔑', 'ค่าแรกเข้า / เงินประกัน'], ['rooms', '🏠', 'ห้องพัก'], ['pay', '💳', 'การรับชำระเงิน'], ['tenant', '👥', 'การใช้งานร่วมกับผู้เช่า'], ['line', '💬', 'บอท LINE / แจ้งเตือน'], ['pw', '🔒', 'รหัสผ่าน'], ['items', '🛏️', 'อุปกรณ์ประจำห้อง'], ['data', '🧹', 'ล้างข้อมูล / เริ่มใช้จริง']];
 VIEWS.profile = () => VIEWS.settings('profile');
 VIEWS.settings = tab => {
   const desk = DESK();
@@ -1437,9 +1437,7 @@ function setContent(tab) {
       <div class="g2" id="fBulk"><label class="f">ตั้งแต่ชั้น<input name="floorFrom" type="number" value="1"></label><label class="f">ถึงชั้น<input name="floorTo" type="number" value="3"></label>
       <label class="f">ห้องต่อชั้น<input name="perFloor" type="number" value="10"></label><label class="f">ค่าเช่า/เดือน<input name="rent" type="number" value="3000"></label>
       <label class="f" style="grid-column:1/-1">ประเภทห้อง<input name="type" placeholder="เช่น ห้องแอร์"></label></div><button class="btn pri" onclick="bulkRooms()">สร้างห้อง</button>` };
-  if (tab === 'line') return { title: 'LINE แจ้งเตือน ' + (s.lineConfigured ? '<span class="badge b-ok">เปิดอยู่</span>' : '<span class="badge">ยังไม่ตั้ง</span>'), sub: 'แจ้งเข้ากลุ่ม LINE ทันทีเมื่อผู้เช่าส่งสลิป/แจ้งซ่อม และสรุปทุกเช้า (LINE Official Account · Messaging API)',
-    html: `<div id="fLine"><label class="f">Channel access token<input name="lineToken" type="password" placeholder="${s.lineConfigured ? 'ตั้งแล้ว — เว้นว่าง = ไม่เปลี่ยน' : ''}"></label><label class="f">Group ID<input name="lineGroupId" value="${esc(s.lineGroupId)}"></label></div>
-      <div class="row"><button class="btn pri" onclick="saveSettings('#fLine')">บันทึก</button><button class="btn" onclick="act('testLine',{},'ส่งข้อความทดสอบแล้ว')">ทดสอบส่ง</button></div>` };
+  if (tab === 'line') return lineContent();
   if (tab === 'data') return dataContent();
   if (tab === 'items') return itemsSetContent();
   if (tab === 'pw') return { title: 'รหัสผ่าน', sub: 'รหัสผ่านเข้าระบบเจ้าของหอของตึกนี้', html: `<div id="fPw"><label class="f">รหัสผ่านใหม่ (อย่างน้อย 4 ตัว)<input name="adminPassword" type="password" autocomplete="new-password"></label></div><button class="btn pri" onclick="savePw()">เปลี่ยนรหัสผ่าน</button>` };
@@ -1966,6 +1964,42 @@ async function cleanPickSave() {
 function cleanLine() {
   const w = D.rooms.filter(r => r.cleanStatus === 'รอทำ').sort((a, b) => a.room.localeCompare(b.room, undefined, { numeric: true }));
   openLine(`🧹 ห้องที่ต้องทำความสะอาด (${w.length} ห้อง) · ${S().buildingName || S().apartmentName}\n` + w.map(r => `• ห้อง ${r.room}${r.cleanNote ? ' — ' + r.cleanNote : ''}${tenantOf(r.room) ? ' (มีผู้เช่า นัดก่อนเข้า)' : ''}`).join('\n'));
+}
+
+/* ---------- ตั้งค่าบอท LINE: เชื่อมต่อ · คำสั่งที่รับ · แจ้งเตือน · บันทึกแชท ---------- */
+const BOT_CMDS = [['ซ่อม', '🔧', 'แจ้งซ่อม / ซ่อมเสร็จ', 'ซ่อม 203 ก๊อกรั่ว · ซ่อมเสร็จ 203'], ['รับเงิน', '💵', 'บันทึกรับเงิน', 'รับเงิน 105 3500 โอน'], ['จ่าย', '💸', 'บันทึกค่าใช้จ่าย', 'จ่าย ค่าแม่บ้าน 4000'],
+  ['ทำความสะอาด', '🧹', 'ทำความสะอาด', 'ทำความสะอาด 102 · สะอาดแล้ว 102'], ['อุปกรณ์', '🛏️', 'อุปกรณ์ห้อง', 'ขาด 204 เตียง · ชำรุด 204 ตู้ · มีแล้ว 204 เตียง'], ['โน้ต', '📝', 'หมายเหตุห้อง', 'โน้ต 305 ฝ้าร้าว'],
+  ['จอง', '📅', 'บันทึกการจอง', 'จอง 301 สมชาย 0812345678 23/11 20:00'], ['ถาม', '🔎', 'ถามข้อมูล / ค้นหา', 'ห้อง 204 · ค้างจ่าย · ห้องว่าง · ค้น ฝ้า']];
+const BOT_NOTI = [['morning', '📋', 'สรุปเช้า 8 โมง', 'ค้างจ่าย งานซ่อม ห้องรอทำความสะอาด ผู้จองที่เข้าวันนี้'], ['slip', '🧾', 'ผู้เช่าส่งสลิป', ''], ['repair', '🔧', 'ผู้เช่าแจ้งซ่อมในแอป', ''],
+  ['moveout', '🚪', 'ผู้เช่าย้ายออก', ''], ['checkin', '🔑', 'เช็คอินผู้เช่าใหม่', ''], ['paid', '💵', 'รับเงินแล้ว (บันทึกจากหน้าเว็บ)', 'ส่งทุกครั้งที่บันทึกรับเงิน'], ['rent', '🏦', 'เตือนจ่ายค่าเช่าตึก', 'ตามวันที่ตั้งไว้ข้างล่าง']];
+function lineContent() {
+  const s = S(), on = s.botOn !== '0', cmds = String(s.botCmds == null ? BOT_CMDS.map(x => x[0]).join(',') : s.botCmds).split(','), no = String(s.botNotify == null ? 'morning,slip,repair,moveout,checkin' : s.botNotify).split(',');
+  const ck = (cls, k, onv, i, l, d) => `<label class="trow" style="cursor:pointer"><input type="checkbox" class="${cls}" value="${k}" ${onv ? 'checked' : ''} style="width:20px;height:20px;flex:none"><span style="font-size:18px">${i}</span><div style="flex:1;min-width:0"><b>${l}</b>${d ? `<div class="muted small">${esc(d)}</div>` : ''}</div></label>`;
+  const hook = typeof API === 'string' && API ? API : '(ลิงก์ Web app ของ Apps Script)';
+  return { title: 'บอท LINE / แจ้งเตือน ' + (s.lineConfigured ? (on ? '<span class="badge b-ok">ทำงานอยู่</span>' : '<span class="badge b-warn">พักอยู่</span>') : '<span class="badge">ยังไม่เชื่อมต่อ</span>'),
+    sub: 'บอทในกลุ่ม LINE ของคุณกับหุ้นส่วน · รับคำสั่งบันทึกข้อมูล · ตอบคำถาม · แจ้งเตือน',
+    html: `<div class="trow" style="border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:14px"><div style="flex:1"><b>บอททั้งหมด</b><div class="muted small">ปิด = บอทเงียบทุกอย่าง (ไม่ตอบ ไม่แจ้งเตือน ไม่จดแชท) · ในกลุ่มพิมพ์ “บอท พัก” / “บอท เปิด” ได้</div></div><button class="tog ${on ? 'on' : ''}" onclick="act('saveSettings',{settings:{botOn:'${on ? '0' : '1'}'}},'${on ? 'พักบอทแล้ว' : 'เปิดบอทแล้ว'}').then(render)"></button></div>
+      <details ${s.lineConfigured ? '' : 'open'} style="margin-bottom:14px"><summary style="cursor:pointer;font-weight:700;padding:6px 0">🔗 การเชื่อมต่อ LINE OA ${s.lineConfigured ? '✅' : ''}</summary>
+        <ol class="small" style="line-height:1.8;padding-left:20px;margin:6px 0 10px">
+          <li>LINE Developers › Channel ของ OA › แท็บ <b>Messaging API</b> › กด Issue <b>Channel access token</b> แล้ววางในช่องข้างล่าง</li>
+          <li>ช่อง <b>Webhook URL</b> ใส่: <code style="word-break:break-all;background:#f3f4f6;padding:2px 5px;border-radius:5px">${esc(hook)}</code> แล้วเปิด <b>Use webhook</b> (ปุ่ม Verify อาจขึ้น error ได้ ไม่เป็นไร)</li>
+          <li>เชิญบัญชี OA เข้ากลุ่ม แล้วพิมพ์ <b>groupid</b> ในกลุ่ม → คัดลอก Group ID ที่บอทตอบมาใส่ข้างล่าง</li></ol>
+        <div id="fLine"><label class="f">Channel access token<input name="lineToken" type="password" placeholder="${s.lineConfigured ? 'ตั้งแล้ว — เว้นว่าง = ไม่เปลี่ยน' : 'วาง token ยาวๆ ที่นี่'}"></label><label class="f">Group ID<input name="lineGroupId" value="${esc(s.lineGroupId || '')}" placeholder="C1234…"></label></div>
+        <div class="row"><button class="btn pri" onclick="saveSettings('#fLine')">บันทึกการเชื่อมต่อ</button><button class="btn" onclick="act('botTest',{},'ส่งข้อความทดสอบเข้ากลุ่มแล้ว')">📨 ทดสอบส่งเข้ากลุ่ม</button></div></details>
+      <div class="g2" style="gap:0 18px;align-items:start;${DESK() ? '' : 'grid-template-columns:1fr'}">
+        <div><div class="fl">💬 คำสั่งที่บอทรับในกลุ่ม</div>${BOT_CMDS.map(([k, i, l, d]) => ck('bcmd', k, cmds.includes(k), i, l, d)).join('')}
+          <div class="muted small" style="margin-top:6px">ข้อความคุยกันทั่วไป บอทไม่ตอบ · พิมพ์ “คำสั่ง” ในกลุ่มเพื่อดูวิธีใช้</div></div>
+        <div><div class="fl" style="margin-top:${DESK() ? 0 : 14}px">🔔 แจ้งเตือนเข้ากลุ่ม</div>${BOT_NOTI.map(([k, i, l, d]) => ck('bnot', k, no.includes(k), i, l, d)).join('')}
+          <div class="g2" style="margin-top:8px"><label class="f">วันที่เตือนจ่ายค่าเช่าตึก<input id="bRentDays" value="${esc(s.rentDays == null ? '10,20' : s.rentDays)}" placeholder="10,20"></label><label class="f">ข้อความเตือน<input id="bRentText" value="${esc(s.rentText == null ? 'จ่ายค่าเช่าตึก' : s.rentText)}" placeholder="จ่ายค่าเช่าตึกป้าป้อม 37,500"></label></div></div></div>
+      <div class="fl" style="margin-top:14px">🗂️ จดข้อความในกลุ่ม (ใช้กับคำสั่ง “ค้น”)</div>
+      <div class="trow"><input type="checkbox" id="bLog" ${s.botLog !== '0' ? 'checked' : ''} style="width:20px;height:20px;flex:none"><div style="flex:1"><b>จดข้อความในกลุ่มลง Google Sheet</b><div class="muted small">เก็บในชีต ChatLog ของคุณเอง · เริ่มจดตั้งแต่บอทเข้ากลุ่ม</div></div>
+        <label class="f" style="margin:0;width:120px">เก็บย้อนหลัง (วัน)<input id="bLogDays" type="number" value="${esc(s.botLogDays || 180)}"></label></div>
+      <div class="row" style="margin-top:12px"><button class="btn pri" onclick="saveBot()">บันทึกการตั้งค่าบอท</button><span class="sp"></span><button class="btn" style="color:var(--bad)" onclick="uiConfirm('ลบข้อความแชทที่จดไว้ทั้งหมด?','ลบ',true).then(ok=>ok&&act('clearChatLog',{},'ลบแล้ว'))">🗑 ลบแชทที่จดไว้</button></div>` };
+}
+async function saveBot() {
+  const v = c => [...document.querySelectorAll('.' + c + ':checked')].map(x => x.value).join(',');
+  await act('saveSettings', { settings: { botCmds: v('bcmd'), botNotify: v('bnot'), rentDays: $('#bRentDays').value.trim(), rentText: $('#bRentText').value.trim(), botLog: $('#bLog').checked ? '1' : '0', botLogDays: String(+$('#bLogDays').value || 180) } }, 'บันทึกการตั้งค่าบอทแล้ว');
+  render();
 }
 </script>
 </body>

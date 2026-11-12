@@ -26,6 +26,7 @@ const SCHEMA = {
   News:     ['id', 'createdAt', 'title', 'body'],
   Files:    ['id', 'createdAt', 'room', 'tenantId', 'category', 'name', 'mime', 'fileId', 'size', 'note'],
   Expenses: ['id', 'date', 'category', 'amount', 'note', 'files', 'createdAt'],
+  ChatLog:  ['at', 'userId', 'name', 'text'],
 };
 
 const NUM_KEYS = new Set(['size', 'floor', 'rent', 'deposit', 'waterPrev', 'waterCur', 'elecPrev', 'elecCur',
@@ -73,6 +74,13 @@ const DEFAULT_SETTINGS = [
   ['tenantSlip', '1', 'ผู้เช่าส่งสลิปในแอป (1/0)'],
   ['tenantRepair', '1', 'ผู้เช่าแจ้งซ่อมในแอป (1/0)'],
   ['roomItems', 'เตียง,ที่นอน,ตู้เสื้อผ้า,โต๊ะ,เก้าอี้,แอร์,พัดลม,ตู้เย็น,เครื่องทำน้ำอุ่น,ผ้าม่าน,มุ้งลวด,ทีวี', 'รายการอุปกรณ์ประจำห้อง (คั่นด้วยจุลภาค)'],
+  ['botOn', '1', 'บอท LINE ในกลุ่ม: 1 = ทำงาน · 0 = พัก (ไม่ตอบ ไม่แจ้งเตือน)'],
+  ['botCmds', 'ซ่อม,รับเงิน,จ่าย,ทำความสะอาด,อุปกรณ์,โน้ต,จอง,ถาม', 'คำสั่งที่บอทรับในกลุ่ม (คั่นด้วยจุลภาค)'],
+  ['botLog', '1', 'จดข้อความในกลุ่มไว้ใช้กับคำสั่ง ค้น (1/0)'],
+  ['botLogDays', '180', 'เก็บข้อความในกลุ่มย้อนหลังกี่วัน'],
+  ['botNotify', 'morning,slip,repair,moveout,checkin', 'แจ้งเตือนเข้ากลุ่ม (คั่นด้วยจุลภาค): morning,slip,repair,moveout,checkin,paid,rent'],
+  ['rentDays', '10,20', 'วันที่เตือนจ่ายค่าเช่าตึก'],
+  ['rentText', 'จ่ายค่าเช่าตึก', 'ข้อความเตือนจ่ายค่าเช่าตึก (ใส่ชื่อ/ยอดได้)'],
   ['tenantNews', '1', 'ประกาศถึงผู้เช่าในแอป (1/0)'],
   ['billLink', '1', 'ส่งลิงก์บิล + QR พร้อมเพย์ทาง LINE (1/0)'],
 ];
@@ -102,13 +110,14 @@ function setup() {
   const blank = ss.getSheetByName('Sheet1') || ss.getSheetByName('ชีต1');
   if (blank && blank.getLastRow() === 0 && ss.getSheets().length > 1) ss.deleteSheet(blank);
   try { DriveApp.getRootFolder(); } catch (e) { /* ขอสิทธิ์ Drive สำหรับเก็บรูปสลิป */ }
+  try { if (!ScriptApp.getProjectTriggers().some(t => t.getHandlerFunction() === 'dailyCheck')) ScriptApp.newTrigger('dailyCheck').timeBased().everyDays(1).atHour(8).create(); } catch (e) { /* สรุปเช้า 8 โมง */ }
   return 'ติดตั้งเรียบร้อย';
 }
 
 /** สรุปเข้ากลุ่ม LINE ทุกเช้า 9 โมง — รันฟังก์ชันนี้ครั้งเดียว */
 function installDailyTrigger() {
   ScriptApp.getProjectTriggers().forEach(t => { if (t.getHandlerFunction() === 'dailyCheck') ScriptApp.deleteTrigger(t); });
-  ScriptApp.newTrigger('dailyCheck').timeBased().everyDays(1).atHour(9).create();
+  ScriptApp.newTrigger('dailyCheck').timeBased().everyDays(1).atHour(8).create();
 }
 
 /** ปลุกเซิร์ฟเวอร์ทุก 5 นาที (ลดอาการเปิดครั้งแรกช้า) + เติมแคชข้อมูล — รันฟังก์ชันนี้ครั้งเดียว */
@@ -133,7 +142,10 @@ function doGet(e) {
 
 function doPost(e) {
   let out;
-  try { out = handle_(JSON.parse((e && e.postData && e.postData.contents) || '{}')); }
+  try {
+    const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    out = body && Array.isArray(body.events) && body.destination !== undefined ? lineWebhook_(body) : handle_(body);
+  }
   catch (err) { out = { ok: false, error: String((err && err.message) || err) }; }
   return json_(out);
 }
@@ -156,7 +168,7 @@ const ADMIN_API = {
   postNews: api_postNews, deleteNews: api_deleteNews,
   saveSettings: api_saveSettings, testLine: api_testLine,
   saveExpense: api_saveExpense, deleteExpense: api_deleteExpense, addExpenseFile: api_addExpenseFile, removeExpenseFile: api_removeExpenseFile,
-  clearData: api_clearData, resetRoom: api_resetRoom, saveRoomItems: api_saveRoomItems, setClean: api_setClean, bulkRoomItems: api_bulkRoomItems,
+  clearData: api_clearData, resetRoom: api_resetRoom, saveRoomItems: api_saveRoomItems, setClean: api_setClean, clearChatLog: api_clearChatLog, botTest: api_botTest, bulkRoomItems: api_bulkRoomItems,
 };
 const NO_DATA = { previewBills: 1, fileImage: 1 }; // คำสั่งที่ไม่ต้องส่งข้อมูลทั้งหมดกลับ
 
@@ -316,6 +328,7 @@ function api_checkIn(req) {
     if (tenant.cardFee > 0) items.push({ l: 'ค่าคีย์การ์ด', a: tenant.cardFee, k: 'card' });
     if (items.length) bill = newBill_(tenant, KIND.FIRST, month, items, start);
   }
+  if (notifyOn_('checkin')) pushLine_('🔑 เช็คอินผู้เช่าใหม่ ห้อง ' + room.room + ' · ' + tenant.name + '\nเริ่ม ' + start + (bill ? ' · บิลแรกเข้า ' + fmtNum_(bill.total) + ' บาท' : ''));
   return { id: tenant.id, pin: tenant.pin, billId: bill && bill.id };
 }
 
@@ -415,6 +428,7 @@ function api_moveOut(req) {
   if (req.note) t.note = (t.note ? t.note + ' | ' : '') + req.note;
   writeRow_('Tenants', t, t._row);
   const r = findBy_('Rooms', 'room', t.room);
+  if (notifyOn_('moveout')) pushLine_('🚪 ห้อง ' + t.room + ' ย้ายออกแล้ว · ' + t.name + (calc.refund > 0 ? '\n💸 ต้องคืนเงิน ' + fmtNum_(calc.refund) + ' บาท' : calc.owe > 0 ? '\n💰 ผู้เช่าต้องจ่ายเพิ่ม ' + fmtNum_(calc.owe) + ' บาท' : '') + '\n🧹 ห้องรอทำความสะอาด');
   if (r) { r.status = ST.VAC; r.cleanStatus = 'รอทำ'; r.cleanSince = today_(); r.cleanNote = 'ทำความสะอาดหลังผู้เช่าย้ายออก'; writeRow_('Rooms', r, r._row); }
   return { calc, billId: bill.id };
 }
@@ -609,6 +623,7 @@ function markPaid_(b, method, amount, date, received, note) {
   if (note) b.note = note;
   if (!b.receiptNo) b.receiptNo = reserveNos_('rcSeq', 'RC', 1)[0];
   writeBill_(b);
+  if (!BOT_CTX.on && notifyOn_('paid')) pushLine_('💵 รับเงินแล้ว ห้อง ' + b.room + ' · ' + billTitle_(b) + ' ' + fmtNum_(b.total) + ' บาท (' + method + ')');
 }
 
 function setSlipResult_(id, result) {
@@ -766,7 +781,7 @@ function api_tenantSlip(req, t) {
   writeRow_('Slips', slip);
   Object.assign(b, { status: ST.REVIEW, slipId: slip.id, slipAt: slip.at, rejectReason: '' });
   writeBill_(b);
-  pushLine_('💰 ห้อง ' + b.room + ' ส่งสลิป ' + billTitle_(b) + ' ยอด ' + fmtNum_(b.total) + ' บาท' + (dup ? '\n⚠️ สลิปซ้ำกับที่เคยส่ง' : '') + '\nกดอนุมัติในระบบเจ้าของหอ');
+  if (notifyOn_('slip')) pushLine_('💰 ห้อง ' + b.room + ' ส่งสลิป ' + billTitle_(b) + ' ยอด ' + fmtNum_(b.total) + ' บาท' + (dup ? '\n⚠️ สลิปซ้ำกับที่เคยส่ง' : '') + '\nกดอนุมัติในระบบเจ้าของหอ');
   return {};
 }
 
@@ -783,7 +798,7 @@ function api_tenantRepair(req, t) {
   };
   r.log = JSON.stringify([{ at: r.createdAt, s: ST.R_NEW, m: '' }]);
   writeRow_('Repairs', r);
-  pushLine_('🔧 แจ้งซ่อม ห้อง ' + t.room + ' (' + r.category + ')\n' + r.detail + '\nโทร ' + r.phone);
+  if (notifyOn_('repair')) pushLine_('🔧 แจ้งซ่อม ห้อง ' + t.room + ' (' + r.category + ')\n' + r.detail + '\nโทร ' + r.phone);
   return {};
 }
 
@@ -979,21 +994,32 @@ function pushLine_(text) {
 }
 
 function dailyCheck() {
-  const today = today_(), in30 = addDays_(today, 30), all = bills_();
+  const st = getSettings_();
+  if (st.botOn === '0') return;
+  try { trimChatLog_(st); } catch (e) {}
+  const L = [];
+  const rd = String(st.rentDays || '').split(/[,\s]+/).map(Number).filter(Boolean), dd = Number(today_().slice(8));
+  if (notifyOn_('rent') && rd.indexOf(dd) >= 0) pushLine_('🏦 วันนี้วันที่ ' + dd + ' · ' + (st.rentText || 'จ่ายค่าเช่าตึก'));
+  if (!notifyOn_('morning')) return;
+  pushLine_(morningText_());
+}
+function morningText_() {
+  const today = today_(), in30 = addDays_(today, 30), all = bills_(), rooms = readAll_('Rooms');
   const review = all.filter(b => b.status === ST.REVIEW);
   const overdue = all.filter(b => b.status === ST.DUE && b.dueDate < today);
-  const exp = readAll_('Tenants').filter(t => t.status === ST.ACTIVE && t.endDate && t.endDate <= in30);
+  const act = readAll_('Tenants').filter(t => t.status === ST.ACTIVE);
+  const exp = act.filter(t => t.endDate && t.endDate <= in30);
   const reps = readAll_('Repairs').filter(r => r.status === ST.R_NEW || r.status === ST.R_DOING);
-  if (!review.length && !overdue.length && !exp.length && !reps.length) return;
-  const L = ['📋 สรุปประจำวัน ' + getSettings_().apartmentName];
+  const clean = rooms.filter(r => r.cleanStatus === 'รอทำ'), book = rooms.filter(r => r.status === ST.RES && String(r.bookAt || '').slice(0, 10) <= addDays_(today, 1) && r.bookAt);
+  const L = ['📋 สรุปเช้านี้ · ' + monthLabel_(today.slice(0, 7)).replace(/^\S+/, Number(today.slice(8)) + ' $&'), '🏠 มีผู้เช่า ' + act.length + ' / ' + rooms.length + ' ห้อง'];
+  if (overdue.length) { L.push('⏰ ค้างจ่าย ' + overdue.length + ' บิล รวม ' + fmtNum_(overdue.reduce((a, b) => a + Number(b.total), 0)) + ' บาท'); overdue.slice(0, 10).forEach(b => L.push('   • ห้อง ' + b.room + ' ' + fmtNum_(b.total) + ' (' + dayDiff_(b.dueDate, today) + ' วัน)')); }
   if (review.length) L.push('🧾 สลิปรออนุมัติ ' + review.length + ' รายการ');
-  if (overdue.length) {
-    L.push('⏰ เกินกำหนด ' + overdue.length + ' บิล รวม ' + fmtNum_(overdue.reduce((a, b) => a + Number(b.total), 0)) + ' บาท');
-    overdue.slice(0, 15).forEach(b => L.push('  • ห้อง ' + b.room + ' ' + billTitle_(b) + ' ' + fmtNum_(b.total)));
-  }
+  if (reps.length) L.push('🔧 งานซ่อมค้าง ' + reps.length + ' งาน: ' + reps.slice(0, 8).map(r => r.room).join(', '));
+  if (clean.length) L.push('🧹 รอทำความสะอาด: ' + clean.map(r => r.room).join(', '));
+  book.forEach(r => L.push('📅 ห้อง ' + r.room + ' ' + (r.bookName || '') + ' เข้าอยู่ ' + r.bookAt));
   if (exp.length) L.push('📄 สัญญาใกล้หมด: ' + exp.map(t => t.room + ' (' + t.endDate + ')').join(', '));
-  if (reps.length) L.push('🔧 งานซ่อมค้าง ' + reps.length + ' งาน');
-  pushLine_(L.join('\n'));
+  if (L.length === 2) L.push('✅ ไม่มีงานค้าง');
+  return L.join('\n');
 }
 
 /* ============================ ตัวช่วยเรื่องบิล ============================ */
@@ -1111,6 +1137,161 @@ function fileFolder_() {
   writeRow_('Settings', { key: 'fileFolderId', value: f.getId(), description: '(ระบบ) โฟลเดอร์ Google Drive ที่เก็บรูปสลิป/รูปแจ้งซ่อม' }, row && row._row);
   return f;
 }
+
+/* ============================ บอท LINE ในกลุ่ม (ระดับ 1: คำสั่ง + ค้นด้วยคำ) ============================ */
+let BOT_CTX = { on: false };
+function notifyOn_(k) { const s = getSettings_(); return s.botOn !== '0' && String(s.botNotify || '').split(',').map(x => x.trim()).indexOf(k) >= 0; }
+function lineApi_(path, payload, method) {
+  const s = getSettings_(); if (!s.lineToken) return null;
+  try {
+    const res = UrlFetchApp.fetch('https://api.line.me' + path, { method: method || 'post', contentType: 'application/json', muteHttpExceptions: true,
+      headers: { Authorization: 'Bearer ' + s.lineToken }, payload: payload ? JSON.stringify(payload) : undefined });
+    return res.getResponseCode() === 200 ? JSON.parse(res.getContentText() || '{}') : null;
+  } catch (e) { return null; }
+}
+function lineReply_(token, text) { if (token) lineApi_('/v2/bot/message/reply', { replyToken: token, messages: [{ type: 'text', text: String(text).slice(0, 4900) }] }); }
+function lineName_(gid, uid) {
+  if (!uid) return 'ไม่ทราบชื่อ';
+  const c = CacheService.getScriptCache(), k = 'ln:' + uid, hit = c.get(k); if (hit) return hit;
+  const p = gid ? lineApi_('/v2/bot/group/' + gid + '/member/' + uid, null, 'get') : null;
+  const n = (p && p.displayName) || 'สมาชิก'; c.put(k, n, 21600); return n;
+}
+function lineWebhook_(body) {
+  MEMO = {}; prefetch_();
+  (body.events || []).forEach(ev => {
+    try { botEvent_(ev); } catch (e) { lineReply_(ev.replyToken, '⚠️ ' + ((e && e.message) || e)); }
+  });
+  return { ok: true };
+}
+const BOT_HELP = {
+  'ซ่อม': ['ซ่อม 203 ก๊อกน้ำรั่ว', 'ซ่อมเสร็จ 203'],
+  'รับเงิน': ['รับเงิน 105 3500 โอน', 'รับเงิน 105 เงินสด'],
+  'จ่าย': ['จ่าย ค่าแม่บ้าน 4000', 'จ่าย ค่าช่าง 1500 ซ่อมปั๊มน้ำ'],
+  'ทำความสะอาด': ['ทำความสะอาด 102 104', 'สะอาดแล้ว 102'],
+  'อุปกรณ์': ['ขาด 204 เตียง', 'ชำรุด 204 ตู้เสื้อผ้า บานพับหลุด', 'มีแล้ว 204 เตียง'],
+  'โน้ต': ['โน้ต 305 ฝ้าห้องน้ำร้าว'],
+  'จอง': ['จอง 301 สมชาย 0812345678 23/11 20:00', 'ยกเลิกจอง 301'],
+  'ถาม': ['ห้อง 204', 'ค้างจ่าย', 'ห้องว่าง', 'ค้น ฝ้า'],
+};
+function botEvent_(ev) {
+  const s = getSettings_(), src = ev.source || {}, gid = src.groupId || src.roomId || '';
+  if (ev.type === 'join') return lineReply_(ev.replyToken, '👋 สวัสดีครับ บอทดูแลตึก\nพิมพ์ groupid เพื่อดู Group ID ของกลุ่มนี้ แล้วนำไปใส่ในระบบ › ตั้งค่า › LINE');
+  if (ev.type !== 'message' || !ev.message || ev.message.type !== 'text') return;
+  const text = String(ev.message.text || '').trim(), rt = ev.replyToken;
+  if (/^(groupid|group id|ไอดีกลุ่ม)$/i.test(text)) return lineReply_(rt, gid ? 'Group ID ของกลุ่มนี้:\n' + gid + '\n\nคัดลอกไปใส่ใน ระบบ › ตั้งค่า › LINE แจ้งเตือน' : 'ใช้คำสั่งนี้ในกลุ่มเท่านั้นครับ');
+  if (!s.lineGroupId || gid !== s.lineGroupId) return; // รับเฉพาะกลุ่มที่ตั้งไว้
+  const sw = text.match(/^บอท\s*(เปิด|พัก|ปิด)$/);
+  if (sw) { withLock_(() => setSetting_('botOn', sw[1] === 'เปิด' ? '1' : '0')); return lineReply_(rt, sw[1] === 'เปิด' ? '✅ บอทกลับมาทำงานแล้ว' : '😴 บอทพักแล้ว · พิมพ์ "บอท เปิด" เพื่อให้กลับมาทำงาน'); }
+  if (s.botOn === '0') return;
+  const name = lineName_(gid, src.userId);
+  if (s.botLog !== '0') withLock_(() => writeRow_('ChatLog', { at: now_(), userId: src.userId || '', name, text: text.slice(0, 2000) }));
+  const out = botCommand_(text, name, s);
+  if (out) lineReply_(rt, out);
+}
+function botRoom_(tok) { const r = findBy_('Rooms', 'room', String(tok || '')); if (!r) throw new Error('ไม่พบห้อง ' + (tok || '') + ' · ตัวอย่าง: ซ่อม 203 ก๊อกรั่ว'); return r; }
+function botNum_(tok) { const n = Number(String(tok || '').replace(/,/g, '')); return tok != null && tok !== '' && !isNaN(n) ? n : null; }
+function botCommand_(text, name, s) {
+  const on = String(s.botCmds || '').split(',').map(x => x.trim()), T = text.split(/\s+/), c = T[0], a = T.slice(1);
+  const need = g => { if (on.indexOf(g) < 0) throw new Error('คำสั่ง "' + g + '" ปิดอยู่ · เปิดได้ที่ ระบบ › ตั้งค่า › บอท LINE'); };
+  const by = ' (LINE: ' + name + ')';
+  BOT_CTX.on = true;
+  try {
+    if (/^(คำสั่ง|ช่วย|help|\?)$/i.test(c)) return '📖 คำสั่งที่ใช้ได้\n' + on.filter(g => BOT_HELP[g]).map(g => BOT_HELP[g].map(x => '• ' + x).join('\n')).join('\n') + '\n• บอท พัก / บอท เปิด';
+    if (c === 'ซ่อมเสร็จ') { need('ซ่อม'); const r = botRoom_(a[0]); return withLock_(() => {
+      const reps = readAll_('Repairs').filter(x => x.room === r.room && (x.status === ST.R_NEW || x.status === ST.R_DOING));
+      reps.forEach(x => api_saveRepair({ repair: { id: x.id, status: ST.R_DONE, ownerMsg: 'ปิดงานผ่าน LINE โดย ' + name } }));
+      let extra = '';
+      if (r.status === ST.FIX && !activeTenant_(r.room)) { api_saveRoom({ room: { room: r.room, status: ST.VAC }, isNew: false }); extra = '\n🏠 ห้องกลับเป็นว่าง พร้อมให้เช่า'; }
+      return reps.length || extra ? '✅ ห้อง ' + r.room + ' ซ่อมเสร็จ' + (reps.length ? ' · ปิดงานซ่อม ' + reps.length + ' งาน' : '') + extra : 'ห้อง ' + r.room + ' ไม่มีงานซ่อมค้างครับ'; }); }
+    if (c === 'ซ่อม') { need('ซ่อม'); const r = botRoom_(a[0]), d = a.slice(1).join(' '); if (!d) throw new Error('ใส่รายละเอียดด้วย · ตัวอย่าง: ซ่อม ' + r.room + ' ก๊อกรั่ว');
+      withLock_(() => api_createRepair({ repair: { room: r.room, detail: d, category: 'อื่นๆ', source: 'LINE: ' + name } }));
+      const t = activeTenant_(r.room); return '🔧 บันทึกแจ้งซ่อมแล้ว\nห้อง ' + r.room + (t ? ' · ' + t.name : '') + '\n' + d + '\nสถานะ: รอดำเนินการ'; }
+    if (c === 'รับเงิน') { need('รับเงิน'); const r = botRoom_(a[0]); let amt = null, m = 'โอน/พร้อมเพย์';
+      a.slice(1).forEach(x => { if (botNum_(x) != null) amt = botNum_(x); else if (/สด/.test(x)) m = 'เงินสด'; });
+      return withLock_(() => {
+        const open = bills_().filter(b => b.room === r.room && (b.status === ST.DUE || b.status === ST.REVIEW)).sort((x, y) => (x.dueDate || '').localeCompare(y.dueDate || ''));
+        if (!open.length) return 'ห้อง ' + r.room + ' ไม่มีบิลค้างครับ';
+        const b = open[0];
+        if (amt != null && amt < Number(b.total)) return '⚠️ ยอดไม่พอ · ' + billTitle_(b) + ' ห้อง ' + r.room + ' ยอด ' + fmtNum_(b.total) + ' บาท';
+        api_recordPayment({ id: b.id, method: m, amount: amt != null ? amt : b.total, note: 'บันทึกผ่าน LINE โดย ' + name });
+        return '💵 บันทึกรับเงินแล้ว\nห้อง ' + r.room + ' · ' + billTitle_(b) + '\nยอด ' + fmtNum_(b.total) + ' บาท · ' + m + (amt > b.total && m === 'เงินสด' ? ' (ทอน ' + fmtNum_(amt - b.total) + ')' : '') + (open.length > 1 ? '\n⚠️ ยังค้างอีก ' + (open.length - 1) + ' บิล' : '') + '\nบันทึกโดย ' + name; }); }
+    if (c === 'จ่าย') { need('จ่าย'); const i = a.findIndex(x => botNum_(x) != null); if (i < 1) throw new Error('ตัวอย่าง: จ่าย ค่าแม่บ้าน 4000');
+      const cat = a.slice(0, i).join(' '), amt = botNum_(a[i]), note = a.slice(i + 1).join(' ');
+      withLock_(() => api_saveExpense({ category: cat, amount: amt, note: (note ? note + ' ' : '') + by.trim() }));
+      return '💸 บันทึกค่าใช้จ่ายแล้ว\n' + cat + ' ' + fmtNum_(amt) + ' บาท' + (note ? '\n' + note : '') + '\nส่งรูปใบเสร็จ: แนบในระบบ › ค่าใช้จ่าย'; }
+    if (c === 'ทำความสะอาด' || c === 'สะอาดแล้ว') { need('ทำความสะอาด'); const rooms = a.filter(x => findBy_('Rooms', 'room', x)), note = a.filter(x => !findBy_('Rooms', 'room', x)).join(' ');
+      if (!rooms.length) throw new Error('ตัวอย่าง: ' + c + ' 102 104');
+      withLock_(() => api_setClean({ rooms, on: c === 'ทำความสะอาด', note }));
+      return c === 'ทำความสะอาด' ? '🧹 สั่งทำความสะอาดห้อง ' + rooms.join(', ') + (note ? '\n' + note : '') : '✅ ห้อง ' + rooms.join(', ') + ' ทำความสะอาดเสร็จแล้ว'; }
+    if (c === 'ขาด' || c === 'ชำรุด' || c === 'มีแล้ว') { need('อุปกรณ์'); const r = botRoom_(a[0]), item = a[1]; if (!item) throw new Error('ตัวอย่าง: ' + c + ' ' + r.room + ' เตียง');
+      const st = c === 'มีแล้ว' ? 'มี' : c, n = a.slice(2).join(' ');
+      withLock_(() => api_saveRoomItems({ room: r.room, merge: true, items: { [item]: { s: st, n } } }));
+      return (st === 'มี' ? '✅' : st === 'ขาด' ? '❌' : '⚠️') + ' ห้อง ' + r.room + ' · ' + item + ': ' + st + (n ? ' (' + n + ')' : ''); }
+    if (c === 'โน้ต') { need('โน้ต'); const r = botRoom_(a[0]), n = a.slice(1).join(' '); if (!n) throw new Error('ตัวอย่าง: โน้ต ' + r.room + ' ฝ้าห้องน้ำร้าว');
+      withLock_(() => { const x = findBy_('Rooms', 'room', r.room); x.note = (x.note ? x.note + ' | ' : '') + today_().slice(5).split('-').reverse().join('/') + ' ' + n; writeRow_('Rooms', x, x._row); });
+      return '📝 เพิ่มหมายเหตุห้อง ' + r.room + ' แล้ว\n' + n; }
+    if (c === 'ยกเลิกจอง') { need('จอง'); const r = botRoom_(a[0]); if (r.status !== ST.RES) return 'ห้อง ' + r.room + ' ไม่ได้จองไว้ครับ';
+      withLock_(() => api_saveRoom({ room: { room: r.room, status: ST.VAC }, isNew: false })); return '✕ ยกเลิกการจองห้อง ' + r.room + ' แล้ว'; }
+    if (c === 'จอง') { need('จอง'); const r = botRoom_(a[0]); if (activeTenant_(r.room)) throw new Error('ห้อง ' + r.room + ' มีผู้เช่าอยู่');
+      let phone = '', date = '', time = ''; const nm = [];
+      a.slice(1).forEach(x => { if (/^0\d{8,9}$/.test(x.replace(/-/g, ''))) phone = x; else if (/^\d{1,2}\/\d{1,2}(\/\d{2,4})?$/.test(x)) date = x; else if (/^\d{1,2}[:.]\d{2}(น\.?)?$/.test(x)) time = x.replace('.', ':').replace(/น\.?$/, ''); else nm.push(x); });
+      if (!nm.length) throw new Error('ตัวอย่าง: จอง ' + r.room + ' สมชาย 0812345678 23/11 20:00');
+      let at = '';
+      if (date) { const p = date.split('/'), y0 = Number(today_().slice(0, 4)); let y = p[2] ? Number(p[2]) : y0; if (y < 100) y += 2000; if (y > 2400) y -= 543; if (y < 2000) y += 0; at = y + '-' + pad2_(Number(p[1])) + '-' + pad2_(Number(p[0])); if (!p[2] && at < today_()) at = (y + 1) + at.slice(4); }
+      if (at && time) { const t2 = time.split(':'); at += ' ' + pad2_(Number(t2[0])) + ':' + t2[1]; }
+      withLock_(() => api_saveRoom({ room: { room: r.room, status: ST.RES, bookName: nm.join(' '), bookPhone: phone, bookAt: at, bookNote: 'จองผ่าน LINE โดย ' + name }, isNew: false }));
+      return '📅 บันทึกการจองแล้ว\nห้อง ' + r.room + ' · ' + nm.join(' ') + (phone ? '\n📞 ' + phone : '') + (at ? '\nเข้าอยู่ ' + at : ''); }
+    if (c === 'ห้อง' && a[0]) { need('ถาม'); return botRoomInfo_(botRoom_(a[0])); }
+    if (c === 'ค้างจ่าย') { need('ถาม'); const today = today_(), o = bills_().filter(b => b.status === ST.DUE || b.status === ST.REVIEW).sort((x, y) => roomSort_(x.room, y.room));
+      if (!o.length) return '✅ ไม่มีบิลค้างครับ';
+      return '⏰ ค้างจ่าย ' + o.length + ' บิล รวม ' + fmtNum_(o.reduce((x, b) => x + Number(b.total), 0)) + ' บาท\n' + o.slice(0, 30).map(b => '• ห้อง ' + b.room + ' ' + fmtNum_(b.total) + (b.status === ST.REVIEW ? ' (สลิปรออนุมัติ)' : b.dueDate < today ? ' · เกิน ' + dayDiff_(b.dueDate, today) + ' วัน' : ' · ครบ ' + b.dueDate.slice(8) + '/' + b.dueDate.slice(5, 7))).join('\n'); }
+    if (c === 'ห้องว่าง' || c === 'ว่าง') { need('ถาม'); const v = readAll_('Rooms').filter(r => !activeTenant_(r.room)).sort((x, y) => roomSort_(x.room, y.room));
+      const grp = k => v.filter(r => k(r)).map(r => r.room).join(', ');
+      return '🏠 ห้องที่ไม่มีผู้เช่า ' + v.length + ' ห้อง\nพร้อมให้เช่า: ' + (grp(r => r.status === ST.VAC && r.cleanStatus !== 'รอทำ') || '-') + '\n🧹 รอทำความสะอาด: ' + (grp(r => r.status === ST.VAC && r.cleanStatus === 'รอทำ') || '-') + '\n📅 จอง: ' + (grp(r => r.status === ST.RES) || '-') + '\n🔧 ซ่อม: ' + (grp(r => r.status === ST.FIX) || '-'); }
+    if (c === 'ค้น') { need('ถาม'); const q = a.join(' ').toLowerCase(); if (!q) throw new Error('ตัวอย่าง: ค้น ฝ้า'); return botSearch_(q); }
+    return null; // ไม่ใช่คำสั่ง → ไม่ตอบ
+  } finally { BOT_CTX.on = false; }
+}
+function botRoomInfo_(r) {
+  const t = activeTenant_(r.room), L = ['🚪 ห้อง ' + r.room + (t ? ' · ' + t.name : ' · ' + r.status)];
+  if (t) {
+    const o = bills_().filter(b => b.tenantId === t.id && (b.status === ST.DUE || b.status === ST.REVIEW));
+    L.push(o.length ? '⏰ ค้าง ' + o.length + ' บิล ' + fmtNum_(o.reduce((a, b) => a + Number(b.total), 0)) + ' บาท' : '✅ จ่ายครบ');
+    if (t.phone) L.push('📞 ' + t.phone); if (t.endDate) L.push('📄 สัญญาถึง ' + t.endDate);
+  }
+  if (r.status === ST.RES) L.push('📅 จอง: ' + (r.bookName || '') + ' ' + (r.bookAt || ''));
+  if (r.status === ST.FIX) L.push((r.fixLevel === 'หนัก' ? '🧱 ซ่อมหนัก: ' : '🔧 ซ่อม: ') + (r.fixNote || ''));
+  if (r.cleanStatus === 'รอทำ') L.push('🧹 รอทำความสะอาด' + (r.cleanNote ? ': ' + r.cleanNote : ''));
+  const it = parseItems_(r), bad = Object.keys(it).filter(k => it[k].s === 'ขาด' || it[k].s === 'ชำรุด');
+  if (bad.length) L.push('🛏️ ' + bad.map(k => (it[k].s === 'ขาด' ? '❌ ขาด' : '⚠️ ชำรุด') + k + (it[k].n ? ' (' + it[k].n + ')' : '')).join(', '));
+  const reps = readAll_('Repairs').filter(x => x.room === r.room && (x.status === ST.R_NEW || x.status === ST.R_DOING));
+  if (reps.length) L.push('🛠️ งานซ่อมค้าง: ' + reps.map(x => x.detail.slice(0, 40)).join(' / '));
+  if (r.note) L.push('📝 ' + r.note);
+  return L.join('\n');
+}
+function botSearch_(q) {
+  const has = x => String(x || '').toLowerCase().indexOf(q) >= 0, H = [];
+  readAll_('Rooms').forEach(r => {
+    if (has(r.note)) H.push('🚪 ห้อง ' + r.room + ' หมายเหตุ: ' + r.note);
+    if (r.status === ST.FIX && has(r.fixNote)) H.push('🔧 ห้อง ' + r.room + ' ซ่อม: ' + r.fixNote);
+    if (r.cleanStatus === 'รอทำ' && has(r.cleanNote)) H.push('🧹 ห้อง ' + r.room + ': ' + r.cleanNote);
+    const it = parseItems_(r); Object.keys(it).forEach(k => { if (has(it[k].n) || (it[k].s && it[k].s !== 'มี' && (has(k) || has(it[k].s)))) H.push('🛏️ ห้อง ' + r.room + ' ' + k + ' ' + (it[k].s || '') + (it[k].n ? ': ' + it[k].n : '')); });
+  });
+  readAll_('Repairs').forEach(x => { if (has(x.detail) || has(x.ownerMsg) || has(x.category)) H.push('🛠️ ' + x.createdAt.slice(0, 10) + ' ห้อง ' + x.room + ': ' + x.detail.slice(0, 60) + ' (' + x.status + ')'); });
+  readAll_('Expenses').forEach(e => { if (has(e.category) || has(e.note)) H.push('💸 ' + e.date + ' ' + e.category + ' ' + fmtNum_(e.amount) + ' บาท' + (e.note ? ' · ' + e.note : '')); });
+  readAll_('Tenants').forEach(t => { if (has(t.note)) H.push('👤 ห้อง ' + t.room + ' ' + t.name + ': ' + t.note); });
+  const chat = readAll_('ChatLog').filter(m => has(m.text) && !/^ค้น\s/.test(m.text)).reverse().slice(0, 10);
+  const L = [];
+  if (H.length) L.push('📂 ในระบบ (' + H.length + ')', ...H.slice(0, 10).map(x => '• ' + x));
+  if (chat.length) L.push((L.length ? '\n' : '') + '💬 ในแชทกลุ่ม (' + chat.length + (chat.length === 10 ? '+' : '') + ')', ...chat.map(m => '• ' + m.at.slice(8, 10) + '/' + m.at.slice(5, 7) + ' ' + m.at.slice(11, 16) + ' ' + m.name + ': ' + m.text.slice(0, 120)));
+  return L.length ? '🔎 ค้น "' + q + '"\n' + L.join('\n') : '🔎 ไม่พบ "' + q + '" ในระบบและในแชทครับ';
+}
+function trimChatLog_(s) {
+  const days = Number(s.botLogDays) || 180, cut = addDays_(today_(), -days);
+  if (readAll_('ChatLog').some(m => m.at.slice(0, 10) < cut)) keepRows_('ChatLog', m => m.at.slice(0, 10) >= cut);
+}
+function api_clearChatLog() { keepRows_('ChatLog', () => false); }
+function api_botTest() { const m = morningText_(); if (!pushLine_('✅ ทดสอบบอทดูแลตึก\n\n' + m)) throw new Error('ส่ง LINE ไม่สำเร็จ — ตรวจสอบ token และ Group ID'); }
 
 /* ============================ Sheet helpers ============================ */
 
