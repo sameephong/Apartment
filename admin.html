@@ -12,11 +12,11 @@
 <link rel="preconnect" href="https://script.google.com"><link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=5.9">
+<link rel="stylesheet" href="app.css?v=5.9.1">
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>document.write('<script src="config.js?t=' + Date.now() + '"><\/script>')</script>
-<script src="common.js?v=5.9"></script>
-<script src="docs.js?v=5.9"></script>
+<script src="common.js?v=5.9.1"></script>
+<script src="docs.js?v=5.9.1"></script>
 </head>
 <body class="admin">
 <div class="wrap">
@@ -2222,7 +2222,7 @@ async function docSet(p) {
 async function docView(print) {
   await docSaveFields(); const d = await docLoad(DS.kind, DS.id);
   if (d.mode === 'paper' || print) d.mode = 'paper';
-  closeSheet(); await docShow(d, `<button class="btn sm" onclick="docClose();leaseSheet(DS.kind,DS.id,true)">← กลับ</button>`); if (print) docPrint();
+  closeSheet(); await docShow(d, `<button class="btn sm" onclick="docClose();leaseSheet(DS.kind,DS.id,true)">← กลับ</button>`); if (print) toast('กด 🖨 พิมพ์ / PDF ที่แถบด้านบน');
 }
 async function docHere() {
   await docSaveFields(); const d = await docLoad(DS.kind, DS.id), C = DS.kind === 'contract';

@@ -33,7 +33,7 @@
 .dov .dovbar{position:sticky;top:0;z-index:2;background:#1e293b;color:#fff;display:flex;gap:8px;align-items:center;padding:10px 14px;flex-wrap:wrap}.dov .dovbar b{flex:1;min-width:140px}
 .dov .dovin{padding:14px 8px 40px;overflow-x:hidden}
 @media print{@page{size:A4;margin:0}body.docprint>*:not(.dov){display:none!important}body.docprint .dov{position:static;background:#fff;overflow:visible}body.docprint .dovbar{display:none}body.docprint .dovin{padding:0}
-  .dsheet.dpage{zoom:1!important;margin:0!important;box-shadow:none!important;break-after:page;page-break-after:always}.dsheet.dpage.dlast{break-after:auto;page-break-after:auto}}`;
+  .dsheet.dpage{zoom:1!important;margin:0!important;box-shadow:none!important;height:296mm;break-after:page;page-break-after:always}.dsheet.dpage.dlast{break-after:auto;page-break-after:auto}}`;
   const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
 })();
 
@@ -167,13 +167,17 @@ function docShow(d, bar) {
   docClose();
   const ov = document.createElement('div'); ov.className = 'dov'; ov.id = 'docOv';
   ov.innerHTML = `<div class="dovbar"><b>${dEsc(d.kind === 'book' ? DOCL[d.lang].bookT : DOCL[d.lang].lease)} · ${dEsc(d.no || '')}</b>${bar || ''}<button class="btn sm" onclick="docPrint()">🖨 พิมพ์ / PDF</button><button class="btn sm" onclick="docClose()">✕ ปิด</button></div><div class="dovin"></div>`;
-  document.body.appendChild(ov); document.body.style.overflow = 'hidden';
+  document.body.appendChild(ov); document.body.style.overflow = 'hidden'; document.body.classList.add('docprint'); // เปิดเอกสารอยู่ = พิมพ์เฉพาะเอกสาร
   return docRender(ov.querySelector('.dovin'), d);
 }
-function docClose() { const o = document.getElementById('docOv'); if (o) o.remove(); document.body.style.overflow = ''; }
+function docClose() { const o = document.getElementById('docOv'); if (o) o.remove(); document.body.style.overflow = ''; document.body.classList.remove('docprint'); if (DOC_T0 != null) { document.title = DOC_T0; DOC_T0 = null; } }
+// พิมพ์ / บันทึก PDF: ต้องเรียก window.print() ทันทีตอนกดปุ่ม (ถ้าหน่วงเวลา iPhone จะบล็อกการพิมพ์ แล้วพิมพ์ทั้งหน้าจอแทน)
+let DOC_T0 = null;
 function docPrint() {
-  const t0 = document.title, b = document.querySelector('#docOv .dovbar b'); if (b) document.title = b.textContent.replace(/\s*·\s*/g, ' ').trim(); // ชื่อไฟล์ PDF = ชื่อเอกสาร
-  document.body.classList.add('docprint'); setTimeout(() => { window.print(); setTimeout(() => { document.body.classList.remove('docprint'); document.title = t0; }, 500); }, 50);
+  const b = document.querySelector('#docOv .dovbar b');
+  if (b) { if (DOC_T0 == null) DOC_T0 = document.title; document.title = b.textContent.replace(/\s*·\s*/g, ' ').trim(); } // ชื่อไฟล์ PDF = ชื่อเอกสาร
+  document.body.classList.add('docprint');
+  window.print();
 }
 // ใบแจ้งหนี้ / ใบเสร็จรับเงิน A4 (บิลทุกแบบ รวมบิลค่าใช้จ่ายเพิ่มเติมที่ออกให้ใครก็ได้)
 function docInvoice(d) {
