@@ -12,10 +12,11 @@
 <link rel="preconnect" href="https://script.google.com"><link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=5.2">
+<link rel="stylesheet" href="app.css?v=5.3">
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>document.write('<script src="config.js?t=' + Date.now() + '"><\/script>')</script>
-<script src="common.js?v=5.2"></script>
+<script src="common.js?v=5.3"></script>
+<script src="docs.js?v=5.3"></script>
 </head>
 <body class="admin">
 <div class="wrap">
@@ -836,7 +837,7 @@ async function delNews(id) { if (!await uiConfirm('ลบประกาศน�
 <script>
 /* ===================== v3 · หน้าจอคอม/Mac + โหมดเจ้าของจัดการเอง ===================== */
 window.matchMedia('(min-width:1024px)').addEventListener('change', () => { if (D) { closeSheet(); render(); } });
-const APP_FRONT = '5.2';
+const APP_FRONT = '5.3';
 const M = Object.assign({}, VIEWS); // หน้ามือถือเดิม
 const _render0 = render;
 render = function () {
@@ -1082,7 +1083,7 @@ function roomPanel(no) {
     <div class="line"><span class="muted">มิเตอร์ล่าสุด</span><span>${lastM ? 'น้ำ ' + money(lastM.waterCur !== '' ? lastM.waterCur : lastM.waterPrev) + ' · ไฟ ' + money(lastM.elecCur !== '' ? lastM.elecCur : lastM.elecPrev) : '-'}</span></div>
     <b style="display:block;margin:14px 0 2px;font-size:14px">บิลล่าสุด</b>${bills.map(b => `<div class="line tap" onclick="billSheet(${q(b.id)})"><span>${esc(billTitle(b))}</span><span>${fmtB(b.total)} ${statusPill(b)}</span></div>`).join('') || '<div class="muted small">ยังไม่มีบิล</div>'}
     <b style="display:block;margin:14px 0 2px;font-size:14px">งานซ่อม</b>${reps.map(x => `<div class="task tap" onclick="repairSheet(${q(x.id)})"><i class="ic" style="background:var(--warn-soft);width:30px;height:30px;font-size:15px">🔧</i><div style="flex:1;min-width:0">${esc(x.category)} · ${esc(x.detail.slice(0, 40))}<div class="muted small">แจ้ง ${ago(x.createdAt)}</div></div><span class="pl ${x.status === 'กำลังซ่อม' ? 'o' : 'warn'}">${esc(x.status)}</span></div>`).join('') || '<div class="muted small">ไม่มีงานค้าง</div>'}
-    ${lineCard(no)}${cleanCard(no)}${itemsCard(no)}${docsHtml(no)}
+    ${contractCard(no)}${lineCard(no)}${cleanCard(no)}${itemsCard(no)}${docsHtml(no)}
     ${ob.length ? `<button class="btn ok blk" style="margin-top:14px" onclick="paySheet(${q(ob[ob.length - 1].id)})">💵 บันทึกรับเงิน ${fmtB(ob[ob.length - 1].total)}</button>` : ''}
     <div class="row" style="flex-wrap:nowrap;margin-top:${ob.length ? 8 : 16}px"><button class="btn" style="flex:1" onclick="go('newbill/${encodeURIComponent(no)}')">🧾 ออกบิล</button><button class="btn" style="flex:1" onclick="tenantSheet(${q(t.id)})">✏️ แก้ไข</button><button class="btn bad" style="flex:1" onclick="go('moveout/${t.id}')">🚪 ย้ายออก</button></div>` + resetRoomBtn(no);
 }
@@ -1577,7 +1578,7 @@ async function dcUpload() {
 // ใส่ส่วนเอกสารในหน้าห้อง (มือถือ/คอมแบบหน้าเดียว)
 VIEWS.room = no => {
   const v = M.room(no);
-  if (D.rooms.some(r => r.room === no)) v.html += (tenantOf(no) ? `<div class="card">${lineCard(no)}</div>` : '') + `<div class="card">${cleanCard(no)}</div><div class="card">${itemsCard(no)}</div><div class="card">${docsHtml(no)}</div>` + resetRoomBtn(no);
+  if (D.rooms.some(r => r.room === no)) v.html += (tenantOf(no) ? `<div class="card">${contractCard(no)}${lineCard(no)}</div>` : '') + `<div class="card">${cleanCard(no)}</div><div class="card">${itemsCard(no)}</div><div class="card">${docsHtml(no)}</div>` + resetRoomBtn(no);
   return v;
 };
 
@@ -1720,6 +1721,7 @@ function roomStatusCard(r) {
       <div class="line"><span class="muted">วันเวลาเข้าอยู่</span><b>${fmtBookLong(r.bookAt)}</b></div>
       <div class="line"><span class="muted">เงินจอง</span><span>${+r.bookDeposit ? fmtB(r.bookDeposit) : '-'}</span></div>
       ${r.bookNote ? `<div class="bubble" style="margin-top:8px">${esc(r.bookNote).replace(/\n/g, '<br>')}</div>` : ''}
+      ${bookDocBtn(r)}
       <div class="row" style="margin-top:10px"><button class="btn sm" style="flex:1" onclick="bookSheet(${q(no)})">✏️ แก้ไขการจอง</button><button class="btn sm" style="flex:1;color:var(--bad)" onclick="clearRoomStatus(${q(no)},'ยกเลิกการจองห้อง ${esc(no)}?')">✕ ยกเลิกจอง</button></div></div>`;
   }
   if (r.status === 'ซ่อม') {
@@ -2113,6 +2115,116 @@ async function vwSet(id, status) {
   if (j && j.sent) toast('ส่งแจ้งลูกค้าใน LINE แล้ว'); closeSheet(); render();
 }
 async function vwDel(id) { if (!(await uiConfirm('ลบนัดนี้?'))) return; await act('deleteViewing', { id }, 'ลบแล้ว'); closeSheet(); render(); }
+
+/* ---------- เอกสาร: สัญญาเช่า / ใบรับเงินจอง (เลือกเซ็นในระบบ หรือเซ็นบนกระดาษ) ---------- */
+function docStat(kind, o) {
+  const mode = kind === 'contract' ? o.signMode : o.bookSignMode, sg = String((kind === 'contract' ? o.signed : o.bookSigned) || '');
+  if (mode === 'paper') return sg ? ['🖨 เซ็นกระดาษแล้ว', 'ok'] : ['🖨 รอเซ็นกระดาษ', 'warn'];
+  if (/^e:/.test(sg)) return ['✅ เซ็นครบแล้ว', 'ok'];
+  if (sg === 'tenant') return ['⏳ รอผู้ให้เช่าเซ็น', 'warn'];
+  if (sg === 'owner') return [kind === 'contract' ? '⏳ รอผู้เช่าเซ็น' : '⏳ รอผู้จองเซ็น', 'warn'];
+  if (mode === 'e') return ['⏳ รอเซ็นออนไลน์', 'warn'];
+  return ['ยังไม่ได้ออก', ''];
+}
+function contractCard(no) {
+  const t = tenantOf(no); if (!t) return '';
+  const st = docStat('contract', t);
+  return `<div class="row" style="margin:12px 0 0;flex-wrap:nowrap;gap:8px"><span class="small" style="flex:1;min-width:0">📄 สัญญาเช่า: <span class="pl ${st[1]}">${st[0]}</span></span><button class="btn sm" onclick="leaseSheet('contract',${q(t.id)})">📄 ออก / เซ็นสัญญา</button></div>`;
+}
+function bookDocBtn(r) {
+  const st = docStat('book', r);
+  return `<div class="row" style="margin-top:8px;flex-wrap:nowrap;gap:8px"><span class="small" style="flex:1;min-width:0">🧾 ใบรับเงินจอง: <span class="pl ${st[1]}">${st[0]}</span></span><button class="btn sm pri" onclick="leaseSheet('book',${q(r.room)})">🧾 ออกใบจอง</button></div>`;
+}
+let DS = {};
+function docUrl(token) { return new URL(withB('sign.html?k=' + token), location.href).href; }
+async function docLoad(kind, id) { const j = await api('docData', { kind, id }); DS = { kind, id, d: j.doc }; return j.doc; }
+async function leaseSheet(kind, id, keep) {
+  if (!keep) { openSheet('<div class="empty">กำลังโหลด…</div>'); try { await docLoad(kind, id); } catch (e) { closeSheet(); return uiAlert(e.message); } }
+  const d = DS.d, C = kind === 'contract', o = C ? tenantById(id) : D.rooms.find(r => r.room === id), sg = d.signs || {}, st = docStat(kind, o);
+  const mode = DS.mode || d.mode || 'e', who = C ? 'ผู้เช่า' : 'ผู้จอง', nm = C ? d.t.name : d.bk.name;
+  const sgl = (w, l) => `<div class="line"><span>${l}</span><span>${sg[w] ? `<span class="pl ok">✅ เซ็นแล้ว</span> <span class="muted small">${esc(dShort(sg[w].at, 'th'))}</span>` : '<span class="pl">ยังไม่เซ็น</span>'}</span></div>`;
+  openSheet(`<div class="row" style="margin-bottom:6px"><h3 style="margin:0;flex:1">${C ? '📄 สัญญาเช่า' : '🧾 ใบรับเงินจอง'} · ห้อง ${esc(d.room.room)}</h3><span class="pl ${st[1]}" style="margin-right:30px">${st[0]}</span></div>
+    <div class="muted small" style="margin-bottom:10px">${esc(d.no || '')} · ${esc(nm || '')}</div>
+    ${C ? `<div class="g2" style="${DESK() ? '' : 'grid-template-columns:1fr'}"><label class="f">เลขบัตรประชาชน / พาสปอร์ต<input id="dsId" value="${esc(d.t.idCard || '')}" placeholder="ใส่ทีหลังได้ (เว้นว่างไว้เขียนมือ)"></label><label class="f">ที่อยู่ตามบัตร<input id="dsAd" value="${esc(d.t.idAddress || '')}"></label></div>` : ''}
+    <label class="f">ชื่อ${C ? 'ผู้ให้เช่า' : 'ผู้รับเงิน'} (ใช้กับทุกเอกสาร)<input id="dsLl" value="${esc(S().landlordName || '')}" placeholder="${esc(S().apartmentName)}"></label>
+    <div class="fl">ภาษาเอกสาร</div><div class="segb" style="margin:4px 0 10px"><button class="${d.lang !== 'en' ? 'on' : ''}" onclick="docSet({lang:'th'})">🇹🇭 ไทย</button><button class="${d.lang === 'en' ? 'on' : ''}" onclick="docSet({lang:'en'})">🇬🇧 English</button></div>
+    <div class="fl">วิธีเซ็น</div><div class="segb" style="margin:4px 0 10px"><button class="${mode === 'e' ? 'on' : ''}" onclick="docSet({mode:'e'})">✍️ เซ็นในระบบ</button><button class="${mode === 'paper' ? 'on' : ''}" onclick="docSet({mode:'paper'})">🖨 เซ็นบนกระดาษ</button></div>
+    ${mode === 'e' ? `<div class="card" style="padding:4px 12px;margin-bottom:10px">${sgl('tenant', who)}${sgl('owner', C ? 'ผู้ให้เช่า' : 'ผู้รับเงิน')}</div>
+      ${sg.tenant ? '' : `<button class="btn pri blk" onclick="docHere()">📱 ${who}เซ็นที่เครื่องนี้</button><button class="btn blk" style="margin-top:8px" onclick="docSend()">💬 ส่งลิงก์ให้${who}เซ็นในมือถือตัวเอง</button>`}
+      ${sg.owner ? '' : `<button class="btn ${sg.tenant ? 'pri' : ''} blk" style="margin-top:8px" onclick="docOwner()">✍️ ${C ? 'ผู้ให้เช่า' : 'ผู้รับเงิน'}เซ็น</button>`}
+      ${sg.tenant && sg.owner ? `<button class="btn ok blk" onclick="docSend(true)">💬 ส่งเอกสารที่เซ็นแล้วให้${who}</button>` : ''}`
+    : `<button class="btn pri blk" onclick="docView(true)">🖨 พิมพ์${C ? 'สัญญา (2 ชุด)' : 'ใบจอง'}</button>
+      <button class="btn ${/^paper/.test(d.signed) ? '' : 'ok'} blk" style="margin-top:8px" onclick="docSet({paperDone:${/^paper/.test(d.signed) ? 'false' : 'true'}})">${/^paper/.test(d.signed) ? '↺ ยังไม่ได้เซ็น' : '✓ เซ็นบนกระดาษครบแล้ว'}</button>
+      <div class="muted small" style="margin-top:8px">💡 ถ่ายรูปเอกสารที่เซ็นแล้ว แนบเก็บไว้ในส่วน “เอกสาร” ของห้องนี้ได้</div>`}
+    <div class="row" style="margin-top:12px;flex-wrap:wrap;gap:8px"><button class="btn" onclick="docView()">👁 ดูเอกสาร</button>${C ? `<button class="btn" onclick="docTermsSheet('contract')">✏️ แก้ข้อความสัญญา</button>` : `<button class="btn" onclick="docTermsSheet('book')">✏️ แก้เงื่อนไขใบจอง</button>`}<span class="sp"></span>${sg.tenant || sg.owner ? `<button class="btn" style="color:var(--bad)" onclick="docResetAsk()">↺ เริ่มเซ็นใหม่</button>` : ''}</div>`);
+}
+async function docSaveFields() {
+  const ll = $('#dsLl'); if (ll && ll.value.trim() !== (S().landlordName || '')) { await api('saveSettings', { settings: { landlordName: ll.value.trim() } }, true); await docLoad(DS.kind, DS.id); }
+  if (DS.kind !== 'contract' || !$('#dsId')) return;
+  const idCard = $('#dsId').value.trim(), idAddress = $('#dsAd').value.trim();
+  if (idCard !== (DS.d.t.idCard || '') || idAddress !== (DS.d.t.idAddress || '')) { await api('docInfo', { kind: DS.kind, id: DS.id, idCard, idAddress }, true); DS.d.t.idCard = idCard; DS.d.t.idAddress = idAddress; }
+}
+async function docSet(p) {
+  await docSaveFields();
+  if (p.mode) DS.mode = p.mode;
+  await act('docInfo', Object.assign({ kind: DS.kind, id: DS.id }, p)); await docLoad(DS.kind, DS.id); leaseSheet(DS.kind, DS.id, true);
+}
+async function docView(print) {
+  await docSaveFields(); const d = await docLoad(DS.kind, DS.id);
+  if (d.mode === 'paper' || print) d.mode = 'paper';
+  closeSheet(); docShow(d, `<button class="btn sm" onclick="docClose();leaseSheet(DS.kind,DS.id,true)">← กลับ</button>`); if (print) setTimeout(docPrint, 300);
+}
+async function docHere() {
+  await docSaveFields(); const d = await docLoad(DS.kind, DS.id), C = DS.kind === 'contract';
+  closeSheet(); d.mode = 'e';
+  docShow(d, `<label style="display:flex;gap:6px;align-items:center;font-size:13.5px;background:#fff1;padding:4px 8px;border-radius:8px"><input type="checkbox" id="dAg" style="width:20px;height:20px"> ${C ? 'ผู้เช่าอ่านและยอมรับสัญญาแล้ว' : 'ผู้จองรับทราบเงื่อนไขแล้ว'}</label><button class="btn sm pri" onclick="docHereSign()">✍️ อ่านแล้ว เซ็นชื่อ</button>`);
+}
+async function docHereSign() {
+  if (!$('#dAg').checked) return toast('ให้ติ๊กยอมรับก่อนเซ็น');
+  const C = DS.kind === 'contract', nm = C ? DS.d.t.name : DS.d.bk.name, en = DS.d.lang === 'en';
+  const img = await signPad(en ? { title: 'Sign', name: nm, step: '1 / 2', hint: 'Sign with your finger in this box', cancel: 'Cancel', clear: 'Clear', ok: 'Done', empty: 'Please sign first' } : { title: C ? 'ผู้เช่าเซ็นชื่อ' : 'ผู้จองเซ็นชื่อ', name: nm, step: '1 / 2' });
+  if (!img) return;
+  await act('docSign', { kind: DS.kind, id: DS.id, who: 'tenant', img }, 'บันทึกลายเซ็นแล้ว');
+  docClose(); await docOwner(true);
+}
+async function docOwner(next) {
+  const C = DS.kind === 'contract', nm = S().landlordName || S().apartmentName;
+  const img = await signPad({ title: C ? 'ผู้ให้เช่าเซ็นชื่อ' : 'ผู้รับเงินเซ็นชื่อ', name: nm, step: next ? '2 / 2' : '', cancel: next ? 'เซ็นทีหลัง' : 'ยกเลิก' });
+  if (img) await act('docSign', { kind: DS.kind, id: DS.id, who: 'owner', img }, 'บันทึกลายเซ็นแล้ว');
+  const d = await docLoad(DS.kind, DS.id); render();
+  if ((d.signs || {}).tenant && (d.signs || {}).owner) { docShow(d, `<button class="btn sm ok" onclick="docClose();docSend(true)">💬 ส่งให้${C ? 'ผู้เช่า' : 'ผู้จอง'}</button>`); toast('เซ็นครบแล้ว ✅'); }
+  else leaseSheet(DS.kind, DS.id, true);
+}
+async function docSend(done) {
+  await docSaveFields();
+  const C = DS.kind === 'contract', t = C ? tenantById(DS.id) : null, linked = C && (D.lineUsers || []).some(u => u.tenantId === DS.id);
+  const j = await api('docLink', { kind: DS.kind, id: DS.id }); const url = docUrl(j.token), en = DS.d.lang === 'en';
+  await docLoad(DS.kind, DS.id); render();
+  const nm = C ? DS.d.t.name : DS.d.bk.name;
+  const msg = done ? (en ? `Your ${C ? 'lease agreement' : 'booking receipt'} (Room ${DS.d.room.room}) is ready:\n${url}` : `${C ? 'สัญญาเช่า' : 'ใบรับเงินจอง'}ห้อง ${DS.d.room.room} ที่เซ็นแล้ว เปิดดู/บันทึก PDF ได้ที่\n${url}`)
+    : (en ? `Please review and sign your ${C ? 'lease agreement' : 'booking receipt'} (Room ${DS.d.room.room}):\n${url}` : `เชิญ${C ? 'เซ็นสัญญาเช่า' : 'เซ็นใบรับเงินจอง'} ห้อง ${DS.d.room.room} คุณ${nm}\nกดเปิดลิงก์ อ่านแล้วเซ็นชื่อในมือถือได้เลย\n${url}`);
+  DS.msg = msg; DS.url = url;
+  openSheet(`<h3>💬 ${done ? 'ส่งเอกสารที่เซ็นแล้ว' : 'ส่งลิงก์ให้เซ็น'} · ห้อง ${esc(DS.d.room.room)}</h3>
+    <div class="muted small" style="margin-bottom:8px">${done ? 'ผู้รับเปิดดูและบันทึก PDF ได้' : 'ผู้รับเปิดลิงก์ อ่านเอกสาร ติ๊กยอมรับ แล้วเซ็นในมือถือ · ระบบแจ้งเข้ากลุ่ม LINE เมื่อเซ็นแล้ว'}</div>
+    <div class="bubble" style="word-break:break-all;font-size:13px">${esc(msg).replace(/\n/g, '<br>')}</div>
+    ${linked ? `<button class="btn ok blk" style="margin-top:10px" onclick="docPush()">📲 ส่งเข้า LINE OA ของผู้เช่า</button>` : ''}
+    <button class="btn ${linked ? '' : 'ok'} blk" style="margin-top:8px" onclick="openLine(DS.msg)">💬 แชร์ทาง LINE</button>
+    <div class="row" style="margin-top:8px"><button class="btn" style="flex:1" onclick="navigator.clipboard&&navigator.clipboard.writeText(DS.msg).then(()=>toast('คัดลอกแล้ว'))">📋 คัดลอกข้อความ</button><button class="btn" style="flex:1" onclick="leaseSheet(DS.kind,DS.id,true)">← กลับ</button></div>`);
+}
+async function docPush() { const j = await act('docLink', { kind: DS.kind, id: DS.id, push: true }); toast(j && j.pushed ? 'ส่งเข้า LINE ผู้เช่าแล้ว' : 'ส่งไม่สำเร็จ ลองแชร์ทาง LINE แทน'); }
+async function docResetAsk() {
+  if (!(await uiConfirm('ลบลายเซ็นทั้งหมดของเอกสารนี้ แล้วเริ่มเซ็นใหม่? (ลิงก์เดิมจะใช้ไม่ได้)'))) return leaseSheet(DS.kind, DS.id, true);
+  await act('docReset', { kind: DS.kind, id: DS.id }, 'ล้างลายเซ็นแล้ว'); await docLoad(DS.kind, DS.id); render(); leaseSheet(DS.kind, DS.id, true);
+}
+function docTermsSheet(kind) {
+  const C = kind === 'contract', s = S(), k = C ? 'contractTerms' : 'bookTerms';
+  const lang = DS.d && DS.d.lang === 'en' ? 'en' : 'th', key = k + (lang === 'en' ? 'En' : '');
+  openSheet(`<h3>✏️ ${C ? 'ข้อความสัญญาเช่า' : 'เงื่อนไขใบรับเงินจอง'} (${lang === 'en' ? 'English' : 'ไทย'})</h3>
+    <div class="muted small" style="margin-bottom:6px">${C ? 'ขึ้นบรรทัดใหม่ด้วย “ข้อ 1 …” จะเป็นหัวข้อ · ตัวแปรที่ระบบเติมให้: {room} {floor} {months} {start} {end} {rent} {dueDay} {water} {elec} {common}' : 'หนึ่งบรรทัด = หนึ่งข้อ · {tel} = เบอร์โทรหลัก'} · ตารางเงินวันทำสัญญาและช่องเซ็นชื่อ ระบบใส่ให้เอง</div>
+    <textarea id="dtT" rows="16" style="width:100%;font-size:14px;line-height:1.5">${esc(s[key] || DS.d.terms || '')}</textarea>
+    <div class="row" style="margin-top:8px"><button class="btn" onclick="$('#dtT').value='';toast('ล้างแล้ว · บันทึกเพื่อกลับไปใช้แบบมาตรฐาน')">↺ ใช้แบบมาตรฐาน</button><span class="sp"></span><button class="btn" onclick="leaseSheet(DS.kind,DS.id,true)">ยกเลิก</button><button class="btn pri" onclick="docTermsSave(${q(key)})">บันทึก</button></div>`);
+}
+async function docTermsSave(key) { await act('saveSettings', { settings: { [key]: $('#dtT').value.trim() } }, 'บันทึกข้อความแล้ว'); await docLoad(DS.kind, DS.id); leaseSheet(DS.kind, DS.id, true); }
 </script>
 </body>
 </html>
