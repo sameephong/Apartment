@@ -1,18 +1,26 @@
 /* ===================== เอกสาร: สัญญาเช่า / ใบรับเงินจอง + แผ่นเซ็นชื่อ (ใช้ร่วม admin.html และ sign.html) ===================== */
 (function () {
   const css = `
-.dsheet{background:#fff;color:#111;width:100%;max-width:794px;margin:0 auto 16px;padding:44px 50px;box-shadow:0 2px 14px rgba(0,0,0,.12);font-family:Sarabun,Loma,sans-serif;font-size:14.5px;line-height:1.7}
-.dsheet h1{text-align:center;font-size:23px;margin:0}.dsheet .dc{text-align:center}.dsheet .dr{text-align:right}.dsheet p{margin:6px 0}
-.dsheet .dsub{text-align:center;color:#555;margin:0 0 14px}.dsheet .dv{border-bottom:1px dotted #444;padding:0 4px;font-weight:600}
-.dsheet .dh{font-weight:700;margin:10px 0 0}.dsheet .dtb{width:100%;border-collapse:collapse;margin:8px 0}.dsheet .dtb td,.dsheet .dtb th{border:1px solid #bbb;padding:5px 9px;text-align:left}.dsheet .dtb td.n{text-align:right;white-space:nowrap;font-weight:600}
-.dsheet .dsig{display:flex;justify-content:space-between;gap:20px;margin-top:26px;text-align:center;page-break-inside:avoid}.dsheet .dsig>div{flex:1}
-.dsheet .dsig img{height:64px;max-width:100%;display:block;margin:0 auto -14px}.dsheet .dsig .blank{height:50px}
-.dsheet .etag{display:inline-block;font-size:11.5px;color:#15803d;border:1px solid #9bd3ae;border-radius:99px;padding:0 8px;margin-top:3px}
-.dsheet .dfoot{color:#888;font-size:11.5px;text-align:center;margin-top:16px}
-.dsheet.rc{max-width:520px;padding:30px 34px;font-size:14.5px}.dsheet .dln{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid #eee}.dsheet .dln span{color:#555}
-.dsheet .dbig{display:flex;justify-content:space-between;font-size:19px;font-weight:700;padding:10px 0}.dsheet .dbox{background:#f5f7fb;border-radius:10px;padding:10px 14px;margin:10px 0}
-.dsheet .dpaid{display:inline-block;border:2px solid #15803d;color:#15803d;border-radius:8px;padding:1px 10px;font-weight:700;transform:rotate(-5deg)}
-.dsheet ul{margin:6px 0;padding-left:20px}
+.dsheet{background:#fff;color:#111;font-family:Sarabun,Loma,sans-serif;font-size:14.5px;line-height:1.62;box-shadow:0 2px 14px rgba(0,0,0,.14)}
+.dsheet.dpage{width:210mm;height:297mm;margin:0 auto 14px;padding:13mm 15mm 0;display:flex;flex-direction:column;box-sizing:border-box;overflow:hidden}
+.dsheet.dpage.rc{padding-bottom:12mm}.dpc{flex:1;min-height:0;overflow:hidden}
+.dsheet h1{text-align:center;font-size:22px;margin:0}.dsheet .dc{text-align:center}.dsheet .dr{text-align:right}.dsheet p{margin:5px 0}
+.dsheet .dsub{text-align:center;color:#555;margin:0 0 12px}.dsheet .dv{border-bottom:1px dotted #444;padding:0 4px;font-weight:600}
+.dsheet .dblank{display:inline-block;min-width:62mm;border-bottom:1px dotted #444;height:1.2em}
+.dsheet .dh{font-weight:700;margin:9px 0 0}.dsheet .dtb{width:100%;border-collapse:collapse;margin:6px 0}.dsheet .dtb td{border:1px solid #bbb;padding:4px 9px;text-align:left}.dsheet .dtb td.n{text-align:right;white-space:nowrap;font-weight:600}
+.dsheet .drow{display:grid;grid-template-columns:12mm 1fr 1.4fr;border:1px solid #bbb;border-top:0}.dsheet .drow>div{padding:4px 8px;border-left:1px solid #bbb}.dsheet .drow>div:first-child{border-left:0}.dsheet .drow.drh{border-top:1px solid #bbb;font-weight:700;background:#f5f5f5;margin-top:6px}
+.dsheet .dsig{display:flex;justify-content:space-between;gap:20px;margin-top:22px;text-align:center}.dsheet .dsig>div{flex:1}
+.dsheet .dsig img{height:60px;max-width:100%;display:block;margin:0 auto -14px}.dsheet .dsig .blank{height:46px}
+.dsheet .etag{display:inline-block;font-size:11px;color:#15803d;border:1px solid #9bd3ae;border-radius:99px;padding:0 8px;margin-top:2px}
+.dpfoot{flex:none;height:27mm;border-top:1px solid #ccc;display:flex;align-items:flex-end;gap:14px;padding:0 0 7mm;font-size:11.5px;line-height:1.35}
+.dpfoot .fs{flex:1;text-align:center}.dpfoot .fs img{height:30px;max-width:100%;display:block;margin:0 auto -8px}.dpfoot .fs .blank{height:24px}.dpfoot .dpn{flex:none;color:#666;white-space:nowrap;align-self:flex-end}
+.dsheet .dln{display:flex;justify-content:space-between;gap:10px;padding:4px 0;border-bottom:1px solid #eee}.dsheet .dln span{color:#555}
+.dsheet .dbig{display:flex;justify-content:space-between;font-size:19px;font-weight:700;padding:8px 0}.dsheet .dbox{background:#f5f7fb;border-radius:10px;padding:8px 14px;margin:8px 0}
+.dsheet .dpaid{display:inline-block;border:2px solid #15803d;color:#15803d;border-radius:8px;padding:0 10px;font-weight:700;transform:rotate(-5deg)}
+.dsheet ul,.dsheet ol{margin:4px 0;padding-left:22px}.rcw{max-width:150mm;margin:0 auto}.dsheet h3{font-size:1em;font-weight:700;margin:9px 0 0}.dsheet h2{font-size:1.15em;margin:10px 0 2px}
+.dedit{outline:none;width:210mm;min-height:297mm;margin:0 auto;padding:13mm 15mm;box-sizing:border-box;box-shadow:0 2px 14px rgba(0,0,0,.14)}.dedit:focus{box-shadow:0 0 0 3px #93c5fd}
+.dsheet hr.dpb{border:0;border-top:2px dashed #f59e0b;margin:14px 0;position:relative;overflow:visible}.dsheet hr.dpb::after{content:'— ขึ้นแผ่นใหม่ —';position:absolute;left:50%;top:-11px;transform:translateX(-50%);background:#fff;color:#b45309;font-size:12px;padding:0 8px}
+.dovbar .tb{background:#334155;color:#fff;border:0;border-radius:8px;padding:6px 10px;font:inherit;font-size:13.5px;cursor:pointer}.dovbar .tb:hover{background:#475569}
 .spad{position:fixed;inset:0;z-index:9999;background:#fff;display:flex;flex-direction:column;touch-action:none}
 .spad .spbar{background:#1e293b;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;gap:10px;font-size:15px}.spad .spbar em{color:#93c5fd;font-style:normal}
 .spad canvas{flex:1;width:100%;touch-action:none;cursor:crosshair}.spad .sphint{position:absolute;left:0;right:0;bottom:84px;text-align:center;color:#cbd2dc;font-size:14px;pointer-events:none}
@@ -20,10 +28,9 @@
 .spad .spbtn{display:flex;gap:8px;padding:12px;border-top:1px solid #e5e7eb;padding-bottom:max(12px,env(safe-area-inset-bottom))}.spad .spbtn .pri{flex:1}
 .dov{position:fixed;inset:0;z-index:9000;background:#e9edf3;overflow:auto;-webkit-overflow-scrolling:touch}
 .dov .dovbar{position:sticky;top:0;z-index:2;background:#1e293b;color:#fff;display:flex;gap:8px;align-items:center;padding:10px 14px;flex-wrap:wrap}.dov .dovbar b{flex:1;min-width:140px}
-.dov .dovin{padding:16px 10px 40px}
-@media (max-width:600px){.dsheet{padding:24px 18px;font-size:13.5px}.dsheet h1{font-size:20px}.dsheet .dsig{gap:10px}}
-@media print{body.docprint>*:not(.dov){display:none!important}body.docprint .dov{position:static;background:#fff;overflow:visible}body.docprint .dovbar{display:none}body.docprint .dovin{padding:0}
-  .dsheet{box-shadow:none;max-width:none;margin:0;padding:0 4mm}.dsheet+.dsheet{page-break-before:always}@page{size:A4;margin:16mm 14mm}}`;
+.dov .dovin{padding:14px 8px 40px;overflow-x:hidden}
+@media print{@page{size:A4;margin:0}body.docprint>*:not(.dov){display:none!important}body.docprint .dov{position:static;background:#fff;overflow:visible}body.docprint .dovbar{display:none}body.docprint .dovin{padding:0}
+  .dsheet.dpage{zoom:1!important;margin:0!important;box-shadow:none!important;break-after:page;page-break-after:always}.dsheet.dpage.dlast{break-after:auto;page-break-after:auto}}`;
   const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
 })();
 
@@ -64,62 +71,156 @@ function docTermsHtml(d) {
     return h ? `<p class="dh">${html}</p>` : `<p style="text-indent:2em">${html}</p>`;
   }).join('');
 }
+function docSigImg(d, who) { const s = (d.signs || {})[who]; return s && d.mode !== 'paper' ? s : null; }
 function docSigBlock(d, who, label, name) {
-  const s = (d.signs || {})[who], L = DOCL[d.lang];
-  return `<div>${s && d.mode !== 'paper' ? `<img src="${s.img}" alt="">` : '<div class="blank"></div>'}${L.sign} ....................................................<br>( ${dEsc(name || '                         ')} )<br>${label}${s && d.mode !== 'paper' ? `<br><span class="etag">${L.esign} ${dEsc(dShort(s.at, d.lang))}</span>` : ''}</div>`;
+  const s = docSigImg(d, who), L = DOCL[d.lang];
+  return `<div>${s ? `<img src="${s.img}" alt="">` : '<div class="blank"></div>'}${L.sign} ....................................................<br>( ${dEsc(name || '                         ')} )<br>${label}${s ? `<br><span class="etag">${L.esign} ${dEsc(dShort(s.at, d.lang))}</span>` : ''}</div>`;
 }
+function docFootSig(d, who, label) { const s = docSigImg(d, who), L = DOCL[d.lang]; return `<div class="fs">${s ? `<img src="${s.img}" alt="">` : '<div class="blank"></div>'}${L.sign} ...................................... ${label}</div>`; }
+// สร้าง HTML ของเอกสาร (ยังไม่แบ่งหน้า) → ใช้ docRender() เพื่อแบ่งเป็นแผ่น A4
 function docHtml(d) {
   const L = DOCL[d.lang] || DOCL.th, b = d.b || {};
+  if (d.kind === 'invoice') return docInvoice(d);
   if (d.kind === 'book') {
     const k = d.bk || {}, mi = d.moveIn || {}, all = mi.deposit + mi.advance + mi.key + mi.card, left = Math.max(0, all - k.deposit);
-    return `<div class="dsheet rc"><h1>🧾 ${L.bookT}</h1><p class="dsub">${dEsc(b.name)}${b.address ? '<br>' + dEsc(b.address) : ''}</p>
+    return `<div class="dflow" data-k="book"><div class="dsec"><div class="rcw"><h1>🧾 ${L.bookT}</h1><p class="dsub">${dEsc(b.name)}${b.address ? '<br>' + dEsc(b.address) : ''}${b.tel ? ' · ' + L.tel + ' ' + dEsc(b.tel) : ''}</p>
       <div class="dln"><span>${L.no}</span><b>${dEsc(d.no || '-')}</b></div>
       <div class="dln"><span>${L.booker}</span><b>${dEsc(k.name)}</b></div>
+      <div class="dln"><span>${L.idc}</span><b>${k.idCard ? dEsc(k.idCard) : '<span class="dblank"></span>'}</b></div>
       <div class="dln"><span>${L.tel}</span><b>${dEsc(k.phone || '-')}</b></div>
       <div class="dln"><span>${L.room}</span><b>${dEsc(d.room.room)}${d.room.floor ? ' · ' + L.floor + ' ' + dEsc(d.room.floor) : ''}</b></div>
       <div class="dln"><span>${L.moveAt}</span><b>${dEsc(dShort(k.at, d.lang))}</b></div>
       <div class="dln"><span>${L.recvAt}</span><b>${dEsc(dShort(d.date, d.lang))}</b></div>
       ${k.note ? `<div class="dln"><span>${L.bnote}</span><span style="text-align:right;color:#111">${dEsc(k.note)}</span></div>` : ''}
-      <div class="dbig"><span>${L.bdep}</span><span style="color:#15803d">${dNum(k.deposit)} ${L.baht}</span></div>
-      ${k.deposit ? `<div class="dr"><span class="dpaid">${L.paid}</span></div>` : ''}
+      <div class="dbig"><span>${L.bdep}</span><span style="color:#15803d">${dNum(k.deposit)} ${L.baht}${k.deposit ? ` &nbsp;<span class="dpaid" style="font-size:14px">${L.paid}</span>` : ''}</span></div>
       <div class="dbox"><b>${L.mi}</b>
         <div class="dln"><span>${L.miAll}</span><b>${dNum(all)} ${L.baht}</b></div>
         <div class="dln"><span>${L.miLess}</span><b>− ${dNum(k.deposit)} ${L.baht}</b></div>
         <div class="dln" style="border:0"><span style="color:#111"><b>${L.miLeft}</b></span><b style="color:#2457c5;font-size:17px">${dNum(left)} ${L.baht}</b></div></div>
       <b>${L.cond2}</b><ul>${String(d.terms || '').split('\n').map(x => x.trim()).filter(Boolean).map(x => `<li>${dEsc(x)}</li>`).join('')}</ul>
-      <div class="dsig">${docSigBlock(d, 'tenant', L.booker, k.name)}${docSigBlock(d, 'owner', L.recv, b.landlord)}</div>
-      <div class="dfoot">${dEsc(d.no || '')}</div></div>`;
+      <div class="dsig">${docSigBlock(d, 'tenant', L.booker, k.name)}${docSigBlock(d, 'owner', L.recv, b.landlord)}</div></div></div></div>`;
   }
-  const t = d.t || {}, rent = d.room.rent;
+  const t = d.t || {};
+  const foot = docFootSig(d, 'owner', L.landlord) + docFootSig(d, 'tenant', L.tenant), sig = `<div class="dsig">${docSigBlock(d, 'owner', L.landlord, b.landlord)}${docSigBlock(d, 'tenant', L.tenant, t.name)}</div>`;
+  const secs = (d.custom ? String(d.custom) : docLeaseBody(d)).split(/<hr[^>]*class="?dpb"?[^>]*>/i);
+  return `<div class="dflow" data-k="lease" data-pg="${L.page}"><template class="dpf">${foot}</template>` + secs.map((x, i) => `<div class="dsec">${x}${i === 0 ? sig : ''}</div>`).join('') + `</div>`;
+}
+// เนื้อหาสัญญาแบบอัตโนมัติ (ไม่รวมช่องเซ็น) · ใช้แสดง และใช้เป็นต้นฉบับในหน้าแก้ไขสัญญา
+function docLeaseBody(d) {
+  const L = DOCL[d.lang] || DOCL.th, b = d.b || {}, t = d.t || {};
   const party = d.lang === 'en'
     ? `${dV(t.name)}, ${L.idc} ${dV(t.idCard)}, ${L.addr} ${dV(t.idAddress)}, ${L.tel} ${dV(t.phone)}`
     : `${dV(t.name)} ${L.idc} ${dV(t.idCard)} ${L.addr} ${dV(t.idAddress)} ${L.tel} ${dV(t.phone)}`;
   const rows = [[L.dep, t.deposit], [L.adv, t.advance], [L.key, t.key], [L.card, t.card]].filter(x => +x[1]);
   const sum = rows.reduce((a, x) => a + (+x[1] || 0), 0);
   const items = d.items && typeof d.items === 'object' ? Object.keys(d.items) : [];
-  const page1 = `<div class="dsheet"><h1>${L.lease}</h1><p class="dsub">${dEsc(b.name)}${b.address ? ' · ' + dEsc(b.address) : ''}</p>
+  const ck = v => v.s ? dEsc(v.s === 'มี' ? L.itemOk : d.lang === 'en' ? ({ 'ขาด': 'Missing', 'ชำรุด': 'Damaged' }[v.s] || v.s) : v.s) : `<span style="color:#666">☐ ${L.itemOk} &nbsp; ☐ ${d.lang === 'en' ? 'Missing' : 'ขาด'} &nbsp; ☐ ${d.lang === 'en' ? 'Damaged' : 'ชำรุด'}</span>`;
+  return `<h1>${L.lease}</h1><p class="dsub">${dEsc(b.name)}${b.address ? ' · ' + dEsc(b.address) : ''}</p>
     <p class="dr">${L.no} ${dV(d.no)} &nbsp; ${L.at} ${dV(b.name)}<br>${L.date} ${dV(dDate(d.date, d.lang))}</p>
     <p style="text-indent:2em">${L.intro(dV(b.landlord), party, b)}</p>
     ${docTermsHtml(d)}
     <p class="dh">${L.pay}</p>
     <table class="dtb">${rows.map(x => `<tr><td>${x[0]}</td><td class="n">${dNum(x[1])} ${L.baht}</td></tr>`).join('')}<tr><td><b>${L.total}</b></td><td class="n">${dNum(sum)} ${L.baht}</td></tr></table>
-    <p style="text-indent:2em;margin-top:14px">${d.mode === 'e' ? L.estmt : L.pstmt}</p>
-    <div class="dsig">${docSigBlock(d, 'owner', L.landlord, b.landlord)}${docSigBlock(d, 'tenant', L.tenant, t.name)}</div>
-    <div class="dfoot">${dEsc(d.no || '')} · ${L.room} ${dEsc(d.room.room)} · ${dNum(rent)} ${L.baht}</div></div>`;
-  const page2 = `<div class="dsheet"><h1 style="font-size:19px">${L.att}</h1><p class="dsub">${L.no} ${dEsc(d.no || '')} · ${L.room} ${dEsc(d.room.room)}</p>
-    ${items.length ? `<table class="dtb"><tr><th style="width:44px">#</th><th>${L.item}</th><th>${L.cond}</th></tr>${items.map((k, i) => { const v = d.items[k] || {}; return `<tr><td>${i + 1}</td><td>${dEsc(k)}</td><td>${v.s ? dEsc(v.s === 'มี' ? L.itemOk : d.lang === 'en' ? ({ 'ขาด': 'Missing', 'ชำรุด': 'Damaged' }[v.s] || v.s) : v.s) : `<span style="color:#666">☐ ${L.itemOk} &nbsp; ☐ ${d.lang === 'en' ? 'Missing' : 'ขาด'} &nbsp; ☐ ${d.lang === 'en' ? 'Damaged' : 'ชำรุด'}</span>`}${v.n ? ' · ' + dEsc(v.n) : ''}</td></tr>`; }).join('')}</table>` : `<p class="dc" style="color:#888">${L.noItems}</p>`}
-    <div class="dsig">${docSigBlock(d, 'owner', L.landlord, b.landlord)}${docSigBlock(d, 'tenant', L.tenant, t.name)}</div></div>`;
-  return page1 + page2;
+    <p style="text-indent:2em;margin-top:12px">${d.mode === 'e' ? L.estmt : L.pstmt}</p>
+    <hr class="dpb"><h1 style="font-size:19px">${L.att}</h1><p class="dsub">${L.no} ${dEsc(d.no || '')} · ${L.room} ${dEsc(d.room.room)}</p>
+    ${items.length ? `<div class="drow drh"><div>#</div><div>${L.item}</div><div>${L.cond}</div></div>${items.map((k, i) => `<div class="drow"><div>${i + 1}</div><div>${dEsc(k)}</div><div>${ck(d.items[k] || {})}${(d.items[k] || {}).n ? ' · ' + dEsc(d.items[k].n) : ''}</div></div>`).join('')}` : `<p class="dc" style="color:#888">${L.noItems}</p>`}`;
 }
+// ใส่เอกสารลงในกล่อง แล้วแบ่งเป็นแผ่น A4 (ใบจอง = 1 แผ่นเสมอ · สัญญา = มีช่องเซ็นชื่อท้ายทุกแผ่น)
+async function docRender(el, d) {
+  el.innerHTML = docHtml(d);
+  try { if (document.fonts && document.fonts.ready) await Promise.race([document.fonts.ready, new Promise(r => setTimeout(r, 2500))]); } catch (e) {}
+  docPaginate(el); docFit(el);
+}
+function docPaginate(el) {
+  el.querySelectorAll('.dflow').forEach(fl => {
+    const tp = fl.querySelector('template.dpf'), foot = tp ? tp.innerHTML : '', one = fl.dataset.k !== 'lease', pages = [];
+    const page = () => { const p = document.createElement('div'); p.className = 'dsheet dpage' + (one ? ' rc' : ''); p.innerHTML = `<div class="dpc"></div>${foot ? `<div class="dpfoot">${foot}<div class="dpn"></div></div>` : ''}`; fl.parentNode.insertBefore(p, fl); pages.push(p); return p.firstChild; };
+    fl.querySelectorAll(':scope > .dsec').forEach(sec => {
+      while (sec.children.length === 1 && sec.firstElementChild.tagName === 'DIV' && !sec.firstElementChild.className && sec.firstElementChild.children.length) sec.firstElementChild.replaceWith(...sec.firstElementChild.childNodes); // แกะ div ห่อ
+      Array.from(sec.childNodes).forEach(n => { if (n.nodeType === 3) { if (n.textContent.trim()) { const p = document.createElement('p'); n.replaceWith(p); p.appendChild(n); } else n.remove(); } else if (n.nodeType !== 1) n.remove(); });
+      if (!sec.children.length) return;
+      let c = page();
+      Array.from(sec.children).forEach(b => {
+        c.appendChild(b);
+        if (c.scrollHeight > c.clientHeight + 1 && c.children.length > 1) {
+          c.removeChild(b); const prev = c.lastElementChild, carry = prev && (prev.classList.contains('dh') || prev.classList.contains('drh') || /^H[1-4]$/.test(prev.tagName)) && c.children.length > 1 ? prev : null; // ไม่ให้หัวข้อค้างท้ายแผ่น
+          c = page(); if (carry) c.appendChild(carry); c.appendChild(b);
+        }
+      });
+    });
+    if (one && pages[0]) { const c = pages[0].firstChild; let fs = 14.5; while (c.scrollHeight > c.clientHeight + 1 && fs > 9.5) { fs -= .5; c.style.fontSize = fs + 'px'; } }
+    pages.forEach((p, i) => { const n = p.querySelector('.dpn'); if (n) n.textContent = (fl.dataset.pg || '') + ' ' + (i + 1) + '/' + pages.length; });
+    if (pages.length) pages[pages.length - 1].classList.add('dlast');
+    fl.remove();
+  });
+}
+function docFit(el) {
+  const cs = getComputedStyle(el), w = (el.clientWidth || window.innerWidth) - parseFloat(cs.paddingLeft || 0) - parseFloat(cs.paddingRight || 0), z = Math.min(1, (w - 2) / (210 * 96 / 25.4));
+  el.querySelectorAll('.dpage').forEach(p => { p.style.zoom = z < 1 ? z : ''; });
+}
+window.addEventListener('resize', () => document.querySelectorAll('.dovin,#docBox').forEach(docFit));
 // แสดงเอกสารเต็มจอ + แถบปุ่ม (พิมพ์/PDF ฯลฯ)
 function docShow(d, bar) {
   docClose();
   const ov = document.createElement('div'); ov.className = 'dov'; ov.id = 'docOv';
-  ov.innerHTML = `<div class="dovbar"><b>${dEsc(d.kind === 'book' ? DOCL[d.lang].bookT : DOCL[d.lang].lease)} · ${dEsc(d.no || '')}</b>${bar || ''}<button class="btn sm" onclick="docPrint()">🖨 พิมพ์ / PDF</button><button class="btn sm" onclick="docClose()">✕ ปิด</button></div><div class="dovin">${docHtml(d)}</div>`;
+  ov.innerHTML = `<div class="dovbar"><b>${dEsc(d.kind === 'book' ? DOCL[d.lang].bookT : DOCL[d.lang].lease)} · ${dEsc(d.no || '')}</b>${bar || ''}<button class="btn sm" onclick="docPrint()">🖨 พิมพ์ / PDF</button><button class="btn sm" onclick="docClose()">✕ ปิด</button></div><div class="dovin"></div>`;
   document.body.appendChild(ov); document.body.style.overflow = 'hidden';
+  return docRender(ov.querySelector('.dovin'), d);
 }
 function docClose() { const o = document.getElementById('docOv'); if (o) o.remove(); document.body.style.overflow = ''; }
-function docPrint() { document.body.classList.add('docprint'); setTimeout(() => { window.print(); setTimeout(() => document.body.classList.remove('docprint'), 500); }, 50); }
+function docPrint() {
+  const t0 = document.title, b = document.querySelector('#docOv .dovbar b'); if (b) document.title = b.textContent.replace(/\s*·\s*/g, ' ').trim(); // ชื่อไฟล์ PDF = ชื่อเอกสาร
+  document.body.classList.add('docprint'); setTimeout(() => { window.print(); setTimeout(() => { document.body.classList.remove('docprint'); document.title = t0; }, 500); }, 50);
+}
+// ใบแจ้งหนี้ / ใบเสร็จรับเงิน A4 (บิลทุกแบบ รวมบิลค่าใช้จ่ายเพิ่มเติมที่ออกให้ใครก็ได้)
+function docInvoice(d) {
+  const x = d.bill, b = d.b || {}, paid = x.status === 'ชำระแล้ว', th = n => Number(n || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return `<div class="dflow" data-k="one"><div class="dsec"><div class="rcw" style="max-width:none">
+    <div style="display:flex;justify-content:space-between;gap:16px;align-items:flex-start"><div><b style="font-size:19px">${dEsc(b.name)}</b><div style="color:#555;font-size:13px">${dEsc(b.address || '')}${b.tel ? '<br>โทร ' + dEsc(b.tel) : ''}</div></div>
+      <div style="text-align:right"><h1 style="font-size:24px;text-align:right">${paid ? 'ใบเสร็จรับเงิน' : 'ใบแจ้งหนี้'}</h1><div style="color:#555;font-size:13px">${paid ? 'RECEIPT' : 'INVOICE'}</div></div></div>
+    <div style="display:flex;justify-content:space-between;gap:16px;margin:16px 0 8px;padding:10px 14px;background:#f5f7fb;border-radius:10px">
+      <div><span style="color:#555">ชื่อผู้ชำระ</span><br><b style="font-size:16px">${dEsc(x.tenantName || '-')}</b>${x.room ? `<br>ห้อง ${dEsc(x.room)}` : ''}${x.payPhone ? `<br>โทร ${dEsc(x.payPhone)}` : ''}</div>
+      <div style="text-align:right">เลขที่ <b>${dEsc(paid && x.receiptNo ? x.receiptNo : x.no)}</b>${paid && x.receiptNo ? `<br><span style="color:#555">อ้างอิง ${dEsc(x.no)}</span>` : ''}<br>วันที่ ${dEsc(dShort(paid ? x.paidDate : (x.createdAt || '').slice(0, 10), 'th'))}${!paid && x.dueDate ? `<br>ครบกำหนด <b>${dEsc(dShort(x.dueDate, 'th'))}</b>` : ''}</div></div>
+    ${x.title ? `<p style="font-weight:700;margin:10px 0 4px">${dEsc(x.title)}</p>` : ''}
+    <table class="dtb"><tr style="background:#f1f5f9"><td style="width:12mm"><b>#</b></td><td><b>รายการ</b></td><td class="n"><b>จำนวนเงิน (บาท)</b></td></tr>${(x.items || []).map((i, k) => `<tr><td>${k + 1}</td><td>${dEsc(i.l)}</td><td class="n" style="font-weight:400">${th(i.a)}</td></tr>`).join('')}
+      <tr><td colspan="2" style="text-align:right"><b>รวมทั้งสิ้น</b></td><td class="n" style="font-size:17px">${th(x.total)}</td></tr></table>
+    ${x.note ? `<p style="color:#555">หมายเหตุ: ${dEsc(x.note)}</p>` : ''}
+    ${paid ? `<p>ชำระโดย <b>${dEsc(x.payMethod || '-')}</b> เมื่อ ${dEsc(dShort(x.paidDate, 'th'))} &nbsp; <span class="dpaid">ชำระแล้ว ✓</span></p>`
+      : `<div class="dbox"><b>ช่องทางชำระเงิน</b>${d.pay && d.pay.promptpay ? `<br>พร้อมเพย์: ${dEsc(d.pay.promptpay)}` : ''}${d.pay && d.pay.bank ? `<br>${dEsc(d.pay.bank)}` : ''}${d.pay && d.pay.cash ? `<br>${dEsc(d.pay.cash)}` : ''}${d.link ? `<br><span style="color:#555;font-size:12.5px">ดูบิล/สแกนจ่ายออนไลน์: ${dEsc(d.link)}</span>` : ''}</div>`}
+    <div class="dsig" style="margin-top:34px"><div><div class="blank"></div>ลงชื่อ ....................................................<br>( ${dEsc(x.tenantName || '                         ')} )<br>ผู้ชำระเงิน</div><div><div class="blank"></div>ลงชื่อ ....................................................<br>( ${dEsc(b.landlord || '                         ')} )<br>${paid ? 'ผู้รับเงิน' : 'ผู้ออกบิล'}</div></div>
+    </div></div></div>`;
+}
+// หน้าแก้ไขสัญญา: แก้/เพิ่ม/ลบข้อความได้อิสระ (ช่องเซ็นชื่อระบบใส่ให้เอง)
+const DOC_TAGS = { P: 1, H1: 1, H2: 1, H3: 1, B: 1, STRONG: 1, I: 1, EM: 1, U: 1, BR: 1, UL: 1, OL: 1, LI: 1, TABLE: 1, TBODY: 1, THEAD: 1, TR: 1, TD: 1, TH: 1, SPAN: 1, DIV: 1, HR: 1 };
+function docClean(html) {
+  const box = document.createElement('div'); box.innerHTML = html;
+  const walk = el => Array.from(el.children).forEach(c => {
+    if (/^(SCRIPT|STYLE|IFRAME|OBJECT|EMBED|LINK|META|TEMPLATE|IMG|SVG|VIDEO|AUDIO|FORM|INPUT|BUTTON)$/.test(c.tagName)) return c.remove();
+    walk(c);
+    if (!DOC_TAGS[c.tagName]) return c.replaceWith(...c.childNodes);
+    Array.from(c.attributes).forEach(a => { const n = a.name.toLowerCase(); if (n === 'class' || n === 'colspan' || n === 'rowspan') return; if (n === 'style' && !/url\(|expression|javascript/i.test(a.value)) return; c.removeAttribute(a.name); });
+    if (c.tagName === 'DIV' && c.parentElement === box && !c.className && !c.textContent.trim() && !c.querySelector('hr,br')) c.remove();
+  });
+  walk(box); return box.innerHTML.trim();
+}
+function docEditor(d, onSave) {
+  docClose();
+  const ov = document.createElement('div'); ov.className = 'dov'; ov.id = 'docOv';
+  const cmd = (c, v) => `onmousedown="event.preventDefault();document.execCommand('${c}',false,${v ? `'${v}'` : 'null'})"`;
+  ov.innerHTML = `<div class="dovbar"><b>✏️ แก้ไขสัญญา · ${dEsc(d.no || '')}</b>
+    <button class="tb" ${cmd('bold')}><b>B</b></button><button class="tb" ${cmd('italic')}><i>I</i></button><button class="tb" ${cmd('underline')}><u>U</u></button>
+    <button class="tb" ${cmd('formatBlock', 'h3')}>หัวข้อ</button><button class="tb" ${cmd('formatBlock', 'p')}>ย่อหน้า</button><button class="tb" ${cmd('insertUnorderedList')}>• รายการ</button>
+    <button class="tb" onmousedown="event.preventDefault();document.execCommand('insertHTML',false,'<hr class=&quot;dpb&quot;><p><br></p>')">⤓ ขึ้นแผ่นใหม่</button>
+    <button class="tb" onmousedown="event.preventDefault();document.execCommand('undo')">↶</button>
+    <button class="btn sm" id="deAuto">↺ แบบอัตโนมัติ</button><button class="btn sm" onclick="docClose()">ยกเลิก</button><button class="btn sm pri" id="deSave">💾 บันทึก</button></div>
+    <div class="dovin"><div style="max-width:210mm;margin:0 auto 10px;background:#fff7e6;border:1px solid #f5d08a;border-radius:10px;padding:8px 12px;font-size:13.5px;line-height:1.5">แตะข้อความเพื่อแก้ไข · ลบ/เพิ่มได้ทุกส่วน · ช่องเซ็นชื่อ (ท้ายสัญญาและท้ายทุกแผ่น) ระบบใส่ให้เอง · ข้อมูลในฉบับที่แก้แล้วจะไม่เปลี่ยนตามระบบ ถ้าแก้ข้อมูลผู้เช่าทีหลัง ให้กด ↺ แบบอัตโนมัติ</div>
+    <div class="dsheet dedit" contenteditable="true" spellcheck="false">${d.custom || docLeaseBody(d)}</div></div>`;
+  document.body.appendChild(ov); document.body.style.overflow = 'hidden';
+  const ed = ov.querySelector('.dedit'), fit = () => { const v = ov.querySelector('.dovin'), w = v.clientWidth - 16, z = Math.min(1, (w - 2) / (210 * 96 / 25.4)); ed.style.zoom = z < 1 ? z : ''; }; fit(); window.addEventListener('resize', fit);
+  try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch (e) {}
+  ov.querySelector('#deSave').onclick = () => onSave(docClean(ed.innerHTML));
+  ov.querySelector('#deAuto').onclick = () => onSave('');
+}
 // แผ่นเซ็นชื่อเต็มจอ → คืนค่า PNG (data URL) ที่ตัดขอบแล้ว หรือ null ถ้ายกเลิก
 function signPad(o) {
   o = o || {};

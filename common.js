@@ -60,7 +60,7 @@ function loadScript(src) {
   });
 }
 function demoReady() {
-  if (!_demoReady) _demoReady = loadScript('demo.js?v=5.3').then(() => loadScript('backend.js?v=5.3')).then(() => window.DemoGAS.init());
+  if (!_demoReady) _demoReady = loadScript('demo.js?v=5.6').then(() => loadScript('backend.js?v=5.6')).then(() => window.DemoGAS.init());
   return _demoReady;
 }
 async function callApi(action, payload) {
@@ -137,7 +137,7 @@ function fmtDayLong(d) { const x = new Date(d + 'T00:00:00'); return 'วัน'
 function daysBetween(a, b) { return Math.round((new Date(b.slice(0, 10) + 'T00:00:00') - new Date(a.slice(0, 10) + 'T00:00:00')) / 864e5); }
 function addDaysStr(d, n) { const x = new Date(d + 'T00:00:00'); x.setDate(x.getDate() + n); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); }
 function addMonthStr(m, n) { const [y, mm] = m.split('-').map(Number); const d = new Date(y, mm - 1 + n, 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
-function billTitle(b) { return b.kind === 'รายเดือน' ? 'บิลเดือน ' + fmtMonth(b.month) : b.kind === 'แรกเข้า' ? 'บิลแรกเข้าอยู่' : b.kind === 'ย้ายออก' ? 'บิลย้ายออก' : (b.items && b.items[0] ? b.items[0].l : 'บิลพิเศษ'); }
+function billTitle(b) { if (b.title) return b.title; return b.kind === 'รายเดือน' ? 'บิลเดือน ' + fmtMonth(b.month) : b.kind === 'แรกเข้า' ? 'บิลแรกเข้าอยู่' : b.kind === 'ย้ายออก' ? 'บิลย้ายออก' : (b.items && b.items[0] ? b.items[0].l : 'บิลพิเศษ'); }
 function billUrl(b) { return new URL(withB('bill.html?t=' + b.token), location.href).href; }
 
 /* ---------- รูปภาพ: ย่อก่อนส่ง ---------- */

@@ -12,11 +12,11 @@
 <link rel="preconnect" href="https://script.google.com"><link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=5.3">
+<link rel="stylesheet" href="app.css?v=5.6">
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>document.write('<script src="config.js?t=' + Date.now() + '"><\/script>')</script>
-<script src="common.js?v=5.3"></script>
-<script src="docs.js?v=5.3"></script>
+<script src="common.js?v=5.6"></script>
+<script src="docs.js?v=5.6"></script>
 </head>
 <body class="admin">
 <div class="wrap">
@@ -454,20 +454,24 @@ VIEWS.newbill = room => {
 VIEWS.editbill = id => {
   const b = billById(id);
   if (!b) return { title: 'ไม่พบบิล', back: 'bills', html: '' };
-  NB = { id, room: b.room, items: b.items.map(i => Object.assign({}, i)), due: b.dueDate, note: b.note || '', kind: b.kind };
+  NB = { id, room: b.room, who: b.tenantName, title: b.title || '', items: b.items.map(i => Object.assign({}, i)), due: b.dueDate, note: b.note || '', kind: b.kind };
   return nbView('แก้ไขบิล · ' + esc(b.no));
 };
 function nbView(title) {
   const rooms = active().sort((a, b) => a.room.localeCompare(b.room, undefined, { numeric: true }));
   const quick = [['ค่าซ่อม', 0], ['ค่าปรับชำระล่าช้า', 100], ['ค่าทำความสะอาด', 300], ['ค่ากุญแจหาย', 200], ['ค่าเช่าเพิ่มเติม', 0], ['ส่วนลด', -100]];
   return { title, back: 'bills', nav: 'bills', html: `
-    <label class="f">ห้อง${NB.id ? `<input value="${esc(NB.room)} · ${esc((tenantOf(NB.room) || {}).name || '')}" disabled>` : `<select id="nbRoom" onchange="NB.room=this.value"><option value="">เลือกห้อง</option>${rooms.map(t => `<option value="${esc(t.room)}" ${t.room === NB.room ? 'selected' : ''}>${esc(t.room)} · ${esc(t.name)}</option>`).join('')}</select>`}</label>
+    ${NB.id ? `<label class="f">ออกให้<input value="${esc(NB.room ? NB.room + ' · ' : '')}${esc(NB.who || (tenantOf(NB.room) || {}).name || '')}" disabled></label>` : `<div class="segb" style="margin-bottom:10px"><button id="nbM1" class="${NB.free ? '' : 'on'}" onclick="nbMode(0)">👤 ผู้เช่าในห้อง</button><button id="nbM2" class="${NB.free ? 'on' : ''}" onclick="nbMode(1)">✍️ ใครก็ได้ (ผู้จอง / คนนอก)</button></div>
+    <div id="nbT" ${NB.free ? 'style="display:none"' : ''}><label class="f">ห้อง<select id="nbRoom" onchange="NB.room=this.value"><option value="">เลือกห้อง</option>${rooms.map(t => `<option value="${esc(t.room)}" ${t.room === NB.room ? 'selected' : ''}>${esc(t.room)} · ${esc(t.name)}</option>`).join('')}</select></label></div>
+    <div id="nbF" ${NB.free ? '' : 'style="display:none"'}><div class="g2"><label class="f">ชื่อผู้ชำระ *<input id="nbName" value="${esc(NB.name || '')}" oninput="NB.name=this.value" placeholder="ชื่อ-นามสกุล / ชื่อร้าน"></label><label class="f">เบอร์โทร<input id="nbPhone" inputmode="tel" value="${esc(NB.phone || '')}" oninput="NB.phone=this.value"></label></div>
+      <label class="f">ห้อง (ไม่บังคับ)<select id="nbRoomF" onchange="nbPickRoom(this.value)"><option value="">ไม่ระบุห้อง</option>${D.rooms.map(r => `<option value="${esc(r.room)}">${esc(r.room)}${r.status === 'จอง' && r.bookName ? ' · จอง: ' + esc(r.bookName) : tenantOf(r.room) ? ' · ' + esc(tenantOf(r.room).name) : ' · ' + esc(r.status)}</option>`).join('')}</select></label></div>`}
+    <label class="f">หัวบิล (ไม่บังคับ)<input id="nbTitle" value="${esc(NB.title || '')}" oninput="NB.title=this.value" placeholder="เช่น ค่าซ่อมแอร์ห้อง 305 · ค่ามัดจำที่จอดรถ"></label>
     <div class="muted small" style="margin-bottom:4px">รายการที่ใช้บ่อย (แตะเพื่อเพิ่ม)</div>
     <div>${quick.map(([l, a]) => `<span class="chip" onclick="nbAdd(${q(l)},${a})">${l}</span>`).join('')}</div>
     <div class="card"><h4>รายการ</h4><div id="nbItems"></div><button class="btn blk" style="border-style:dashed;color:var(--o)" onclick="nbAdd('',0)">+ เพิ่มรายการ</button></div>
     <div class="g2"><label class="f">ครบกำหนดชำระ<input type="date" value="${NB.due}" onchange="NB.due=this.value"></label><label class="f">หมายเหตุ<input value="${esc(NB.note)}" oninput="NB.note=this.value"></label></div>
     <div class="card row"><b>รวม</b><span class="sp"></span><b style="font-size:22px" id="nbTotal">0 บาท</b></div>
-    <button class="btn pri blk lg" onclick="nbSave()">${NB.id ? 'บันทึกการแก้ไข' : 'ส่งบิลให้ผู้เช่า'}</button>
+    <button class="btn pri blk lg" id="nbGo" onclick="nbSave()">${NB.id ? 'บันทึกการแก้ไข' : NB.free ? 'ออกบิล' : 'ส่งบิลให้ผู้เช่า'}</button>
     ${NB.id ? `<button class="btn bad blk" style="margin-top:8px" onclick="delBill(${q(NB.id)})">ลบบิลนี้</button>` : ''}`, after: nbDraw };
 }
 function nbDraw() {
@@ -477,12 +481,21 @@ function nbDraw() {
 }
 function nbTotal() { $('#nbTotal').textContent = money(NB.items.reduce((a, i) => a + (+i.a || 0), 0)) + ' บาท'; }
 function nbAdd(l, a) { NB.items.push({ l, a, c: 1 }); nbDraw(); const ins = document.querySelectorAll('#nbItems input'); (a ? ins[ins.length - 2] : ins[ins.length - 1]).focus(); }
+function nbMode(f) { NB.free = !!f; $('#nbT').style.display = f ? 'none' : ''; $('#nbF').style.display = f ? '' : 'none'; $('#nbM1').classList.toggle('on', !f); $('#nbM2').classList.toggle('on', !!f); $('#nbGo').textContent = f ? 'ออกบิล' : 'ส่งบิลให้ผู้เช่า'; }
+function nbPickRoom(no) { NB.froom = no; const r = D.rooms.find(x => x.room === no) || {}, t = tenantOf(no);
+  const nm = r.status === 'จอง' ? r.bookName : t ? t.name : '', ph = r.status === 'จอง' ? r.bookPhone : t ? t.phone : '';
+  if (nm && !$('#nbName').value) { $('#nbName').value = nm; NB.name = nm; } if (ph && !$('#nbPhone').value) { $('#nbPhone').value = ph; NB.phone = ph; } }
 async function nbSave() {
   const items = NB.items.filter(i => String(i.l).trim() && (+i.a || i.k));
   if (!items.length) return uiAlert('กรุณาใส่รายการและจำนวนเงิน');
-  if (NB.id) { await act('updateBill', { id: NB.id, items, dueDate: NB.due, note: NB.note }, 'บันทึกบิลแล้ว'); history.back(); return; }
+  if (NB.id) { await act('updateBill', { id: NB.id, items, dueDate: NB.due, note: NB.note, title: NB.title || '' }, 'บันทึกบิลแล้ว'); history.back(); return; }
+  if (NB.free) {
+    if (!String(NB.name || '').trim()) return uiAlert('กรุณาใส่ชื่อผู้ชำระ');
+    const j = await act('createBill', { free: true, name: NB.name, phone: NB.phone || '', room: NB.froom || '', title: NB.title || '', items, dueDate: NB.due, note: NB.note });
+    go('bills'); billDone(j.billId, 'ออกบิลแล้ว', 'ส่งลิงก์บิลให้ผู้ชำระทาง LINE หรือพิมพ์ใบแจ้งหนี้ A4 ได้เลย'); return;
+  }
   if (!NB.room) return uiAlert('กรุณาเลือกห้อง');
-  const j = await act('createBill', { room: NB.room, items, dueDate: NB.due, note: NB.note });
+  const j = await act('createBill', { room: NB.room, items, dueDate: NB.due, note: NB.note, title: NB.title || '' });
   go('bills'); billDone(j.billId, 'ส่งบิลแล้ว', 'ผู้เช่าเห็นบิลในแอปแล้ว');
 }
 async function delBill(id) { if (!await uiConfirm('ลบบิลนี้?')) return; await act('deleteBill', { id }, 'ลบบิลแล้ว'); closeSheet(); go('bills'); }
@@ -515,7 +528,7 @@ function newBillMenu() {
 function billSheet(id) {
   const b = billById(id); if (!b) return;
   const slip = b.slipId && D.slips.find(s => s.id === b.slipId);
-  openSheet(`<h3>${esc(billTitle(b))}</h3><div class="muted small">ห้อง ${esc(b.room)} · ${esc(b.tenantName)} · ${esc(b.no)}</div>
+  openSheet(`<h3>${esc(billTitle(b))}</h3><div class="muted small">${b.room ? 'ห้อง ' + esc(b.room) + ' · ' : ''}${esc(b.tenantName)}${b.payPhone ? ' · ' + esc(b.payPhone) : ''} · ${esc(b.no)}${!b.tenantId ? ' · <span class="pl">บิลนอก</span>' : ''}</div>
     <div class="row" style="margin:8px 0">${statusBadge(b)}<span class="muted small">ครบกำหนด ${fmtDate(b.dueDate)}</span></div>
     <div class="card" style="position:relative">${b.status === 'ชำระแล้ว' ? '<span class="stamp">ชำระแล้ว</span>' : ''}
       ${b.items.map(i => `<div class="line"><span>${esc(i.l)}</span><span>${money(i.a)}</span></div>`).join('')}
@@ -525,6 +538,7 @@ function billSheet(id) {
       ${b.note ? `<div class="muted small">หมายเหตุ: ${esc(b.note)}</div>` : ''}</div>
     ${slip ? `<button class="btn blk" style="margin-bottom:8px" onclick="viewFile(${q(slip.fileId)})">ดูสลิป (${fmtDateTime(slip.at)})</button>` : ''}
     <div class="row" style="margin-bottom:8px"><a class="btn" style="flex:1" target="_blank" href="${billUrl(b)}">${b.status === 'ชำระแล้ว' ? 'ใบเสร็จ' : 'ดูบิล'} / พิมพ์</a><button class="btn" style="flex:1" onclick="shareBill(${q(b.id)})">ส่ง LINE</button></div>
+    <button class="btn blk" style="margin-bottom:8px" onclick="billA4(${q(b.id)})">🖨 ${b.status === 'ชำระแล้ว' ? 'ใบเสร็จรับเงิน' : 'ใบแจ้งหนี้'} A4 / PDF</button>
     ${b.status === 'รออนุมัติ' ? `<button class="btn pri blk" onclick="go('approve/${b.id}')">ตรวจสลิป</button>` : ''}
     ${b.status === 'รอชำระ' ? `<div class="row"><button class="btn" style="flex:1" onclick="go('editbill/${b.id}')">แก้ไข</button><button class="btn ok" style="flex:2" onclick="paySheet(${q(b.id)})">💵 บันทึกรับเงิน</button></div>` : ''}
     ${b.status === 'ชำระแล้ว' ? `<button class="btn bad blk" onclick="unpay(${q(b.id)})">ยกเลิกการรับเงิน</button>` : ''}`);
@@ -532,9 +546,9 @@ function billSheet(id) {
 function shareBill(id, w) {
   const b = billById(id), paid = b.status === 'ชำระแล้ว';
   (w ? t => lineTo(w, t) : openLine)(paid ? `ใบเสร็จรับเงิน ${S().apartmentName}\nห้อง ${b.room} · ${billTitle(b)}\nยอด ${money(b.total)} บาท · ${b.payMethod}\nเลขที่ ${b.receiptNo}\n${FL().billLink ? 'ดูใบเสร็จ: ' + billUrl(b) : 'ขอบคุณครับ'}`
-    : `${billTitle(b)} · ${S().apartmentName}\nห้อง ${b.room} คุณ${b.tenantName}\n` + b.items.map(i => `${i.l} ${money(i.a)}`).join('\n') + `\nรวม ${money(b.total)} บาท\nครบกำหนด ${fmtDate(b.dueDate)}` +
+    : `${billTitle(b)} · ${S().apartmentName}\n${b.room ? 'ห้อง ' + b.room + ' ' : ''}คุณ${b.tenantName}\n` + b.items.map(i => `${i.l} ${money(i.a)}`).join('\n') + `\nรวม ${money(b.total)} บาท\nครบกำหนด ${fmtDate(b.dueDate)}` +
       (FL().billLink ? `\nดูบิล/สแกนจ่าย: ${billUrl(b)}` : (S().promptpay ? `\nพร้อมเพย์: ${S().promptpay}` : '') + (S().bankInfo ? `\n${S().bankInfo}` : '')) +
-      (FL().app ? `\nหรือเข้าแอปผู้เช่า: ${tenantUrl(b.room)}` : '\nโอนแล้วส่งสลิปในแชทนี้ได้เลยครับ'));
+      (FL().app && b.tenantId ? `\nหรือเข้าแอปผู้เช่า: ${tenantUrl(b.room)}` : '\nโอนแล้วส่งสลิปในแชทนี้ได้เลยครับ'));
 }
 function nudge(id) {
   const b = billById(id);
@@ -706,6 +720,7 @@ VIEWS.more = () => ({
   html: `<div class="card" style="padding:2px 14px"><div class="item tap" onclick="go('profile')"><span style="font-size:20px">🏢</span><span style="flex:1">ข้อมูลหอ<div class="muted small">${esc(S().apartmentName)} · ${esc(S().phone || 'ยังไม่ใส่เบอร์')}</div></span><span class="muted">›</span></div>
     <div class="item tap" onclick="go('settings/tenant')"><span style="font-size:20px">👥</span><span style="flex:1">การใช้งานร่วมกับผู้เช่า<div class="muted small">${OWN() ? '🔑 เจ้าของจัดการเอง' : '👥 ใช้ร่วมกับผู้เช่า'}</div></span><span class="muted">›</span></div>
     <div class="item tap" onclick="go('deposits')"><span style="font-size:20px">💰</span><span style="flex:1">เงินประกัน<div class="muted small">ห้องที่ถือเงินประกัน · รอคืนเงิน ${D.tenants.filter(t => t.refundStatus === 'รอคืนเงิน').length} คน</div></span><span class="muted">›</span></div>
+    <div class="item tap" onclick="go('roomfix')"><span style="font-size:20px">🛠</span><span style="flex:1">กู้ข้อมูลห้อง<div class="muted small">ซ่อมหนัก · อุปกรณ์ในห้อง · ทำความสะอาด ที่หายหลังอัปเดต 5.3–5.5</div></span><span class="muted">›</span></div>
     <div class="item tap" onclick="go('viewings')"><span style="font-size:20px">📅</span><span style="flex:1">นัดดูห้อง<div class="muted small">ลูกค้าที่ขอนัดดูห้องจาก LINE OA · ยืนยัน/ยกเลิกนัด</div></span>${(D.viewings || []).filter(v => v.status === 'ใหม่').length ? `<span class="pl warn">${(D.viewings || []).filter(v => v.status === 'ใหม่').length}</span>` : ''}<span class="muted">›</span></div>
     <div class="item tap" onclick="go('clean')"><span style="font-size:20px">🧹</span><span style="flex:1">ทำความสะอาด<div class="muted small">ห้องที่รอทำความสะอาด · ส่งรายการให้แม่บ้าน</div></span><span class="muted">›</span></div>
     <div class="item tap" onclick="go('find')"><span style="font-size:20px">🔎</span><span style="flex:1">ค้นหา / อุปกรณ์ห้อง<div class="muted small">ห้องไหนขาดเตียง ตู้ · ค้นทุกข้อมูลที่บันทึกไว้</div></span><span class="muted">›</span></div>
@@ -837,7 +852,7 @@ async function delNews(id) { if (!await uiConfirm('ลบประกาศน�
 <script>
 /* ===================== v3 · หน้าจอคอม/Mac + โหมดเจ้าของจัดการเอง ===================== */
 window.matchMedia('(min-width:1024px)').addEventListener('change', () => { if (D) { closeSheet(); render(); } });
-const APP_FRONT = '5.3';
+const APP_FRONT = '5.6';
 const M = Object.assign({}, VIEWS); // หน้ามือถือเดิม
 const _render0 = render;
 render = function () {
@@ -2145,7 +2160,8 @@ async function leaseSheet(kind, id, keep) {
   const sgl = (w, l) => `<div class="line"><span>${l}</span><span>${sg[w] ? `<span class="pl ok">✅ เซ็นแล้ว</span> <span class="muted small">${esc(dShort(sg[w].at, 'th'))}</span>` : '<span class="pl">ยังไม่เซ็น</span>'}</span></div>`;
   openSheet(`<div class="row" style="margin-bottom:6px"><h3 style="margin:0;flex:1">${C ? '📄 สัญญาเช่า' : '🧾 ใบรับเงินจอง'} · ห้อง ${esc(d.room.room)}</h3><span class="pl ${st[1]}" style="margin-right:30px">${st[0]}</span></div>
     <div class="muted small" style="margin-bottom:10px">${esc(d.no || '')} · ${esc(nm || '')}</div>
-    ${C ? `<div class="g2" style="${DESK() ? '' : 'grid-template-columns:1fr'}"><label class="f">เลขบัตรประชาชน / พาสปอร์ต<input id="dsId" value="${esc(d.t.idCard || '')}" placeholder="ใส่ทีหลังได้ (เว้นว่างไว้เขียนมือ)"></label><label class="f">ที่อยู่ตามบัตร<input id="dsAd" value="${esc(d.t.idAddress || '')}"></label></div>` : ''}
+    ${C ? `<div class="g2" style="${DESK() ? '' : 'grid-template-columns:1fr'}"><label class="f">เลขบัตรประชาชน / พาสปอร์ต<input id="dsId" value="${esc(d.t.idCard || '')}" placeholder="เว้นว่าง = เขียนมือ / ผู้เช่ากรอกเองตอนเซ็น"></label><label class="f">ที่อยู่ตามบัตร<input id="dsAd" value="${esc(d.t.idAddress || '')}"></label></div>`
+      : `<label class="f">เลขบัตรประชาชน / พาสปอร์ต ผู้จอง<input id="dsId" value="${esc(d.bk.idCard || '')}" placeholder="เว้นว่าง = เขียนมือ / ผู้จองกรอกเองตอนเซ็น"></label>`}
     <label class="f">ชื่อ${C ? 'ผู้ให้เช่า' : 'ผู้รับเงิน'} (ใช้กับทุกเอกสาร)<input id="dsLl" value="${esc(S().landlordName || '')}" placeholder="${esc(S().apartmentName)}"></label>
     <div class="fl">ภาษาเอกสาร</div><div class="segb" style="margin:4px 0 10px"><button class="${d.lang !== 'en' ? 'on' : ''}" onclick="docSet({lang:'th'})">🇹🇭 ไทย</button><button class="${d.lang === 'en' ? 'on' : ''}" onclick="docSet({lang:'en'})">🇬🇧 English</button></div>
     <div class="fl">วิธีเซ็น</div><div class="segb" style="margin:4px 0 10px"><button class="${mode === 'e' ? 'on' : ''}" onclick="docSet({mode:'e'})">✍️ เซ็นในระบบ</button><button class="${mode === 'paper' ? 'on' : ''}" onclick="docSet({mode:'paper'})">🖨 เซ็นบนกระดาษ</button></div>
@@ -2156,11 +2172,12 @@ async function leaseSheet(kind, id, keep) {
     : `<button class="btn pri blk" onclick="docView(true)">🖨 พิมพ์${C ? 'สัญญา (2 ชุด)' : 'ใบจอง'}</button>
       <button class="btn ${/^paper/.test(d.signed) ? '' : 'ok'} blk" style="margin-top:8px" onclick="docSet({paperDone:${/^paper/.test(d.signed) ? 'false' : 'true'}})">${/^paper/.test(d.signed) ? '↺ ยังไม่ได้เซ็น' : '✓ เซ็นบนกระดาษครบแล้ว'}</button>
       <div class="muted small" style="margin-top:8px">💡 ถ่ายรูปเอกสารที่เซ็นแล้ว แนบเก็บไว้ในส่วน “เอกสาร” ของห้องนี้ได้</div>`}
-    <div class="row" style="margin-top:12px;flex-wrap:wrap;gap:8px"><button class="btn" onclick="docView()">👁 ดูเอกสาร</button>${C ? `<button class="btn" onclick="docTermsSheet('contract')">✏️ แก้ข้อความสัญญา</button>` : `<button class="btn" onclick="docTermsSheet('book')">✏️ แก้เงื่อนไขใบจอง</button>`}<span class="sp"></span>${sg.tenant || sg.owner ? `<button class="btn" style="color:var(--bad)" onclick="docResetAsk()">↺ เริ่มเซ็นใหม่</button>` : ''}</div>`);
+    <div class="row" style="margin-top:12px;flex-wrap:wrap;gap:8px"><button class="btn" onclick="docView()">👁 ดูเอกสาร</button>${C ? `<button class="btn" onclick="docEditOpen()">✏️ แก้ไขสัญญาฉบับนี้${d.custom ? ' <span class="pl o">แก้แล้ว</span>' : ''}</button><button class="btn" onclick="docTermsSheet('contract')">📝 แบบฟอร์มสัญญากลาง</button>` : `<button class="btn" onclick="docTermsSheet('book')">✏️ แก้เงื่อนไขใบจอง</button>`}<span class="sp"></span>${sg.tenant || sg.owner ? `<button class="btn" style="color:var(--bad)" onclick="docResetAsk()">↺ เริ่มเซ็นใหม่</button>` : ''}</div>`);
 }
 async function docSaveFields() {
   const ll = $('#dsLl'); if (ll && ll.value.trim() !== (S().landlordName || '')) { await api('saveSettings', { settings: { landlordName: ll.value.trim() } }, true); await docLoad(DS.kind, DS.id); }
-  if (DS.kind !== 'contract' || !$('#dsId')) return;
+  if (!$('#dsId')) return;
+  if (DS.kind === 'book') { const v = $('#dsId').value.trim(); if (v !== (DS.d.bk.idCard || '')) { await api('docInfo', { kind: DS.kind, id: DS.id, idCard: v }, true); DS.d.bk.idCard = v; } return; }
   const idCard = $('#dsId').value.trim(), idAddress = $('#dsAd').value.trim();
   if (idCard !== (DS.d.t.idCard || '') || idAddress !== (DS.d.t.idAddress || '')) { await api('docInfo', { kind: DS.kind, id: DS.id, idCard, idAddress }, true); DS.d.t.idCard = idCard; DS.d.t.idAddress = idAddress; }
 }
@@ -2172,7 +2189,7 @@ async function docSet(p) {
 async function docView(print) {
   await docSaveFields(); const d = await docLoad(DS.kind, DS.id);
   if (d.mode === 'paper' || print) d.mode = 'paper';
-  closeSheet(); docShow(d, `<button class="btn sm" onclick="docClose();leaseSheet(DS.kind,DS.id,true)">← กลับ</button>`); if (print) setTimeout(docPrint, 300);
+  closeSheet(); await docShow(d, `<button class="btn sm" onclick="docClose();leaseSheet(DS.kind,DS.id,true)">← กลับ</button>`); if (print) docPrint();
 }
 async function docHere() {
   await docSaveFields(); const d = await docLoad(DS.kind, DS.id), C = DS.kind === 'contract';
@@ -2225,6 +2242,42 @@ function docTermsSheet(kind) {
     <div class="row" style="margin-top:8px"><button class="btn" onclick="$('#dtT').value='';toast('ล้างแล้ว · บันทึกเพื่อกลับไปใช้แบบมาตรฐาน')">↺ ใช้แบบมาตรฐาน</button><span class="sp"></span><button class="btn" onclick="leaseSheet(DS.kind,DS.id,true)">ยกเลิก</button><button class="btn pri" onclick="docTermsSave(${q(key)})">บันทึก</button></div>`);
 }
 async function docTermsSave(key) { await act('saveSettings', { settings: { [key]: $('#dtT').value.trim() } }, 'บันทึกข้อความแล้ว'); await docLoad(DS.kind, DS.id); leaseSheet(DS.kind, DS.id, true); }
+
+/* ---------- ใบแจ้งหนี้ / ใบเสร็จ A4 + แก้ไขสัญญาอิสระ ---------- */
+function billA4(id) {
+  const b = billById(id), s = S(); if (!b) return; closeSheet();
+  docShow({ kind: 'invoice', lang: 'th', no: b.status === 'ชำระแล้ว' && b.receiptNo ? b.receiptNo : b.no, bill: b, link: FL().billLink ? billUrl(b) : '',
+    b: { name: s.buildingName || s.apartmentName, address: s.address, tel: s.lineTel1 || s.phone, landlord: s.landlordName || s.apartmentName }, pay: { promptpay: s.promptpay, bank: s.bankInfo, cash: s.cashInfo } });
+  const t = $('#docOv .dovbar b'); if (t) t.textContent = (b.status === 'ชำระแล้ว' ? 'ใบเสร็จรับเงิน ' : 'ใบแจ้งหนี้ ') + (b.status === 'ชำระแล้ว' && b.receiptNo ? b.receiptNo : b.no) + (b.room ? ' · ห้อง ' + b.room : '');
+}
+async function docEditOpen() {
+  await docSaveFields(); const d = await docLoad(DS.kind, DS.id), sg = d.signs || {};
+  if ((sg.tenant || sg.owner) && !(await uiConfirm('สัญญานี้มีลายเซ็นแล้ว ถ้าแก้ไข ลายเซ็นเดิมจะถูกล้าง และต้องเซ็นใหม่ ต้องการแก้ไขต่อ?'))) return leaseSheet(DS.kind, DS.id, true);
+  closeSheet();
+  docEditor(d, async html => {
+    await act('docEdit', { id: DS.id, html }, html ? 'บันทึกสัญญาฉบับนี้แล้ว' : 'กลับไปใช้สัญญาแบบอัตโนมัติแล้ว');
+    docClose(); await docLoad(DS.kind, DS.id); render(); leaseSheet(DS.kind, DS.id, true);
+  });
+}
+
+/* ---------- กู้ข้อมูลห้อง (ซ่อม / ซ่อมหนัก / อุปกรณ์ห้อง / ทำความสะอาด) จากประวัติเวอร์ชันของ Google Sheets ---------- */
+VIEWS.roomfix = () => ({ title: 'กู้ข้อมูลห้อง', sub: 'ซ่อม · ซ่อมหนัก · อุปกรณ์ในห้อง · ทำความสะอาด', back: DESK() ? '' : 'more', nav: 'more',
+  html: `<div class="card"><h4 style="margin-top:0">ทำไมต้องกู้</h4><div style="font-size:14.5px;line-height:1.6">เวอร์ชัน 5.3–5.5 แทรกคอลัมน์ใหม่กลางชีต Rooms ทำให้ระบบอ่านรายละเอียดซ่อม ซ่อมหนัก อุปกรณ์ในห้อง และทำความสะอาดผิดช่อง<br>เวอร์ชันนี้จัดคอลัมน์กลับให้อัตโนมัติแล้ว (สำรองชีตเดิมไว้เป็นแท็บ <b>Rooms_backup_…</b>) · แต่ห้องที่ถูกบันทึกซ้ำระหว่างนั้น ข้อมูลบางช่องอาจถูกล้าง ให้กู้จากประวัติเวอร์ชันตามขั้นตอนนี้</div></div>
+    <div class="card"><h4 style="margin-top:0">ขั้นตอน (ทำครั้งเดียว)</h4><ol style="margin:0;padding-left:20px;font-size:14.5px;line-height:1.7">
+      <li>เปิด Google Sheet ของระบบ → เมนู <b>ไฟล์ › ประวัติเวอร์ชัน › ดูประวัติเวอร์ชัน</b></li>
+      <li>เลือกเวอร์ชัน <b>ก่อนอัปเดต v5.3</b> (ก่อนวันที่ 13 พ.ย. ช่วงเย็น)</li>
+      <li>กด ⋮ ที่เวอร์ชันนั้น → <b>ทำสำเนา</b> → ได้ไฟล์ใหม่ เปิดไฟล์นั้นแล้วคัดลอกลิงก์จากแถบที่อยู่</li>
+      <li>วางลิงก์ด้านล่าง → กด “ตรวจก่อน” แล้ว “กู้ข้อมูล”</li></ol>
+      <label class="f" style="margin-top:10px">ลิงก์ไฟล์สำเนา<input id="rfUrl" placeholder="https://docs.google.com/spreadsheets/d/…"></label>
+      <div class="row"><button class="btn" style="flex:1" onclick="roomFix(true)">🔍 ตรวจก่อน</button><button class="btn pri" style="flex:1" onclick="roomFix(false)">🛠 กู้ข้อมูล</button></div>
+      <div class="muted small" style="margin-top:8px">ระบบเติมเฉพาะช่องที่ว่างอยู่ตอนนี้ ข้อมูลที่คุณแก้ใหม่หลังอัปเดตจะไม่ถูกทับ · ห้องที่ไม่ได้อยู่ในสถานะซ่อมแล้ว จะไม่คืนข้อมูลซ่อม</div>
+      <div id="rfOut" style="margin-top:10px"></div></div>` });
+async function roomFix(dry) {
+  const url = $('#rfUrl').value.trim(); if (!url) return uiAlert('กรุณาวางลิงก์ไฟล์สำเนา');
+  const j = await act('repairRoomsFrom', { url, dry }); const r = j || {};
+  $('#rfOut').innerHTML = `<div class="card" style="background:${r.filled ? 'var(--ok-soft)' : 'var(--warn-soft)'};border:0"><b>${dry ? 'ตรวจแล้ว: จะกู้' : '✅ กู้แล้ว'} ${r.filled || 0} ช่อง ใน ${(r.rooms || []).length} ห้อง</b>${(r.rooms || []).map(x => `<div class="small" style="margin-top:4px">• ห้อง ${esc(x)}</div>`).join('') || '<div class="small">ไม่พบช่องที่ต้องกู้ (ข้อมูลครบแล้ว)</div>'}</div>`;
+  if (!dry) render();
+}
 </script>
 </body>
 </html>
