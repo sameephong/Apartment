@@ -12,11 +12,11 @@
 <link rel="preconnect" href="https://script.google.com"><link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=5.6">
+<link rel="stylesheet" href="app.css?v=5.7">
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>document.write('<script src="config.js?t=' + Date.now() + '"><\/script>')</script>
-<script src="common.js?v=5.6"></script>
-<script src="docs.js?v=5.6"></script>
+<script src="common.js?v=5.7"></script>
+<script src="docs.js?v=5.7"></script>
 </head>
 <body class="admin">
 <div class="wrap">
@@ -852,7 +852,7 @@ async function delNews(id) { if (!await uiConfirm('ลบประกาศน�
 <script>
 /* ===================== v3 · หน้าจอคอม/Mac + โหมดเจ้าของจัดการเอง ===================== */
 window.matchMedia('(min-width:1024px)').addEventListener('change', () => { if (D) { closeSheet(); render(); } });
-const APP_FRONT = '5.6';
+const APP_FRONT = '5.7';
 const M = Object.assign({}, VIEWS); // หน้ามือถือเดิม
 const _render0 = render;
 render = function () {
@@ -2162,6 +2162,11 @@ async function leaseSheet(kind, id, keep) {
     <div class="muted small" style="margin-bottom:10px">${esc(d.no || '')} · ${esc(nm || '')}</div>
     ${C ? `<div class="g2" style="${DESK() ? '' : 'grid-template-columns:1fr'}"><label class="f">เลขบัตรประชาชน / พาสปอร์ต<input id="dsId" value="${esc(d.t.idCard || '')}" placeholder="เว้นว่าง = เขียนมือ / ผู้เช่ากรอกเองตอนเซ็น"></label><label class="f">ที่อยู่ตามบัตร<input id="dsAd" value="${esc(d.t.idAddress || '')}"></label></div>`
       : `<label class="f">เลขบัตรประชาชน / พาสปอร์ต ผู้จอง<input id="dsId" value="${esc(d.bk.idCard || '')}" placeholder="เว้นว่าง = เขียนมือ / ผู้จองกรอกเองตอนเซ็น"></label>`}
+    <div class="fl">📅 วันที่ในเอกสาร${d.custom ? ' <span class="muted small">(สัญญาฉบับนี้แก้ข้อความเองแล้ว วันที่ในเนื้อหาให้แก้ในหน้า ✏️ แก้ไขสัญญา)</span>' : ''}</div>
+    <div class="g2" style="margin-top:4px;${DESK() ? 'grid-template-columns:repeat(3,1fr)' : ''}">${C
+      ? `<label class="f">วันที่ทำสัญญา<input type="date" id="dsDd" value="${esc(d.date || '')}"></label><label class="f">เริ่มสัญญา<input type="date" id="dsSd" value="${esc(d.t.start || '')}"></label><label class="f">สิ้นสุดสัญญา<input type="date" id="dsEd" value="${esc(d.t.end || '')}"></label>`
+      : `<label class="f">วันที่รับเงินจอง<input type="date" id="dsDd" value="${esc(d.date || '')}"></label><label class="f">วันเข้าอยู่<input type="date" id="dsBd" value="${esc(String(d.bk.at || '').slice(0, 10))}"></label><label class="f">เวลาเข้าอยู่<input type="time" id="dsBt" value="${esc(String(d.bk.at || '').slice(11, 16))}"></label>`}</div>
+    <div class="row" style="justify-content:flex-end;margin:-4px 0 8px"><button class="btn sm" onclick="docDatesSave()">💾 บันทึกวันที่</button></div>
     <label class="f">ชื่อ${C ? 'ผู้ให้เช่า' : 'ผู้รับเงิน'} (ใช้กับทุกเอกสาร)<input id="dsLl" value="${esc(S().landlordName || '')}" placeholder="${esc(S().apartmentName)}"></label>
     <div class="fl">ภาษาเอกสาร</div><div class="segb" style="margin:4px 0 10px"><button class="${d.lang !== 'en' ? 'on' : ''}" onclick="docSet({lang:'th'})">🇹🇭 ไทย</button><button class="${d.lang === 'en' ? 'on' : ''}" onclick="docSet({lang:'en'})">🇬🇧 English</button></div>
     <div class="fl">วิธีเซ็น</div><div class="segb" style="margin:4px 0 10px"><button class="${mode === 'e' ? 'on' : ''}" onclick="docSet({mode:'e'})">✍️ เซ็นในระบบ</button><button class="${mode === 'paper' ? 'on' : ''}" onclick="docSet({mode:'paper'})">🖨 เซ็นบนกระดาษ</button></div>
@@ -2174,7 +2179,25 @@ async function leaseSheet(kind, id, keep) {
       <div class="muted small" style="margin-top:8px">💡 ถ่ายรูปเอกสารที่เซ็นแล้ว แนบเก็บไว้ในส่วน “เอกสาร” ของห้องนี้ได้</div>`}
     <div class="row" style="margin-top:12px;flex-wrap:wrap;gap:8px"><button class="btn" onclick="docView()">👁 ดูเอกสาร</button>${C ? `<button class="btn" onclick="docEditOpen()">✏️ แก้ไขสัญญาฉบับนี้${d.custom ? ' <span class="pl o">แก้แล้ว</span>' : ''}</button><button class="btn" onclick="docTermsSheet('contract')">📝 แบบฟอร์มสัญญากลาง</button>` : `<button class="btn" onclick="docTermsSheet('book')">✏️ แก้เงื่อนไขใบจอง</button>`}<span class="sp"></span>${sg.tenant || sg.owner ? `<button class="btn" style="color:var(--bad)" onclick="docResetAsk()">↺ เริ่มเซ็นใหม่</button>` : ''}</div>`);
 }
+async function docSaveDates() { // คืน true ถ้ามีการเปลี่ยน
+  const dd = $('#dsDd'); if (!dd) return false;
+  const C = DS.kind === 'contract', p = {};
+  if (dd.value && dd.value !== (DS.d.date || '')) p.docDate = dd.value;
+  if (C) { const sd = $('#dsSd').value, ed = $('#dsEd').value; if (sd && sd !== (DS.d.t.start || '')) p.startDate = sd; if (ed !== (DS.d.t.end || '')) p.endDate = ed; }
+  else { const bd = $('#dsBd').value, bt = $('#dsBt').value, at = bd ? bd + (bt ? ' ' + bt : '') : ''; if (at && at !== String(DS.d.bk.at || '').slice(0, 16)) p.bookAt = at; }
+  if (!Object.keys(p).length) return false;
+  const sg = DS.d.signs || {};
+  if ((sg.tenant || sg.owner) && DS.d.mode !== 'paper') {
+    if (!(await uiConfirm('เอกสารนี้เซ็นแล้ว ถ้าเปลี่ยนวันที่ ลายเซ็นเดิมจะถูกล้าง และต้องเซ็นใหม่ ต้องการเปลี่ยนต่อ?'))) { dd.value = DS.d.date || ''; throw new Error('ยกเลิกการเปลี่ยนวันที่'); }
+    await api('docReset', { kind: DS.kind, id: DS.id }, true);
+  }
+  await api('docInfo', Object.assign({ kind: DS.kind, id: DS.id }, p), true); await docLoad(DS.kind, DS.id); return true;
+}
+async function docDatesSave() {
+  try { const ch = await docSaveDates(); render(); leaseSheet(DS.kind, DS.id, true); toast(ch ? 'บันทึกวันที่แล้ว' : 'วันที่ไม่ได้เปลี่ยน'); } catch (e) { if (!/ยกเลิก/.test(e.message)) uiAlert(e.message); leaseSheet(DS.kind, DS.id, true); }
+}
 async function docSaveFields() {
+  await docSaveDates();
   const ll = $('#dsLl'); if (ll && ll.value.trim() !== (S().landlordName || '')) { await api('saveSettings', { settings: { landlordName: ll.value.trim() } }, true); await docLoad(DS.kind, DS.id); }
   if (!$('#dsId')) return;
   if (DS.kind === 'book') { const v = $('#dsId').value.trim(); if (v !== (DS.d.bk.idCard || '')) { await api('docInfo', { kind: DS.kind, id: DS.id, idCard: v }, true); DS.d.bk.idCard = v; } return; }
