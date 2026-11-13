@@ -12,11 +12,11 @@
 <link rel="preconnect" href="https://script.google.com"><link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=5.7">
+<link rel="stylesheet" href="app.css?v=5.9">
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>document.write('<script src="config.js?t=' + Date.now() + '"><\/script>')</script>
-<script src="common.js?v=5.7"></script>
-<script src="docs.js?v=5.7"></script>
+<script src="common.js?v=5.9"></script>
+<script src="docs.js?v=5.9"></script>
 </head>
 <body class="admin">
 <div class="wrap">
@@ -852,7 +852,7 @@ async function delNews(id) { if (!await uiConfirm('ลบประกาศน�
 <script>
 /* ===================== v3 · หน้าจอคอม/Mac + โหมดเจ้าของจัดการเอง ===================== */
 window.matchMedia('(min-width:1024px)').addEventListener('change', () => { if (D) { closeSheet(); render(); } });
-const APP_FRONT = '5.7';
+const APP_FRONT = '5.8';
 const M = Object.assign({}, VIEWS); // หน้ามือถือเดิม
 const _render0 = render;
 render = function () {
@@ -1520,7 +1520,7 @@ function refundSheet(id) {
 }
 
 /* ---------- เอกสาร / รูปของห้อง: สัญญาเช่า บัตร รูปห้องตอนเข้า-ออก ---------- */
-const DOCCAT = [['สัญญาเช่า', '📄'], ['เอกสารผู้เช่า', '🪪'], ['รูปห้องตอนเข้า', '📷'], ['รูปห้องตอนออก', '📸'], ['อื่นๆ', '📎']];
+const DOCCAT = [['สัญญาเช่า', '📄'], ['เอกสารผู้เช่า', '🪪'], ['รูปห้องตอนเข้า', '📷'], ['รูปห้องตอนออก', '📸'], ['การจอง', '🧾'], ['อื่นๆ', '📎']];
 const docCatIcon = c => (DOCCAT.find(x => x[0] === c) || ['', '📎'])[1];
 const fmtSize = n => +n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round((+n || 0) / 1024)) + ' KB';
 function docsHtml(no) {
@@ -1554,11 +1554,13 @@ let DC = null;
 function docSheet(room, cat, tenantId) {
   const t = tenantId ? tenantById(tenantId) : tenantOf(room);
   DC = { room, tenantId: t ? t.id : '', files: [] };
-  openSheet(`<h3>📎 แนบไฟล์ · ห้อง ${esc(room)}</h3><div class="muted small">${t ? 'ผู้เช่า: ' + esc(t.name) : 'ห้องว่าง · เก็บเป็นไฟล์ของห้อง'}</div>
-    <div class="fl" style="margin-top:12px">ประเภท</div><div class="segb" id="dcCat">${DOCCAT.map(([c, i]) => `<button class="${c === (cat || 'สัญญาเช่า') ? 'on' : ''}" data-v="${c}" onclick="segPick(this)">${i} ${c}</button>`).join('')}</div>
+  const rr = D.rooms.find(x => x.room === room) || {}, bk = rr.status === 'จอง' && !t;
+  if (cat === 'การจอง' && !bk) cat = '';
+  openSheet(`<h3>📎 แนบไฟล์ · ห้อง ${esc(room)}</h3><div class="muted small">${t ? 'ผู้เช่า: ' + esc(t.name) : bk ? 'ผู้จอง: ' + esc(rr.bookName || '') + ' · เลือก “การจอง” เพื่อแนบกับใบจอง' : 'ห้องว่าง · เก็บเป็นไฟล์ของห้อง'}</div>
+    <div class="fl" style="margin-top:12px">ประเภท</div><div class="segb" id="dcCat">${DOCCAT.filter(([c]) => c !== 'การจอง' || bk).map(([c, i]) => `<button class="${c === (cat || 'สัญญาเช่า') ? 'on' : ''}" data-v="${c}" onclick="segPick(this)">${i} ${c}</button>`).join('')}</div>
     <label class="paydrop" id="dcDrop"><input type="file" multiple accept="image/*,application/pdf" style="display:none" onchange="dcPick(this.files);this.value=''"><span style="font-size:28px">📎</span><div style="flex:1"><b>เลือกไฟล์ / ถ่ายรูป</b><div class="muted small">รูปภาพหรือ PDF · เลือกได้หลายไฟล์ · ลากมาวาง หรือกด Ctrl+V</div></div></label>
     <div id="dcList" style="margin:8px 0"></div>
-    <label class="f">หมายเหตุ (ไม่บังคับ)<input id="dcNote" placeholder="เช่น สัญญา 1 ปี เริ่ม 1 พ.ย. 69"></label>
+    <label class="f">หมายเหตุ (ไม่บังคับ)<input id="dcNote" placeholder="${cat === 'การจอง' ? 'เช่น สลิปโอนเงินจอง 1,000 บาท' : 'เช่น สัญญา 1 ปี เริ่ม 1 พ.ย. 69'}"></label>
     <div class="row" style="justify-content:flex-end"><button class="btn" onclick="DC=null;closeSheet()">ยกเลิก</button><button class="btn pri" id="dcBtn" onclick="dcUpload()" disabled>⬆️ อัปโหลด</button></div>`);
   const d = $('#dcDrop');
   d.ondragover = e => { e.preventDefault(); d.classList.add('over'); }; d.ondragleave = () => d.classList.remove('over');
@@ -2146,14 +2148,21 @@ function contractCard(no) {
   const st = docStat('contract', t);
   return `<div class="row" style="margin:12px 0 0;flex-wrap:nowrap;gap:8px"><span class="small" style="flex:1;min-width:0">📄 สัญญาเช่า: <span class="pl ${st[1]}">${st[0]}</span></span><button class="btn sm" onclick="leaseSheet('contract',${q(t.id)})">📄 ออก / เซ็นสัญญา</button></div>`;
 }
+function bookFiles(r) { return r.bookNo ? (D.docs || []).filter(d => d.ref === 'BK:' + r.bookNo) : []; }
+function bookFilesHtml(r) {
+  const fs = bookFiles(r);
+  return `<div class="row" style="margin-top:10px;flex-wrap:nowrap;gap:8px"><b class="small" style="flex:1">📎 สลิป / รูปการจอง (${fs.length})</b><button class="btn sm" onclick="docSheet(${q(r.room)},'การจอง')">＋ แนบสลิป / รูป</button></div>
+    ${fs.length ? `<div class="docs" style="margin-top:6px">${fs.map(d => `<div class="doc tap" onclick="viewDoc(${q(d.id)})" title="${esc(d.name)}">${/^image/.test(d.mime) ? `<img class="dthumb" data-file="${esc(d.fileId)}" alt="">` : '<div class="dthumb pdf">PDF</div>'}<div class="dn">${esc(d.note || d.name)}</div></div>`).join('')}</div>` : ''}`;
+}
 function bookDocBtn(r) {
   const st = docStat('book', r);
-  return `<div class="row" style="margin-top:8px;flex-wrap:nowrap;gap:8px"><span class="small" style="flex:1;min-width:0">🧾 ใบรับเงินจอง: <span class="pl ${st[1]}">${st[0]}</span></span><button class="btn sm pri" onclick="leaseSheet('book',${q(r.room)})">🧾 ออกใบจอง</button></div>`;
+  return bookFilesHtml(r) + `<div class="row" style="margin-top:8px;flex-wrap:nowrap;gap:8px"><span class="small" style="flex:1;min-width:0">🧾 ใบรับเงินจอง: <span class="pl ${st[1]}">${st[0]}</span></span><button class="btn sm pri" onclick="leaseSheet('book',${q(r.room)})">🧾 ออกใบจอง</button></div>`;
 }
 let DS = {};
 function docUrl(token) { return new URL(withB('sign.html?k=' + token), location.href).href; }
 async function docLoad(kind, id) { const j = await api('docData', { kind, id }); DS = { kind, id, d: j.doc }; return j.doc; }
-async function leaseSheet(kind, id, keep) {
+async function leaseSheet(kind, id, keep) { await leaseSheet0(kind, id, keep); loadDocThumbs(); }
+async function leaseSheet0(kind, id, keep) {
   if (!keep) { openSheet('<div class="empty">กำลังโหลด…</div>'); try { await docLoad(kind, id); } catch (e) { closeSheet(); return uiAlert(e.message); } }
   const d = DS.d, C = kind === 'contract', o = C ? tenantById(id) : D.rooms.find(r => r.room === id), sg = d.signs || {}, st = docStat(kind, o);
   const mode = DS.mode || d.mode || 'e', who = C ? 'ผู้เช่า' : 'ผู้จอง', nm = C ? d.t.name : d.bk.name;
@@ -2168,6 +2177,7 @@ async function leaseSheet(kind, id, keep) {
       : `<label class="f">วันที่รับเงินจอง<input type="date" id="dsDd" value="${esc(d.date || '')}"></label><label class="f">วันเข้าอยู่<input type="date" id="dsBd" value="${esc(String(d.bk.at || '').slice(0, 10))}"></label><label class="f">เวลาเข้าอยู่<input type="time" id="dsBt" value="${esc(String(d.bk.at || '').slice(11, 16))}"></label>`}</div>
     <div class="row" style="justify-content:flex-end;margin:-4px 0 8px"><button class="btn sm" onclick="docDatesSave()">💾 บันทึกวันที่</button></div>
     <label class="f">ชื่อ${C ? 'ผู้ให้เช่า' : 'ผู้รับเงิน'} (ใช้กับทุกเอกสาร)<input id="dsLl" value="${esc(S().landlordName || '')}" placeholder="${esc(S().apartmentName)}"></label>
+    ${C ? '' : `<div style="margin:-2px 0 10px">${bookFilesHtml(o)}</div>`}
     <div class="fl">ภาษาเอกสาร</div><div class="segb" style="margin:4px 0 10px"><button class="${d.lang !== 'en' ? 'on' : ''}" onclick="docSet({lang:'th'})">🇹🇭 ไทย</button><button class="${d.lang === 'en' ? 'on' : ''}" onclick="docSet({lang:'en'})">🇬🇧 English</button></div>
     <div class="fl">วิธีเซ็น</div><div class="segb" style="margin:4px 0 10px"><button class="${mode === 'e' ? 'on' : ''}" onclick="docSet({mode:'e'})">✍️ เซ็นในระบบ</button><button class="${mode === 'paper' ? 'on' : ''}" onclick="docSet({mode:'paper'})">🖨 เซ็นบนกระดาษ</button></div>
     ${mode === 'e' ? `<div class="card" style="padding:4px 12px;margin-bottom:10px">${sgl('tenant', who)}${sgl('owner', C ? 'ผู้ให้เช่า' : 'ผู้รับเงิน')}</div>

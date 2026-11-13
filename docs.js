@@ -23,8 +23,11 @@
 .dovbar .tb{background:#334155;color:#fff;border:0;border-radius:8px;padding:6px 10px;font:inherit;font-size:13.5px;cursor:pointer}.dovbar .tb:hover{background:#475569}
 .spad{position:fixed;inset:0;z-index:9999;background:#fff;display:flex;flex-direction:column;touch-action:none}
 .spad .spbar{background:#1e293b;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;gap:10px;font-size:15px}.spad .spbar em{color:#93c5fd;font-style:normal}
-.spad canvas{flex:1;width:100%;touch-action:none;cursor:crosshair}.spad .sphint{position:absolute;left:0;right:0;bottom:84px;text-align:center;color:#cbd2dc;font-size:14px;pointer-events:none}
+.spad canvas{flex:1 1 0;min-height:0;height:0;width:100%;display:block;touch-action:none;cursor:crosshair}.spad .sphint{position:absolute;left:0;right:0;bottom:84px;text-align:center;color:#cbd2dc;font-size:14px;pointer-events:none}
 .spad .spline{position:absolute;left:12%;right:12%;bottom:150px;border-bottom:2px dashed #e2e8f0;pointer-events:none}
+.spad .sprot{background:#3b82f6;color:#fff;border:0;border-radius:99px;padding:6px 12px;font:inherit;font-size:13.5px;font-weight:700;white-space:nowrap}
+@media (max-height:500px){.spad .spbar{padding:7px 14px}.spad .spbtn{padding:7px 12px}.spad .spline{bottom:96px}.spad .sphint{bottom:66px}}
+.spad.rot .spbar{padding:7px 14px}.spad.rot .spbtn{padding:7px 12px}.spad.rot .spline{bottom:96px}.spad.rot .sphint{bottom:66px}
 .spad .spbtn{display:flex;gap:8px;padding:12px;border-top:1px solid #e5e7eb;padding-bottom:max(12px,env(safe-area-inset-bottom))}.spad .spbtn .pri{flex:1}
 .dov{position:fixed;inset:0;z-index:9000;background:#e9edf3;overflow:auto;-webkit-overflow-scrolling:touch}
 .dov .dovbar{position:sticky;top:0;z-index:2;background:#1e293b;color:#fff;display:flex;gap:8px;align-items:center;padding:10px 14px;flex-wrap:wrap}.dov .dovbar b{flex:1;min-width:140px}
@@ -226,19 +229,38 @@ function signPad(o) {
   o = o || {};
   return new Promise(resolve => {
     const ov = document.createElement('div'); ov.className = 'spad';
-    ov.innerHTML = `<div class="spbar"><span>✍️ ${dEsc(o.title || 'เซ็นชื่อ')} <em>${dEsc(o.name || '')}</em></span><b>${dEsc(o.step || '')}</b></div><canvas></canvas><div class="spline"></div><div class="sphint">${dEsc(o.hint || 'เซ็นชื่อด้วยนิ้วหรือปากกาในกรอบนี้')}</div>
+    const touch = matchMedia('(pointer:coarse)').matches;
+    ov.innerHTML = `<div class="spbar"><span>✍️ ${dEsc(o.title || 'เซ็นชื่อ')} <em>${dEsc(o.name || '')}</em></span><span style="display:flex;gap:8px;align-items:center"><b>${dEsc(o.step || '')}</b>${touch ? `<button class="sprot" data-a="r"></button>` : ''}</span></div><canvas></canvas><div class="spline"></div><div class="sphint">${dEsc(o.hint || 'เซ็นชื่อด้วยนิ้วหรือปากกาในกรอบนี้')}</div>
       <div class="spbtn"><button class="btn" data-a="x">✕ ${dEsc(o.cancel || 'ยกเลิก')}</button><button class="btn" data-a="c">↻ ${dEsc(o.clear || 'ล้าง')}</button><button class="btn pri" data-a="ok">✓ ${dEsc(o.ok || 'เซ็นเสร็จ')}</button></div>`;
     document.body.appendChild(ov);
-    const cv = ov.querySelector('canvas'), ctx = cv.getContext('2d'), S = []; let cur = null;
-    const fit = () => { const r = cv.getBoundingClientRect(), k = window.devicePixelRatio || 1; cv.width = r.width * k; cv.height = r.height * k; ctx.setTransform(k, 0, 0, k, 0, 0); draw(); };
+    const cv = ov.querySelector('canvas'), ctx = cv.getContext('2d'), S = [], rb = ov.querySelector('.sprot'); let cur = null, rot = false, W0 = 0, H0 = 0;
+    const land = () => innerWidth > innerHeight;
+    // หมุนกรอบเซ็นเป็นแนวนอน (ใช้ได้แม้ล็อกการหมุนจอไว้): ทั้งกรอบหมุน 90° แล้วให้ผู้ใช้เอียงโทรศัพท์
+    const layout = () => {
+      if (rot && land()) rot = false; // หมุนเครื่องจริงแล้ว ไม่ต้องหมุนซ้ำ
+      ov.classList.toggle('rot', rot);
+      if (rot) { ov.style.cssText = `inset:auto;top:0;left:0;width:${innerHeight}px;height:${innerWidth}px;transform-origin:0 0;transform:translateX(${innerWidth}px) rotate(90deg)`; }
+      else ov.style.cssText = '';
+      if (rb) { rb.style.display = land() ? 'none' : ''; rb.textContent = rot ? '📱 แนวตั้ง' : '📱↻ เซ็นแนวนอน'; }
+    };
+    const fit = () => {
+      layout();
+      const w = cv.offsetWidth, h = cv.offsetHeight, k = window.devicePixelRatio || 1;
+      if (W0 && H0 && S.length && (w !== W0 || h !== H0)) { // หมุนจอ/ขนาดจอเปลี่ยน: ย่อ-ขยายลายเซ็นตามสัดส่วน ไม่ให้หาย
+        const f = Math.min(w / W0, h / H0), dx = (w - W0 * f) / 2, dy = (h - H0 * f) / 2;
+        S.forEach(st => st.forEach(p => { p[0] = p[0] * f + dx; p[1] = p[1] * f + dy; }));
+      }
+      W0 = w; H0 = h; cv.width = w * k; cv.height = h * k; ctx.setTransform(k, 0, 0, k, 0, 0); draw();
+    };
     const draw = () => { ctx.clearRect(0, 0, cv.width, cv.height); ctx.lineCap = ctx.lineJoin = 'round'; ctx.strokeStyle = '#111'; ctx.lineWidth = 2.6; S.forEach(path); };
     const path = s => { ctx.beginPath(); ctx.moveTo(s[0][0], s[0][1]); if (s.length === 1) ctx.lineTo(s[0][0] + .1, s[0][1]); for (let i = 1; i < s.length - 1; i++) ctx.quadraticCurveTo(s[i][0], s[i][1], (s[i][0] + s[i + 1][0]) / 2, (s[i][1] + s[i + 1][1]) / 2); if (s.length > 1) ctx.lineTo(s[s.length - 1][0], s[s.length - 1][1]); ctx.stroke(); };
-    const pt = e => { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+    // พิกัดบนกรอบ (กรณีหมุน: แปลงพิกัดจอกลับเป็นพิกัดของกรอบ → ลายเซ็นออกมาเป็นแนวนอนตรง ใช้ในเอกสารแนวตั้งได้เลย)
+    const pt = e => { if (rot) { const top = cv.offsetTop; return [e.clientY, innerWidth - e.clientX - top]; } const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
     cv.addEventListener('pointerdown', e => { e.preventDefault(); cv.setPointerCapture(e.pointerId); cur = [pt(e)]; S.push(cur); ov.querySelector('.sphint').style.display = 'none'; draw(); });
     cv.addEventListener('pointermove', e => { if (!cur) return; e.preventDefault(); (e.getCoalescedEvents ? e.getCoalescedEvents() : [e]).forEach(x => cur.push(pt(x))); draw(); });
     const up = () => { cur = null; }; cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
-    window.addEventListener('resize', fit); setTimeout(fit, 0);
-    const done = v => { window.removeEventListener('resize', fit); ov.remove(); resolve(v); };
+    const onR = () => setTimeout(fit, 60); window.addEventListener('resize', onR); window.addEventListener('orientationchange', onR); setTimeout(fit, 0);
+    const done = v => { window.removeEventListener('resize', onR); window.removeEventListener('orientationchange', onR); ov.remove(); resolve(v); };
     const exp = () => {
       const all = [].concat.apply([], S); if (all.length < 3) return null;
       let x0 = Math.min(...all.map(p => p[0])), x1 = Math.max(...all.map(p => p[0])), y0 = Math.min(...all.map(p => p[1])), y1 = Math.max(...all.map(p => p[1]));
@@ -254,6 +276,7 @@ function signPad(o) {
     };
     ov.addEventListener('click', e => { const a = e.target.closest('[data-a]'); if (!a) return; const k = a.dataset.a;
       if (k === 'x') return done(null);
+      if (k === 'r') { rot = !rot; fit(); return; }
       if (k === 'c') { S.length = 0; draw(); ov.querySelector('.sphint').style.display = ''; return; }
       const u = exp(); if (!u) { alert(o.empty || 'กรุณาเซ็นชื่อก่อน'); return; } done(u); });
   });
