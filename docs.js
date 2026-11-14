@@ -33,7 +33,7 @@
 .dov .dovbar{position:sticky;top:0;z-index:2;background:#1e293b;color:#fff;display:flex;gap:8px;align-items:center;padding:10px 14px;flex-wrap:wrap}.dov .dovbar b{flex:1;min-width:140px}
 .dov .dovin{padding:14px 8px 40px;overflow-x:hidden}
 @media print{@page{size:A4;margin:0}body.docprint>*:not(.dov){display:none!important}body.docprint .dov{position:static;background:#fff;overflow:visible}body.docprint .dovbar{display:none}body.docprint .dovin{padding:0}
-  .dsheet.dpage{zoom:1!important;margin:0!important;box-shadow:none!important;height:296mm;break-after:page;page-break-after:always}.dsheet.dpage.dlast{break-after:auto;page-break-after:auto}}`;
+  .dsheet.dpage{zoom:.84!important;margin:2mm auto 0!important;box-shadow:none!important;height:296mm;break-after:page;page-break-after:always} /* ย่อ 84%: iPhone/Safari ใส่ขอบกระดาษ+หัวท้ายเองเสมอ ถ้าเต็ม A4 จะตกขอบ */.dsheet.dpage.dlast{break-after:auto;page-break-after:auto}}`;
   const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
 })();
 
