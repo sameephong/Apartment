@@ -119,7 +119,9 @@ async function rpSheet(id) {
     <div id="rpSt" class="small" style="margin:8px 0"></div>
     ${S().promptpay ? `<label style="display:flex;gap:8px;align-items:center;margin:4px 0 8px;font-size:15px"><input type="checkbox" id="rpQr" ${RPB.qr ? 'checked' : ''} onchange="RPB.qr=this.checked;rpPreview()" style="width:20px;height:20px"> ใส่ QR พร้อมเพย์</label>` : '<div class="muted small" style="margin-bottom:8px">💡 ใส่เบอร์พร้อมเพย์ในหน้า ตั้งค่า › การรับเงิน เพื่อพิมพ์ QR</div>'}
     <div style="background:#e9edf3;border-radius:12px;padding:12px;text-align:center;max-height:46vh;overflow:auto"><div id="rpPv" class="muted">กำลังสร้างใบเสร็จ…</div></div>
-    <div class="row" style="margin-top:10px;flex-wrap:wrap;gap:8px"><button class="btn" onclick="rpPickPrinter()">🔗 ${RP.ch ? 'เปลี่ยนเครื่อง' : 'เชื่อมเครื่องพิมพ์'}</button><button class="btn" onclick="rpSave()">⬇️ บันทึกรูป</button><span class="sp"></span><button class="btn pri" id="rpGo" onclick="rpPrint()">🖨 พิมพ์</button></div>`);
+    <div class="row" style="margin-top:10px;flex-wrap:wrap;gap:8px"><button class="btn" onclick="rpPickPrinter()">🔗 ${RP.ch ? 'เปลี่ยนเครื่อง' : 'เชื่อมเครื่องพิมพ์'}</button><button class="btn" onclick="rpSave()">⬇️ บันทึกรูป</button><span class="sp"></span><button class="btn pri" id="rpGo" onclick="rpPrint()">🖨 พิมพ์ (บลูทูธ)</button></div>
+    <button class="btn blk" style="margin-top:8px" onclick="rpSysPrint()">🖥 พิมพ์ผ่านหน้าต่างพิมพ์ (เครื่องที่ต่อสาย USB / ติดตั้งไดรเวอร์)</button>
+    <div class="muted small" style="margin-top:6px">หน้าต่างพิมพ์: เลือกเครื่อง Y58 · ขนาดกระดาษ 58 มม. (หรือ 58×210) · ระยะขอบ “ไม่มี” · ไม่ต้องย่อ/ขยาย</div>`);
   rpStatus(); rpPreview();
 }
 async function rpPreview() {
@@ -143,9 +145,27 @@ async function rpPrint() {
     await rpWrite(rpRaster(RPB.cv));
     toast('ส่งพิมพ์แล้ว');
   } catch (e) { if (!/cancel|NotFoundError/i.test(e.name + e.message)) uiAlert('พิมพ์ไม่สำเร็จ: ' + e.message + '\nลองปิด-เปิดเครื่องพิมพ์ แล้วกด “เชื่อมเครื่องพิมพ์” ใหม่'); }
-  finally { if (btn) { btn.disabled = false; btn.textContent = '🖨 พิมพ์'; } rpStatus(); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = '🖨 พิมพ์ (บลูทูธ)'; } rpStatus(); }
 }
 function rpSave() {
   if (!RPB || !RPB.cv) return; const b = billById(RPB.id), a = document.createElement('a');
   a.href = RPB.cv.toDataURL('image/png'); a.download = 'ใบเสร็จ_' + (b.room || '') + '_' + (b.receiptNo || b.no) + '.png'; document.body.appendChild(a); a.click(); a.remove();
+}
+
+// ---------- พิมพ์ผ่านหน้าต่างพิมพ์ของเครื่อง (USB / เครื่องที่ติดตั้งไดรเวอร์) · จัดหน้ากระดาษกว้าง 58 มม. ----------
+function rpSysClear() { ['rpPrintBox', 'rpPrintCss'].forEach(i => { const e = document.getElementById(i); if (e) e.remove(); }); document.body.classList.remove('rpprint'); }
+function rpSysPrint() {
+  if (!RPB || !RPB.cv) return toast('รอสร้างใบเสร็จสักครู่');
+  rpSysClear();
+  const cv = RPB.cv, wmm = 48, hmm = Math.ceil(cv.height / cv.width * wmm) + 12; // พื้นที่พิมพ์ 48 มม. บนกระดาษ 58 มม.
+  const box = document.createElement('div'); box.id = 'rpPrintBox'; box.innerHTML = `<img src="${cv.toDataURL('image/png')}" alt="">`; document.body.appendChild(box);
+  const st = document.createElement('style'); st.id = 'rpPrintCss';
+  st.textContent = `#rpPrintBox{display:none}
+@media print{@page{size:58mm ${hmm}mm;margin:0}html,body{width:58mm!important;min-width:0!important;margin:0!important;padding:0!important;background:#fff!important}
+body.rpprint>*:not(#rpPrintBox){display:none!important}body.rpprint #rpPrintBox{display:block!important;width:58mm;padding:3mm 5mm 0;box-sizing:border-box}
+#rpPrintBox img{display:block;width:${wmm}mm;height:auto;image-rendering:pixelated}}`;
+  document.head.appendChild(st);
+  document.body.classList.add('rpprint');
+  window.addEventListener('afterprint', rpSysClear, { once: true });
+  window.print(); // เรียกทันทีตอนกด (ถ้าหน่วงเวลา เบราว์เซอร์บางตัวจะบล็อก)
 }
