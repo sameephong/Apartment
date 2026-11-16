@@ -12,11 +12,12 @@
 <link rel="preconnect" href="https://script.google.com"><link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=5.9.2">
+<link rel="stylesheet" href="app.css?v=5.10">
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>document.write('<script src="config.js?t=' + Date.now() + '"><\/script>')</script>
-<script src="common.js?v=5.9.2"></script>
-<script src="docs.js?v=5.9.2"></script>
+<script src="common.js?v=5.10"></script>
+<script src="docs.js?v=5.10"></script>
+<script src="printer.js?v=5.10"></script>
 </head>
 <body class="admin">
 <div class="wrap">
@@ -538,6 +539,7 @@ function billSheet(id) {
       ${b.note ? `<div class="muted small">หมายเหตุ: ${esc(b.note)}</div>` : ''}</div>
     ${slip ? `<button class="btn blk" style="margin-bottom:8px" onclick="viewFile(${q(slip.fileId)})">ดูสลิป (${fmtDateTime(slip.at)})</button>` : ''}
     <div class="row" style="margin-bottom:8px"><a class="btn" style="flex:1" target="_blank" href="${billUrl(b)}">${b.status === 'ชำระแล้ว' ? 'ใบเสร็จ' : 'ดูบิล'} / พิมพ์</a><button class="btn" style="flex:1" onclick="shareBill(${q(b.id)})">ส่ง LINE</button></div>
+    <button class="btn blk" style="margin-bottom:8px" onclick="rpSheet(${q(b.id)})">🧾 พิมพ์ใบเสร็จ 58 มม. (บลูทูธ)</button>
     <button class="btn blk" style="margin-bottom:8px" onclick="billA4(${q(b.id)})">🖨 ${b.status === 'ชำระแล้ว' ? 'ใบเสร็จรับเงิน' : 'ใบแจ้งหนี้'} A4 / PDF</button>
     ${b.status === 'รออนุมัติ' ? `<button class="btn pri blk" onclick="go('approve/${b.id}')">ตรวจสลิป</button>` : ''}
     ${b.status === 'รอชำระ' ? `<div class="row"><button class="btn" style="flex:1" onclick="go('editbill/${b.id}')">แก้ไข</button><button class="btn ok" style="flex:2" onclick="paySheet(${q(b.id)})">💵 บันทึกรับเงิน</button></div>` : ''}
@@ -632,7 +634,7 @@ function billDone(id, title, note) {
     <div class="card" style="position:relative;margin-top:12px">${b.status === 'ชำระแล้ว' ? '<span class="stamp">ชำระแล้ว</span>' : ''}<b>${b.status === 'ชำระแล้ว' ? 'ใบเสร็จ ' + esc(b.receiptNo) : 'ใบแจ้งหนี้ ' + esc(b.no)}</b><div class="muted small">ห้อง ${esc(b.room)} · ${esc(b.tenantName)}</div>
       ${b.items.map(i => `<div class="line"><span>${esc(i.l)}</span><span>${money(i.a)}</span></div>`).join('')}<div class="line tot"><span>รวม</span><span>${money(b.total)}</span></div></div>
     <div class="card" style="background:var(--t-soft);border:0">✓ ${note}</div>
-    <div class="row"><button class="btn" style="flex:1" onclick="shareBill(${q(id)})">ส่ง LINE</button><a class="btn" style="flex:1" target="_blank" href="${billUrl(b)}">พิมพ์</a><button class="btn pri" style="flex:1" onclick="closeSheet()">เสร็จ</button></div>`);
+    <div class="row"><button class="btn" style="flex:1" onclick="shareBill(${q(id)})">ส่ง LINE</button><button class="btn" style="flex:1" onclick="rpSheet(${q(id)})">🧾 พิมพ์ 58 มม.</button><button class="btn pri" style="flex:1" onclick="closeSheet()">เสร็จ</button></div>`);
 }
 
 /* ---------- O13 แจ้งซ่อม ---------- */
