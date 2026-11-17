@@ -1,58 +1,49 @@
 /* ===================== พิมพ์ใบเสร็จ 58 มม. ผ่านบลูทูธ (เครื่อง Y58 / เครื่องพิมพ์ความร้อน ESC/POS) =====================
  * พิมพ์เป็นรูปภาพทั้งใบ → ภาษาไทยคมชัด ไม่เพี้ยน · Android ใช้ Chrome · iPhone ใช้แอป Bluefy (Safari/LINE ต่อบลูทูธไม่ได้)
  */
-const RP = { dev: null, ch: null, name: '', chunk: 180, W: 384 };
-const RP_SVC = ['000018f0-0000-1000-8000-00805f9b34fb', 'e7810a71-73ae-499d-8c15-faa9aef0c3f2', '49535343-fe7d-4ae5-8fa9-9fafd205e455',
-  '0000ff00-0000-1000-8000-00805f9b34fb', '0000ffe0-0000-1000-8000-00805f9b34fb', '0000fee7-0000-1000-8000-00805f9b34fb', '0000ae30-0000-1000-8000-00805f9b34fb',
-  '0000ae00-0000-1000-8000-00805f9b34fb', '0000ff80-0000-1000-8000-00805f9b34fb', '00001101-0000-1000-8000-00805f9b34fb'];
+const RP = { dev: null, ch: null, name: '', busy: false, W: 384 };
+// ใช้ค่าเดียวกับระบบ DD หลอมทอง (ทดสอบกับเครื่อง Y58 จริงแล้ว) · อยู่โดเมนเดียวกัน จึงใช้สิทธิ์เครื่องพิมพ์ที่เคยอนุญาตไว้ร่วมกันได้
+const RP_SVC = [0x18f0, 0xff00, 0xffe0, 0xfee7, 0xae30, 0xff80, '49535343-fe7d-4ae5-8fa9-9fafd205e455', 'e7810a71-73ae-499d-8c15-faa9aef0c3f2'];
 const rpOk = () => !!(navigator.bluetooth && navigator.bluetooth.requestDevice);
 const rpIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-function rpSaved() { try { return localStorage.getItem('rpName') || ''; } catch (e) { return ''; } }
+function rpLoad(k) { try { const v = localStorage.getItem(k); return v == null ? '' : v.replace(/^"|"$/g, ''); } catch (e) { return ''; } }
+function rpSaved() { return rpLoad('rpName') || rpLoad('dd_bt_name'); }
 
 // ---------- เชื่อมเครื่องพิมพ์ ----------
-async function rpConnect(pick) {
-  if (!rpOk()) throw new Error(rpIOS() ? 'iPhone ต้องเปิดระบบในแอป Bluefy ถึงจะต่อเครื่องพิมพ์ได้' : 'เบราว์เซอร์นี้ต่อบลูทูธไม่ได้ · ใช้ Chrome บน Android หรือคอม');
-  if (pick || !RP.dev) {
-    RP.dev = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: RP_SVC });
-    RP.ch = null; RP.dev.addEventListener('gattserverdisconnected', () => { RP.ch = null; rpStatus(); });
-  }
-  if (RP.ch && RP.dev.gatt.connected) return RP.ch;
-  const srv = await RP.dev.gatt.connect();
-  let ch = null;
-  for (const u of RP_SVC) {
-    let s; try { s = await srv.getPrimaryService(u); } catch (e) { continue; }
-    const cs = await s.getCharacteristics();
-    ch = cs.find(c => c.properties.writeWithoutResponse) || cs.find(c => c.properties.write);
-    if (ch) break;
-  }
-  if (!ch) { try { for (const s of await srv.getPrimaryServices()) { const cs = await s.getCharacteristics(); ch = cs.find(c => c.properties.writeWithoutResponse || c.properties.write); if (ch) break; } } catch (e) {} }
-  if (!ch) throw new Error('เครื่องนี้ไม่ใช่เครื่องพิมพ์ที่รองรับ (ไม่พบช่องส่งข้อมูล) · ลองเลือกชื่อเครื่องอื่นในรายการ');
-  RP.ch = ch; RP.name = RP.dev.name || 'เครื่องพิมพ์';
+async function rpAttach(dev) {
+  const srv = await dev.gatt.connect(); let ch = null;
+  for (const sv of await srv.getPrimaryServices()) { for (const c of await sv.getCharacteristics()) { if (!ch && (c.properties.writeWithoutResponse || c.properties.write)) ch = c; } }
+  if (!ch) throw new Error('ไม่พบช่องส่งข้อมูลของเครื่องพิมพ์');
+  if (RP.dev !== dev) dev.addEventListener('gattserverdisconnected', () => { RP.ch = null; rpStatus(); });
+  RP.dev = dev; RP.ch = ch; RP.name = dev.name || 'เครื่องพิมพ์';
   try { localStorage.setItem('rpName', RP.name); } catch (e) {}
-  rpStatus(); return ch;
+  rpStatus();
 }
-async function rpWrite(bytes) {
-  const ch = RP.ch, slow = ms => new Promise(r => setTimeout(r, ms));
-  for (let i = 0; i < bytes.length;) {
-    const part = bytes.slice(i, i + RP.chunk);
-    try {
-      if (ch.properties.writeWithoutResponse && ch.writeValueWithoutResponse) { await ch.writeValueWithoutResponse(part); await slow(RP.chunk > 100 ? 18 : 6); }
-      else await (ch.writeValueWithResponse ? ch.writeValueWithResponse(part) : ch.writeValue(part));
-      i += part.length;
-    } catch (e) { if (RP.chunk > 20) { RP.chunk = 20; continue; } throw e; } // เครื่อง/มือถือบางรุ่นรับครั้งละ 20 ไบต์
+async function rpPick() {
+  if (!rpOk()) throw new Error(rpIOS() ? 'iPhone ต้องเปิดระบบในแอป Bluefy ถึงจะต่อเครื่องพิมพ์ได้' : 'ใช้ Google Chrome เพื่อเชื่อมบลูทูธ');
+  const dev = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: RP_SVC }); await rpAttach(dev);
+}
+async function rpReady() { // ต่อเครื่องเดิมให้เอง ไม่ต้องเลือกใหม่
+  if (RP.ch && RP.dev && RP.dev.gatt.connected) return true;
+  if (RP.dev) { try { await rpAttach(RP.dev); return true; } catch (e) {} }
+  if (navigator.bluetooth && navigator.bluetooth.getDevices) {
+    try { const ds = await navigator.bluetooth.getDevices(), nm = rpSaved(); const d = ds.find(x => x.name === nm) || (ds.length === 1 ? ds[0] : null); if (d) { await rpAttach(d); return true; } } catch (e) {}
   }
+  return false;
 }
-// ---------- รูป → คำสั่ง ESC/POS (GS v 0 พิมพ์ภาพ) ----------
+async function rpConnect(pick) { if (pick || !(await rpReady())) await rpPick(); return RP.ch; }
+async function rpWrite(parts) {
+  const ch = RP.ch, wr = ch.properties.writeWithoutResponse ? v => ch.writeValueWithoutResponse(v) : v => ch.writeValue(v);
+  for (const p of parts) for (let i = 0; i < p.length; i += 100) { await wr(p.slice(i, i + 100)); await new Promise(r => setTimeout(r, 20)); }
+}
+// ---------- รูป → คำสั่ง ESC/POS (GS v 0 พิมพ์ภาพ) แบบเดียวกับระบบหลอมทอง ----------
 function rpRaster(cv) {
-  const W = cv.width, H = cv.height, bw = W / 8, px = cv.getContext('2d').getImageData(0, 0, W, H).data, out = [0x1B, 0x40];
-  for (let y0 = 0; y0 < H; y0 += 48) { // พิมพ์ทีละแถบ กันบัฟเฟอร์เครื่องเต็ม
-    const h = Math.min(48, H - y0); out.push(0x1D, 0x76, 0x30, 0x00, bw & 255, bw >> 8, h & 255, h >> 8);
-    for (let y = y0; y < y0 + h; y++) for (let xb = 0; xb < bw; xb++) {
-      let b = 0; for (let k = 0; k < 8; k++) { const i = (y * W + xb * 8 + k) * 4; if (px[i + 3] > 0 && px[i] < 140) b |= 0x80 >> k; } out.push(b);
-    }
-  }
-  out.push(0x1B, 0x64, 0x04); // เลื่อนกระดาษ 4 บรรทัด
-  return new Uint8Array(out);
+  const w = cv.width, h = cv.height, d = cv.getContext('2d').getImageData(0, 0, w, h).data, bw = w / 8, out = [new Uint8Array([0x1B, 0x40])];
+  for (let y0 = 0; y0 < h; y0 += 128) { const rows = Math.min(128, h - y0), buf = new Uint8Array(8 + bw * rows); buf.set([0x1D, 0x76, 0x30, 0, bw & 255, bw >> 8, rows & 255, rows >> 8]);
+    for (let y = 0; y < rows; y++) for (let x = 0; x < w; x++) { const i = ((y0 + y) * w + x) * 4; if (d[i] * .3 + d[i + 1] * .59 + d[i + 2] * .11 < 150) buf[8 + y * bw + (x >> 3)] |= 0x80 >> (x & 7); }
+    out.push(buf); }
+  out.push(new Uint8Array([0x1B, 0x4A, 200, 0x1B, 0x4A, 40])); // ป้อนกระดาษให้ท้ายใบพ้นใบมีดฉีก
+  return out;
 }
 // ---------- วาดใบเสร็จ (กว้าง 384 จุด = กระดาษ 58 มม.) ----------
 function rpQR(text, size) {
@@ -126,7 +117,7 @@ async function rpSheet(id) {
 }
 async function rpPreview() {
   const b = billById(RPB.id); const cv = await rpReceipt(b, { qr: RPB.qr }); RPB.cv = cv;
-  const box = $('#rpPv'); if (!box) return; box.className = ''; box.innerHTML = ''; cv.style.cssText = 'width:240px;max-width:100%;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.15)'; box.appendChild(cv);
+  const box = $('#rpPv'); if (!box) return; box.className = ''; box.innerHTML = ''; cv.style.cssText = 'width:240px;max-width:100%;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.15)'; box.appendChild(cv); rpSysPrep(cv);
 }
 function rpStatus() {
   const el = $('#rpSt'); if (!el) return;
@@ -135,17 +126,18 @@ function rpStatus() {
     : `<div class="card" style="background:var(--warn-soft);border:0;margin:0">เบราว์เซอร์นี้ต่อบลูทูธไม่ได้ · ใช้ <b>Chrome</b> บน Android หรือคอม (หรือกด “บันทึกรูป” แล้วพิมพ์จากแอปของเครื่องพิมพ์)</div>`; return; }
   el.innerHTML = RP.ch && RP.dev && RP.dev.gatt.connected ? `🟢 เชื่อมแล้ว: <b>${esc(RP.name)}</b>` : `⚪ ยังไม่ได้เชื่อม${rpSaved() ? ' · ครั้งก่อนใช้ <b>' + esc(rpSaved()) + '</b>' : ''} · เปิดเครื่องพิมพ์ แล้วกด “พิมพ์” เลือกชื่อเครื่องในรายการ`;
 }
-async function rpPickPrinter() { try { await rpConnect(true); toast('เชื่อมเครื่องพิมพ์แล้ว'); } catch (e) { if (!/cancel|User cancelled|NotFoundError/i.test(e.name + e.message)) uiAlert('เชื่อมไม่สำเร็จ: ' + e.message); rpStatus(); } }
+async function rpPickPrinter() { try { await rpPick(); toast('เชื่อมเครื่องพิมพ์ ' + RP.name + ' แล้ว'); } catch (e) { if (e.name !== 'NotFoundError') uiAlert('เชื่อมไม่สำเร็จ: ' + e.message); rpStatus(); } }
 async function rpPrint() {
-  const btn = $('#rpGo');
+  const btn = $('#rpGo'); if (RP.busy) return toast('เครื่องพิมพ์กำลังพิมพ์อยู่ — รอสักครู่');
+  if (!(await rpReady())) { try { await rpPick(); } catch (e) { if (e.name !== 'NotFoundError') uiAlert('เชื่อมไม่สำเร็จ: ' + e.message); rpStatus(); return; } }
+  RP.busy = true;
   try {
-    if (!RP.ch || !RP.dev || !RP.dev.gatt.connected) await rpConnect(!RP.dev); // ต้องเรียกทันทีตอนกด (iPhone/Android กำหนด)
     if (!RPB.cv) await rpPreview();
     btn.disabled = true; btn.textContent = 'กำลังพิมพ์…';
     await rpWrite(rpRaster(RPB.cv));
     toast('ส่งพิมพ์แล้ว');
-  } catch (e) { if (!/cancel|NotFoundError/i.test(e.name + e.message)) uiAlert('พิมพ์ไม่สำเร็จ: ' + e.message + '\nลองปิด-เปิดเครื่องพิมพ์ แล้วกด “เชื่อมเครื่องพิมพ์” ใหม่'); }
-  finally { if (btn) { btn.disabled = false; btn.textContent = '🖨 พิมพ์ (บลูทูธ)'; } rpStatus(); }
+  } catch (e) { RP.ch = null; uiAlert('พิมพ์ผ่านบลูทูธไม่สำเร็จ: ' + e.message + '\nลองปิด-เปิดเครื่องพิมพ์ แล้วกด “เชื่อมเครื่องพิมพ์” ใหม่'); }
+  finally { RP.busy = false; if (btn) { btn.disabled = false; btn.textContent = '🖨 พิมพ์ (บลูทูธ)'; } rpStatus(); }
 }
 function rpSave() {
   if (!RPB || !RPB.cv) return; const b = billById(RPB.id), a = document.createElement('a');
@@ -153,19 +145,26 @@ function rpSave() {
 }
 
 // ---------- พิมพ์ผ่านหน้าต่างพิมพ์ของเครื่อง (USB / เครื่องที่ติดตั้งไดรเวอร์) · จัดหน้ากระดาษกว้าง 58 มม. ----------
-function rpSysClear() { ['rpPrintBox', 'rpPrintCss'].forEach(i => { const e = document.getElementById(i); if (e) e.remove(); }); document.body.classList.remove('rpprint'); }
-function rpSysPrint() {
-  if (!RPB || !RPB.cv) return toast('รอสร้างใบเสร็จสักครู่');
+// เตรียมรูปไว้ล่วงหน้าตั้งแต่ตอนสร้างพรีวิว (ถ้าสร้างตอนกดพิมพ์ รูปยังโหลดไม่ทัน หน้าพิมพ์จะว่างเปล่า)
+function rpSysPrep(cv) {
+  let box = document.getElementById('rpPrintBox');
+  if (!box) { box = document.createElement('div'); box.id = 'rpPrintBox'; box.innerHTML = '<img alt="">'; document.body.appendChild(box); }
+  const img = box.querySelector('img'); img.src = cv.toDataURL('image/png'); RPB.img = img; RPB.ready = img.decode ? img.decode().catch(() => {}) : Promise.resolve();
+  let st = document.getElementById('rpPrintCss0');
+  if (!st) { st = document.createElement('style'); st.id = 'rpPrintCss0'; st.textContent = '#rpPrintBox{position:fixed;left:-99999px;top:0;width:1px;height:1px;overflow:hidden}'; document.head.appendChild(st); }
+}
+function rpSysClear() { const e = document.getElementById('rpPrintCss'); if (e) e.remove(); document.body.classList.remove('rpprint'); }
+async function rpSysPrint() {
+  if (!RPB || !RPB.cv || !RPB.img) return toast('รอสร้างใบเสร็จสักครู่');
+  if (!RPB.img.complete) await RPB.ready;
   rpSysClear();
   const cv = RPB.cv, wmm = 48, hmm = Math.ceil(cv.height / cv.width * wmm) + 12; // พื้นที่พิมพ์ 48 มม. บนกระดาษ 58 มม.
-  const box = document.createElement('div'); box.id = 'rpPrintBox'; box.innerHTML = `<img src="${cv.toDataURL('image/png')}" alt="">`; document.body.appendChild(box);
   const st = document.createElement('style'); st.id = 'rpPrintCss';
-  st.textContent = `#rpPrintBox{display:none}
-@media print{@page{size:58mm ${hmm}mm;margin:0}html,body{width:58mm!important;min-width:0!important;margin:0!important;padding:0!important;background:#fff!important}
-body.rpprint>*:not(#rpPrintBox){display:none!important}body.rpprint #rpPrintBox{display:block!important;width:58mm;padding:3mm 5mm 0;box-sizing:border-box}
-#rpPrintBox img{display:block;width:${wmm}mm;height:auto;image-rendering:pixelated}}`;
+  st.textContent = `@media print{@page{size:58mm ${hmm}mm;margin:0}html,body{width:58mm!important;min-width:0!important;margin:0!important;padding:0!important;background:#fff!important}
+body.rpprint>*:not(#rpPrintBox){display:none!important}body.rpprint #rpPrintBox{display:block!important;position:static!important;width:58mm!important;height:auto!important;overflow:visible!important;padding:3mm 5mm 0;box-sizing:border-box}
+#rpPrintBox img{display:block;width:${wmm}mm;height:auto}}`;
   document.head.appendChild(st);
   document.body.classList.add('rpprint');
   window.addEventListener('afterprint', rpSysClear, { once: true });
-  window.print(); // เรียกทันทีตอนกด (ถ้าหน่วงเวลา เบราว์เซอร์บางตัวจะบล็อก)
+  window.print();
 }
