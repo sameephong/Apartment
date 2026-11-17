@@ -12,18 +12,19 @@
 <link rel="preconnect" href="https://script.google.com"><link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=5.11.3">
+<link rel="stylesheet" href="app.css?v=6.0">
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>document.write('<script src="config.js?t=' + Date.now() + '"><\/script>')</script>
-<script src="common.js?v=5.11.3"></script>
-<script src="docs.js?v=5.11.3"></script>
-<script src="printer.js?v=5.11.3"></script>
+<script src="common.js?v=6.0"></script>
+<script src="docs.js?v=6.0"></script>
+<script src="printer.js?v=6.0"></script>
 </head>
 <body class="admin">
 <div class="wrap">
   <div id="login" class="bd" style="padding-top:12vh">
     <div class="card pp-card">
       <div class="row" style="flex-wrap:nowrap;gap:14px;margin-bottom:14px"><img src="icon-192.png" alt="" style="width:62px;height:62px;border-radius:16px;flex:none"><div style="min-width:0"><b style="font-size:22px">ดูแลตึก</b><div class="muted small">เข้าสู่ระบบเจ้าของหอ</div><div class="muted small" id="bldLine"></div></div></div>
+      <div id="userPick" class="hide"></div>
       <div id="pwPad"></div>
       <div id="pwText" class="hide"><label class="f">รหัสผ่าน<input id="pw" type="password" autocomplete="current-password" style="font-size:18px"></label><button class="btn pri blk lg login-go" onclick="doLogin()">เข้าสู่ระบบ</button></div>
       <p class="muted" id="loginErr" style="color:var(--bad);text-align:center;min-height:1em;margin:10px 0 4px"></p>
@@ -46,7 +47,7 @@
 <div id="loading"><div>กำลังบันทึก…</div></div>
 
 <script>
-let PW = '', D = null, ROUTE = ['home'], UI = { billSeg: 'todo', billMonth: '', repSeg: 'open', meterUtil: 'both', showLeft: false, reportMonth: '' };
+let PW = '', TK = '', D = null, ROUTE = ['home'], UI = { billSeg: 'todo', billMonth: '', repSeg: 'open', meterUtil: 'both', showLeft: false, reportMonth: '' };
 const IMG = {};
 const $ = s => document.querySelector(s);
 const q = s => esc(JSON.stringify(String(s)));
@@ -64,7 +65,7 @@ const repOpen = r => r.status === 'รอดำเนินการ' || r.statu
 const DESK = () => window.matchMedia('(min-width:1024px)').matches;
 async function api(action, payload, quiet) {
   if (!quiet) $('#loading').style.display = 'flex';
-  try { const j = await callApi(action, Object.assign({ password: PW }, payload || {})); if (j.data) { D = j.data; cacheData('owner_cache', D); } return j; }
+  try { const j = await callApi(action, Object.assign({ password: PW, token: TK }, payload || {})); if (j.data) { D = j.data; cacheData('owner_cache', D); } return j; }
   finally { $('#loading').style.display = 'none'; }
 }
 async function act(action, payload, msg) {
@@ -104,15 +105,27 @@ function badgeCounts() {
 }
 
 /* ================= เข้าสู่ระบบ ================= */
+let LU = null; // รายชื่อผู้ใช้สำหรับหน้าเข้าสู่ระบบ (null = ยังไม่ได้ตั้งผู้ใช้ → ใช้รหัสผ่านรวม)
 async function doLogin() {
-  PW = $('#pw').value; if (!PW) return;
+  const v = $('#pw').value; if (!v) return;
   const btns = document.querySelectorAll('#loginBtn, .login-go'); $('#loginErr').textContent = '';
+  if (LU && !LU.sel) { $('#loginErr').textContent = 'แตะชื่อของคุณก่อน'; return; }
   btns.forEach(b => { b.disabled = true; b.dataset.l = b.dataset.l || b.textContent; b.textContent = '…'; });
-  try { await api('login', {}, true); store('owner_pw', PW); start(); }
-  catch (e) { $('#loginErr').textContent = e.message; if (PAD) PAD.shake(); $('#pw').value = ''; }
+  try {
+    if (LU) { const j = await callApi('userLogin', { uid: LU.sel, pin: v }); TK = j.token; PW = ''; store('owner_tk', TK); store('owner_pw'); try { localStorage.setItem('last_uid', LU.sel); } catch (e) {} await api('getAll', {}, true); start(); }
+    else { PW = v; await api('login', {}, true); store('owner_pw', PW); start(); }
+  }
+  catch (e) { $('#loginErr').textContent = e.message; if (PAD) PAD.shake(); $('#pw').value = ''; if (PAD) PAD.clear(); }
   btns.forEach(b => { b.disabled = false; b.textContent = b.dataset.l; });
 }
-function logout() { store('owner_pw'); store('owner_cache'); location.href = 'admin.html'; }
+function logout() { if (TK) callApi('logout', { token: TK }).catch(() => {}); store('owner_pw'); store('owner_tk'); store('owner_cache'); location.href = 'admin.html'; }
+function drawUserPick(users, pick) {
+  LU = { users, sel: pick || '' }; if (!LU.sel) try { const l = localStorage.getItem('last_uid'); if (users.some(u => u.id === l)) LU.sel = l; } catch (e) {}
+  if (!LU.sel && users.length === 1) LU.sel = users[0].id;
+  const el = $('#userPick'); el.classList.remove('hide');
+  el.innerHTML = `<div class="muted small" style="margin-bottom:6px">แตะชื่อของคุณ แล้วใส่ PIN 6 หลัก</div><div class="segb" style="margin-bottom:12px">${users.map(u => `<button class="${u.id === LU.sel ? 'on' : ''}" onclick="drawUserPick(LU.users,'${u.id}');$('#loginErr').textContent=''">👤 ${esc(u.name)}</button>`).join('')}</div>`;
+  $('#pwSwitch').parentElement.classList.add('hide'); if (IS_DEMO) $('#demoHint').innerHTML = 'โหมดทดลอง: ใช้ PIN ที่ตั้งไว้';
+}
 function start() { $('#login').classList.add('hide'); $('#app').classList.remove('hide'); $('#demo').innerHTML = demoBanner(FL().app ? '<a href="tenant.html">ลองฝั่งผู้เช่า</a>' : ''); render(); }
 $('#pw').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 // แป้นตัวเลขบนจอ (ค่าเริ่มต้น) · ถ้ารหัสมีตัวอักษร สลับไปใช้แป้นพิมพ์ปกติได้ (จำไว้ในเครื่อง)
@@ -130,17 +143,18 @@ try { if (localStorage.getItem('pw_kb') === 'text') pwSwitch(true); } catch (e) 
   if (IS_DEMO) $('#demoHint').innerHTML = 'โหมดทดลอง: รหัสผ่าน <b>1234</b>';
   if (BLD_MANY && BLD) $('#bldLine').innerHTML = `🏢 <b>${esc(bLabel(BLD.code))}</b> · <a href="#" onclick="changeBuilding();return false">เปลี่ยนตึก</a>`;
   const bi = bInfo(BLD && BLD.code); if (bi && !bi.app) $('#tenLink').classList.add('hide');
-  const saved = load('owner_pw');
-  if (!saved) { // ปลุกเซิร์ฟเวอร์ไว้ระหว่างพิมพ์รหัส + อัปเดตชื่อตึก/สถานะระบบผู้เช่า
+  const saved = load('owner_pw'), savedTk = load('owner_tk');
+  if (!saved && !savedTk) { // ปลุกเซิร์ฟเวอร์ไว้ระหว่างพิมพ์รหัส + อัปเดตชื่อตึก/สถานะระบบผู้เช่า
+    callApi('loginUsers').then(j => { if (j.users && j.users.length) drawUserPick(j.users); }).catch(() => {});
     callApi('publicInfo').then(i => { bInfo(BLD && BLD.code, i); $('#tenLink').classList.toggle('hide', !!(i.flags && i.flags.app === false)); const b = $('#bldLine b'); if (b) b.textContent = i.buildingName || i.apartmentName; }).catch(() => {});
     return;
   }
-  PW = saved;
+  PW = saved || ''; TK = savedTk || '';
   const cached = loadData('owner_cache');
   if (cached && cached.settings) { D = cached; start(); } // เปิดหน้าทันทีจากข้อมูลที่จำไว้
   syncBadge(true);
   try { await api('getAll', {}, true); if (cached && cached.settings) render(); else start(); }
-  catch (e) { if (/รหัสผ่าน/.test(e.message)) { store('owner_pw'); store('owner_cache'); location.reload(); } else if (!cached) $('#loginErr').textContent = e.message; }
+  catch (e) { if (/รหัสผ่าน|เข้าสู่ระบบใหม่/.test(e.message)) { store('owner_pw'); store('owner_tk'); store('owner_cache'); location.reload(); } else if (!cached) $('#loginErr').textContent = e.message; }
   syncBadge(false);
 })();
 async function refresh() { syncBadge(true); try { await api('getAll', {}, true); if (!$('#sbg').classList.contains('on')) render(); } catch (e) {} syncBadge(false); }
@@ -411,7 +425,7 @@ window.addEventListener('hashchange', () => { if (Object.keys(mDirty).length) fl
 window.addEventListener('pagehide', () => {
   if (!Object.keys(mDirty).length || IS_DEMO || !navigator.sendBeacon) return;
   const byMonth = {}; Object.keys(mDirty).forEach(k => { const m = k.split('|')[0]; (byMonth[m] = byMonth[m] || []).push(mDirty[k]); });
-  Object.keys(byMonth).forEach(m => navigator.sendBeacon(API, new Blob([JSON.stringify({ action: 'saveMeters', password: PW, month: m, rows: byMonth[m] })], { type: 'text/plain;charset=utf-8' })));
+  Object.keys(byMonth).forEach(m => navigator.sendBeacon(API, new Blob([JSON.stringify({ action: 'saveMeters', password: PW, token: TK, month: m, rows: byMonth[m] })], { type: 'text/plain;charset=utf-8' })));
 });
 
 /* ---------- O6 ออกบิลทุกห้อง ---------- */
@@ -531,6 +545,7 @@ function billSheet(id) {
   const slip = b.slipId && D.slips.find(s => s.id === b.slipId);
   openSheet(`<h3>${esc(billTitle(b))}</h3><div class="muted small">${b.room ? 'ห้อง ' + esc(b.room) + ' · ' : ''}${esc(b.tenantName)}${b.payPhone ? ' · ' + esc(b.payPhone) : ''} · ${esc(b.no)}${!b.tenantId ? ' · <span class="pl">บิลนอก</span>' : ''}</div>
     <div class="row" style="margin:8px 0">${statusBadge(b)}<span class="muted small">ครบกำหนด ${fmtDate(b.dueDate)}</span></div>
+    ${b.createdBy || b.paidBy ? `<div class="muted small" style="margin:-4px 0 8px">${b.createdBy ? '🧾 ออกบิลโดย <b>' + esc(b.createdBy) + '</b>' : ''}${b.createdBy && b.paidBy ? ' · ' : ''}${b.paidBy ? '💵 รับเงินโดย <b>' + esc(b.paidBy) + '</b>' : ''}</div>` : ''}
     <div class="card" style="position:relative">${b.status === 'ชำระแล้ว' ? '<span class="stamp">ชำระแล้ว</span>' : ''}
       ${b.items.map(i => `<div class="line"><span>${esc(i.l)}</span><span>${money(i.a)}</span></div>`).join('')}
       <div class="line tot"><span>รวม</span><span>${money(b.total)} บาท</span></div>
@@ -719,7 +734,8 @@ async function moveOut(id) {
 /* ---------- O16 เพิ่มเติม ---------- */
 VIEWS.more = () => ({
   title: 'เพิ่มเติม', sub: esc(S().apartmentName),
-  html: `<div class="card" style="padding:2px 14px"><div class="item tap" onclick="go('profile')"><span style="font-size:20px">🏢</span><span style="flex:1">ข้อมูลหอ<div class="muted small">${esc(S().apartmentName)} · ${esc(S().phone || 'ยังไม่ใส่เบอร์')}</div></span><span class="muted">›</span></div>
+  html: `<div class="card row" style="flex-wrap:nowrap;gap:12px"><span style="font-size:26px">👤</span><div style="flex:1;min-width:0"><b>${ME().name ? esc(ME().name) : 'รหัสผ่านรวม (ยังไม่แยกผู้ใช้)'}</b><div class="muted small">${ME().name ? (STAFF() ? 'ผู้ช่วย' : 'เจ้าของ') : 'ตั้งชื่อ + PIN ของแต่ละคน เพื่อบันทึกว่าใครทำอะไร'}</div></div><button class="btn sm" onclick="go('users')">${ME().name ? 'ผู้ใช้ระบบ' : 'ตั้งผู้ใช้'}</button></div>
+  <div class="card" style="padding:2px 14px"><div class="item tap" onclick="go('profile')"><span style="font-size:20px">🏢</span><span style="flex:1">ข้อมูลหอ<div class="muted small">${esc(S().apartmentName)} · ${esc(S().phone || 'ยังไม่ใส่เบอร์')}</div></span><span class="muted">›</span></div>
     <div class="item tap" onclick="go('settings/tenant')"><span style="font-size:20px">👥</span><span style="flex:1">การใช้งานร่วมกับผู้เช่า<div class="muted small">${OWN() ? '🔑 เจ้าของจัดการเอง' : '👥 ใช้ร่วมกับผู้เช่า'}</div></span><span class="muted">›</span></div>
     <div class="item tap" onclick="go('deposits')"><span style="font-size:20px">💰</span><span style="flex:1">เงินประกัน<div class="muted small">ห้องที่ถือเงินประกัน · รอคืนเงิน ${D.tenants.filter(t => t.refundStatus === 'รอคืนเงิน').length} คน</div></span><span class="muted">›</span></div>
     <div class="item tap" onclick="go('roomfix')"><span style="font-size:20px">🛠</span><span style="flex:1">กู้ข้อมูลห้อง<div class="muted small">ซ่อมหนัก · อุปกรณ์ในห้อง · ทำความสะอาด ที่หายหลังอัปเดต 5.3–5.5</div></span><span class="muted">›</span></div>
@@ -854,7 +870,9 @@ async function delNews(id) { if (!await uiConfirm('ลบประกาศน�
 <script>
 /* ===================== v3 · หน้าจอคอม/Mac + โหมดเจ้าของจัดการเอง ===================== */
 window.matchMedia('(min-width:1024px)').addEventListener('change', () => { if (D) { closeSheet(); render(); } });
-const APP_FRONT = '5.8';
+const APP_FRONT = '6.0';
+const ME = () => (D && D.me) || {};
+const STAFF = () => ME().role === 'staff';
 const M = Object.assign({}, VIEWS); // หน้ามือถือเดิม
 const _render0 = render;
 render = function () {
@@ -862,6 +880,7 @@ render = function () {
   _render0();
   showInstall(); loadDocThumbs();
   if (D && !DESK() && $('#hd') && !$('#hd .bellbtn')) { const n = bellCount(); $('#hd').insertAdjacentHTML('beforeend', `<button class="pill rfbtn ic" onclick="manualRefresh(this)" title="รีเฟรชข้อมูล" style="flex:none">⟳</button><button class="pill ic" onclick="mSearch()" title="ค้นหา" style="flex:none">🔍</button><div style="position:relative;flex:none"><button class="pill bellbtn" onclick="bellToggle(event)" title="การแจ้งเตือน">🔔${n ? `<span class="n">${n}</span>` : ''}</button><div class="bellbox" id="bellBox"></div></div>`); }
+  if (D && ME().legacy && !$('#userWarn') && $('#view') && !/^users/.test(location.hash.slice(1))) $('#view').insertAdjacentHTML('afterbegin', `<div id="userWarn" class="card" style="background:var(--o-soft);border:0;font-size:14.5px">🔐 <b>แยกผู้ใช้ระหว่างคุณกับหุ้นส่วน</b> — ตั้งชื่อ + PIN 6 หลักของแต่ละคน ระบบจะบันทึกว่าใครออกบิล รับเงิน หรือแก้ไขอะไร<div style="margin-top:8px"><button class="btn sm pri" onclick="go('users')">ตั้งผู้ใช้เลย</button></div></div>`);
   if (D && D.ver !== APP_FRONT && !$('#verWarn') && $('#view')) $('#view').insertAdjacentHTML('afterbegin', `<div id="verWarn" class="card" style="background:var(--warn-soft);border-color:var(--warn);font-size:14px">⚠️ <b>โค้ด Apps Script ยังเป็นเวอร์ชันเก่า</b> (${esc(D.ver || 'ก่อน 5.2')} · หน้าเว็บ ${APP_FRONT}) — ฟังก์ชันใหม่บางอย่าง เช่น ฟอร์มนัดดูห้อง จะยังใช้ไม่ได้<br>วางโค้ดใหม่ใน Code.gs → รัน setup → <b>Deploy › จัดการการทำให้ใช้งานได้ › แก้ไข › เวอร์ชันใหม่</b></div>`);
   if (D && BLD) bInfo(BLD.code, { buildingName: S().buildingName || S().apartmentName, flags: FL() }); // จำชื่อตึกล่าสุดไว้ใช้ในรายการเลือกตึก
 };
@@ -894,14 +913,14 @@ function renderSide() {
   const items = [['home', '📊', 'ภาพรวม'], ['rooms', '🏠', 'ผังห้อง'], ['meters', '💧', 'จดมิเตอร์'],
     ['bills', '🧾', own ? 'บิล / รับเงิน' : 'บิล / การเงิน', own ? c.open : c.over],
     (!own && (f.slip || c.review)) ? ['approve', '✅', 'อนุมัติสลิป', c.review] : null,
-    ['repairs', '🔧', 'งานซ่อม', c.rep], 'จัดการ', ['tenants', '👥', 'ผู้เช่า / สัญญา'], ['deposits', '💰', 'เงินประกัน', D.tenants.filter(t => t.refundStatus === 'รอคืนเงิน').length], ['expenses', '💸', 'ค่าใช้จ่าย / กำไร'], ['viewings', '📅', 'นัดดูห้อง', (D.viewings || []).filter(v => v.status === 'ใหม่').length || ''], ['clean', '🧹', 'ทำความสะอาด', D.rooms.filter(r => r.cleanStatus === 'รอทำ').length || ''], ['find', '🔎', 'ค้นหา / อุปกรณ์ห้อง', itemIssueRooms() || ''], f.app ? ['pins', '🔐', 'รหัสผู้เช่า'] : null,
+    ['repairs', '🔧', 'งานซ่อม', c.rep], 'จัดการ', ['tenants', '👥', 'ผู้เช่า / สัญญา'], ['deposits', '💰', 'เงินประกัน', D.tenants.filter(t => t.refundStatus === 'รอคืนเงิน').length], STAFF() ? null : ['expenses', '💸', 'ค่าใช้จ่าย / กำไร'], ['viewings', '📅', 'นัดดูห้อง', (D.viewings || []).filter(v => v.status === 'ใหม่').length || ''], ['clean', '🧹', 'ทำความสะอาด', D.rooms.filter(r => r.cleanStatus === 'รอทำ').length || ''], ['find', '🔎', 'ค้นหา / อุปกรณ์ห้อง', itemIssueRooms() || ''], f.app ? ['pins', '🔐', 'รหัสผู้เช่า'] : null,
     ['news', '📢', 'ประกาศ'], ['report', '📈', 'รายงาน'], ['settings', '⚙️', 'ตั้งค่า'], ['more', '☰', 'เพิ่มเติม']].filter(Boolean);
   $('#side').innerHTML = `<div class="brand"><i>🏢</i><div style="min-width:0"><b>${esc(S().apartmentName)}</b><small>ระบบบริหารอพาร์ทเม้นท์</small></div></div>
     ${BLD_MANY ? `<div class="bchip"><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">🏢 <b style="color:#fff">${esc(S().buildingName || S().apartmentName)}</b></span><a onclick="changeBuilding()" style="flex:none;margin-left:8px">เปลี่ยนตึก</a></div>` : ''}
     <div class="mode ${own ? '' : 'sh'}" onclick="go('settings/tenant')" title="เปลี่ยนได้ที่ ตั้งค่า › การใช้งานร่วมกับผู้เช่า">${own ? '🔑 โหมดเจ้าของจัดการเอง' : '👥 ใช้ร่วมกับผู้เช่า'}</div>
     <nav>${items.map(x => typeof x === 'string' ? `<div class="sep">${x}</div>` : `<a class="nv ${x[0] === k ? 'on' : ''}" onclick="go('${x[0]}')"><span>${x[1]}</span>${x[2]}${x[3] ? `<span class="n">${x[3]}</span>` : ''}</a>`).join('')}</nav>
     <a class="nv install-btn" onclick="installApp()" style="margin-top:10px"><span>📲</span>ติดตั้งแอปลงเครื่อง</a>
-    <div class="me"><i>${esc((S().apartmentName || 'อ').trim()[0])}</i><div><b style="color:#fff">เจ้าของหอ</b><div><a onclick="logout()">ออกจากระบบ</a></div></div></div>`;
+    <div class="me"><i>${esc(((ME().name || S().apartmentName || 'อ').trim()[0]))}</i><div><b style="color:#fff">${ME().name ? esc(ME().name) : 'เจ้าของหอ'}</b>${ME().name ? `<div style="font-size:11px;opacity:.7">${ME().role === 'staff' ? 'ผู้ช่วย' : 'เจ้าของ'}</div>` : ''}<div><a onclick="logout()">ออกจากระบบ</a></div></div></div>`;
 }
 function deskTools() {
   const n = bellCount();
@@ -2240,7 +2259,7 @@ async function docHereSign() {
   docClose(); await docOwner(true);
 }
 async function docOwner(next) {
-  const C = DS.kind === 'contract', nm = S().landlordName || S().apartmentName;
+  const C = DS.kind === 'contract', nm = (!C && DS.d && DS.d.recvBy) || S().landlordName || S().apartmentName;
   const img = await signPad({ title: C ? 'ผู้ให้เช่าเซ็นชื่อ' : 'ผู้รับเงินเซ็นชื่อ', name: nm, step: next ? '2 / 2' : '', cancel: next ? 'เซ็นทีหลัง' : 'ยกเลิก' });
   if (img) await act('docSign', { kind: DS.kind, id: DS.id, who: 'owner', img }, 'บันทึกลายเซ็นแล้ว');
   const d = await docLoad(DS.kind, DS.id); render();
@@ -2313,6 +2332,63 @@ async function roomFix(dry) {
   $('#rfOut').innerHTML = `<div class="card" style="background:${r.filled ? 'var(--ok-soft)' : 'var(--warn-soft)'};border:0"><b>${dry ? 'ตรวจแล้ว: จะกู้' : '✅ กู้แล้ว'} ${r.filled || 0} ช่อง ใน ${(r.rooms || []).length} ห้อง</b>${(r.rooms || []).map(x => `<div class="small" style="margin-top:4px">• ห้อง ${esc(x)}</div>`).join('') || '<div class="small">ไม่พบช่องที่ต้องกู้ (ข้อมูลครบแล้ว)</div>'}</div>`;
   if (!dry) render();
 }
+
+
+/* ---------- ผู้ใช้ระบบ (แยกชื่อ + PIN) และประวัติการใช้งาน ---------- */
+VIEWS.users = () => {
+  const us = D.users || [], legacy = ME().legacy;
+  const row = u => `<div class="item"><span style="font-size:20px">👤</span><div style="flex:1;min-width:0"><b>${esc(u.name)}</b> ${u.id === ME().id ? '<span class="pl ok">คุณ</span>' : ''} ${u.active ? '' : '<span class="pl">ปิดใช้งาน</span>'}<div class="muted small">${u.role === 'staff' ? 'ผู้ช่วย · ออกบิล/รับเงินได้ แต่ลบบิล แก้ตั้งค่า ดูกำไรไม่ได้' : 'เจ้าของ · ทำได้ทุกอย่าง'}${u.lastLogin ? ' · เข้าล่าสุด ' + esc(ago(u.lastLogin)) : ''}</div></div>${STAFF() ? '' : `<button class="btn sm" onclick="userSheet(${q(u.id)})">แก้ไข</button>`}</div>`;
+  return { title: 'ผู้ใช้ระบบ', sub: 'แต่ละคนเข้าด้วยชื่อ + PIN ของตัวเอง', back: DESK() ? '' : 'more', nav: 'more',
+    html: `${legacy ? `<div class="card" style="background:var(--o-soft);border:0;font-size:14.5px;line-height:1.6">ตอนนี้ทุกคนใช้รหัสผ่านเดียวกัน ระบบเลยไม่รู้ว่าใครทำรายการ<br><b>ขั้นแรก:</b> ตั้งผู้ใช้ของคุณเอง (เป็นเจ้าของ) → แล้วเพิ่มหุ้นส่วน<br>หลังตั้งผู้ใช้คนแรก รหัสผ่านรวมเดิมจะใช้เข้าระบบไม่ได้แล้ว ทุกคนต้องเข้าด้วยชื่อ + PIN</div>` : ''}
+      <div class="card" style="padding:2px 14px">${us.map(row).join('') || '<div class="empty">ยังไม่มีผู้ใช้</div>'}</div>
+      ${STAFF() ? '' : `<button class="btn pri blk" onclick="userSheet()">＋ เพิ่มผู้ใช้${legacy ? ' (คุณเอง)' : ''}</button>`}
+      ${ME().id ? `<button class="btn blk" style="margin-top:8px" onclick="myPinSheet()">🔑 เปลี่ยน PIN ของฉัน</button>` : ''}
+      ${!legacy && !STAFF() ? `<button class="btn blk" style="margin-top:8px" onclick="go('audit')">📜 ประวัติการใช้งาน</button>` : ''}` };
+};
+function userSheet(id) {
+  const u = id ? (D.users || []).find(x => x.id === id) : null, first = !(D.users || []).some(x => x.active);
+  openSheet(`<h3>${u ? '✏️ แก้ไขผู้ใช้' : first ? '🔐 ตั้งผู้ใช้ของคุณ (เจ้าของ)' : '＋ เพิ่มผู้ใช้'}</h3><div id="fUser">
+    <label class="f">ชื่อที่แสดง (ขึ้นในบิล ใบเสร็จ และประวัติ)<input name="name" value="${esc(u ? u.name : '')}" placeholder="เช่น แซม · เดด" maxlength="40"></label>
+    ${first ? '' : `<div class="fl">สิทธิ์</div><div class="segb" id="uRole" style="margin:4px 0 10px"><button class="${!u || u.role !== 'staff' ? 'on' : ''}" data-v="owner" onclick="segPick(this)">👑 เจ้าของ (ทำได้ทุกอย่าง)</button><button class="${u && u.role === 'staff' ? 'on' : ''}" data-v="staff" onclick="segPick(this)">🧑‍💼 ผู้ช่วย</button></div>`}
+    ${u ? `<label style="display:flex;gap:8px;align-items:center;margin:4px 0 10px"><input type="checkbox" id="uAct" ${u.active ? 'checked' : ''} style="width:20px;height:20px"> ใช้งานอยู่ (เอาออก = เข้าระบบไม่ได้ แต่ประวัติยังอยู่)</label>
+      <label class="f">ตั้ง PIN ใหม่ให้ (ไม่บังคับ · ตัวเลข 6 หลัก)<input name="pin" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password"></label>`
+      : `<div class="g2"><label class="f">PIN 6 หลัก<input name="pin" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password"></label><label class="f">ใส่ PIN อีกครั้ง<input name="pin2" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password"></label></div>`}</div>
+    <div class="row" style="justify-content:flex-end"><button class="btn" onclick="closeSheet()">ยกเลิก</button><button class="btn pri" onclick="userSave(${q(id || '')})">บันทึก</button></div>`);
+}
+async function userSave(id) {
+  const o = formObj('#fUser'), role = $('#uRole .on') ? $('#uRole .on').dataset.v : 'owner', first = !(D.users || []).some(x => x.active);
+  if (!o.name.trim()) return uiAlert('กรุณาใส่ชื่อ');
+  if (!id) { if (!/^\d{6}$/.test(o.pin)) return uiAlert('PIN ต้องเป็นตัวเลข 6 หลัก'); if (o.pin !== o.pin2) return uiAlert('PIN สองช่องไม่ตรงกัน'); }
+  else if (o.pin && !/^\d{6}$/.test(o.pin)) return uiAlert('PIN ต้องเป็นตัวเลข 6 หลัก');
+  const j = await act('saveUser', { user: { id: id || '', name: o.name.trim(), role, pin: o.pin, active: id ? $('#uAct').checked : true } });
+  if (id && o.pin) await act('setUserPin', { id, pin: o.pin });
+  if (first && j && j.id) { // ผู้ใช้คนแรก: เข้าระบบด้วยชื่อนี้ทันที (รหัสผ่านรวมใช้ไม่ได้แล้ว)
+    const r = await callApi('userLogin', { uid: j.id, pin: o.pin }); TK = r.token; PW = ''; store('owner_tk', TK); store('owner_pw'); try { localStorage.setItem('last_uid', j.id); } catch (e) {}
+    await api('getAll', {}, true); closeSheet(); render(); return uiAlert('ตั้งผู้ใช้เรียบร้อย ✅\nต่อไปเข้าระบบด้วยชื่อ “' + o.name.trim() + '” + PIN 6 หลัก\nกด “＋ เพิ่มผู้ใช้” เพื่อเพิ่มหุ้นส่วนได้เลย');
+  }
+  toast('บันทึกแล้ว'); closeSheet(); render();
+}
+function myPinSheet() {
+  openSheet(`<h3>🔑 เปลี่ยน PIN ของฉัน</h3><div id="fMy"><label class="f">PIN เดิม<input name="old" type="password" inputmode="numeric" maxlength="6"></label>
+    <div class="g2"><label class="f">PIN ใหม่ 6 หลัก<input name="pin" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password"></label><label class="f">ใส่อีกครั้ง<input name="pin2" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password"></label></div></div>
+    <div class="row" style="justify-content:flex-end"><button class="btn" onclick="closeSheet()">ยกเลิก</button><button class="btn pri" onclick="myPinSave()">บันทึก</button></div>`);
+}
+async function myPinSave() { const o = formObj('#fMy'); if (!/^\d{6}$/.test(o.pin)) return uiAlert('PIN ใหม่ต้องเป็นตัวเลข 6 หลัก'); if (o.pin !== o.pin2) return uiAlert('PIN ใหม่สองช่องไม่ตรงกัน'); await act('changeMyPin', { old: o.old, pin: o.pin }, 'เปลี่ยน PIN แล้ว'); closeSheet(); }
+const AUDIT_L = { login: '🔓 เข้าสู่ระบบ', createBill: '🧾 ออกบิล', generateBills: '🧾 ออกบิลรายเดือน', updateBill: '✏️ แก้ไขบิล', deleteBill: '🗑 ลบบิล', recordPayment: '💵 บันทึกรับเงิน', receiveCash: '💵 รับเงินสด',
+  approveSlip: '✅ อนุมัติสลิป', rejectSlip: '✖ ปฏิเสธสลิป', unpay: '↺ ยกเลิกรับเงิน', checkIn: '🔑 เช็คอิน', moveOut: '🚪 ย้ายออก', saveTenant: '✏️ แก้ไขผู้เช่า', saveRoom: '🚪 แก้ไขห้อง/การจอง', deleteRoom: '🗑 ลบห้อง',
+  saveMeters: '💧 จดมิเตอร์', saveRepair: '🔧 อัปเดตงานซ่อม', createRepair: '🔧 แจ้งซ่อม', saveExpense: '💸 ค่าใช้จ่าย', deleteExpense: '🗑 ลบค่าใช้จ่าย', saveSettings: '⚙️ แก้ตั้งค่า', clearData: '🧹 ล้างข้อมูล',
+  resetRoom: '🧹 เคลียร์ห้อง', uploadDoc: '📎 แนบไฟล์', deleteDoc: '🗑 ลบไฟล์', postNews: '📢 ประกาศ', docSign: '✍️ เซ็นเอกสาร', docInfo: '📄 แก้ข้อมูลเอกสาร', docEdit: '📄 แก้ไขสัญญา', docReset: '↺ ล้างลายเซ็น', docLink: '🔗 ส่งลิงก์เซ็น',
+  saveUser: '👤 แก้ไขผู้ใช้', setUserPin: '🔑 ตั้ง PIN ให้ผู้ใช้', setClean: '🧹 ทำความสะอาด', saveRoomItems: '🛏️ อุปกรณ์ห้อง', saveViewing: '📅 นัดดูห้อง', markRefund: '💸 คืนเงินประกัน', setPin: '🔐 รหัสผู้เช่า', resetPin: '🔐 รหัสผู้เช่า' };
+function auditText(x) { let d = {}; try { d = JSON.parse(x.detail || '{}'); } catch (e) {} const p = []; if (d.room) p.push('ห้อง ' + d.room); if (d.name) p.push(d.name); if (d.title) p.push(d.title); if (d.amount) p.push(money(d.amount) + ' ฿'); if (d.total) p.push(money(d.total) + ' ฿'); if (d.method) p.push(d.method); if (d.status) p.push(d.status); if (d.month) p.push(d.month); if (d.settings) p.push(d.settings); return p.join(' · '); }
+let AUD = { uid: '', log: null };
+VIEWS.audit = () => {
+  if (!AUD.log) { api('auditLog', { uid: AUD.uid, limit: 400 }, true).then(j => { AUD.log = j.log || []; render(); }).catch(e => { AUD.log = []; uiAlert(e.message); }); }
+  const L = AUD.log || [], byDay = {};
+  L.forEach(x => { const d = String(x.at || '').slice(0, 10); (byDay[d] = byDay[d] || []).push(x); });
+  return { title: 'ประวัติการใช้งาน', sub: 'ใครทำอะไร เมื่อไหร่ (ล่าสุด 400 รายการ)', back: DESK() ? '' : 'users', nav: 'more',
+    html: `<div class="segb" style="margin-bottom:10px"><button class="${!AUD.uid ? 'on' : ''}" onclick="AUD={uid:'',log:null};render()">ทุกคน</button>${(D.users || []).map(u => `<button class="${AUD.uid === u.id ? 'on' : ''}" onclick="AUD={uid:'${u.id}',log:null};render()">${esc(u.name)}</button>`).join('')}</div>
+      ${AUD.log == null ? '<div class="empty">กำลังโหลด…</div>' : Object.keys(byDay).map(d => `<div class="card" style="padding:4px 14px"><h4 style="margin:8px 0 4px">${fmtDate(d)}</h4>${byDay[d].map(x => `<div class="line" style="align-items:flex-start"><span style="flex:1;min-width:0">${AUDIT_L[x.action] || esc(x.action)}<div class="muted small">${esc(auditText(x))}</div></span><span class="muted small" style="text-align:right;white-space:nowrap">${esc(x.userName || '-')}<br>${esc(String(x.at).slice(11, 16))}</span></div>`).join('')}</div>`).join('') || '<div class="empty">ยังไม่มีประวัติ</div>'}` };
+};
 </script>
 </body>
 </html>

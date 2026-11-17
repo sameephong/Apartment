@@ -60,7 +60,7 @@ function loadScript(src) {
   });
 }
 function demoReady() {
-  if (!_demoReady) _demoReady = loadScript('demo.js?v=5.10').then(() => loadScript('backend.js?v=5.10')).then(() => window.DemoGAS.init());
+  if (!_demoReady) _demoReady = loadScript('demo.js?v=6.0').then(() => loadScript('backend.js?v=6.0')).then(() => window.DemoGAS.init());
   return _demoReady;
 }
 async function callApi(action, payload) {

@@ -69,19 +69,21 @@
     },
     getUuid: () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)),
     base64Decode: s => ({ __b64: s }),
-    base64Encode: b => b.__b64,
+    base64Encode: b => Array.isArray(b) ? btoa(String.fromCharCode(...b.map(x => x & 255))) : b.__b64,
     newBlob: (b, mime, name) => ({ b64: b.__b64, mime, name }),
-    DigestAlgorithm: { SHA_256: 'SHA_256' },
+    DigestAlgorithm: { SHA_256: 'SHA_256' }, Charset: { UTF_8: 'UTF-8' },
     computeDigest(alg, b) {
-      const s = b.__b64, out = [];
+      const s = typeof b === 'string' ? b : b.__b64, out = [];
       let h = 2166136261;
       for (let k = 0; k < 32; k++) {
-        for (let i = k; i < s.length; i += 97) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+        h ^= k * 2654435761; for (let i = 0; i < s.length; i += (s.length > 4000 ? 97 : 1)) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
         out.push(((h >>> 0) % 256) - 128);
       }
       return out;
     },
   };
+  window.PropertiesService = { getScriptProperties: () => { const K = 'demo_props', ld = () => { try { return JSON.parse(localStorage.getItem(K) || '{}'); } catch (e) { return {}; } }, sv = o => { try { localStorage.setItem(K, JSON.stringify(o)); } catch (e) {} };
+    return { getProperty: k => { const o = ld(); return k in o ? o[k] : null; }, setProperty(k, v) { const o = ld(); o[k] = String(v); sv(o); return this; }, deleteProperty(k) { const o = ld(); delete o[k]; sv(o); return this; }, getProperties: () => ld() }; } };
   window.LockService = { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) };
   const skip = k => /^(sv|gen):/.test(k); // โหมดทดลองไม่แคชข้อมูลชีต (เปิดหลายแท็บได้ถูกต้อง)
   window.CacheService = { getScriptCache: () => ({

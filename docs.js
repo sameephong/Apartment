@@ -101,7 +101,7 @@ function docHtml(d) {
         <div class="dln"><span>${L.miLess}</span><b>− ${dNum(k.deposit)} ${L.baht}</b></div>
         <div class="dln" style="border:0"><span style="color:#111"><b>${L.miLeft}</b></span><b style="color:#2457c5;font-size:17px">${dNum(left)} ${L.baht}</b></div></div>
       <b>${L.cond2}</b><ul>${String(d.terms || '').split('\n').map(x => x.trim()).filter(Boolean).map(x => `<li>${dEsc(x)}</li>`).join('')}</ul>
-      <div class="dsig">${docSigBlock(d, 'tenant', L.booker, k.name)}${docSigBlock(d, 'owner', L.recv, b.landlord)}</div></div></div></div>`;
+      <div class="dsig">${docSigBlock(d, 'tenant', L.booker, k.name)}${docSigBlock(d, 'owner', L.recv, d.recvBy || b.landlord)}</div></div></div></div>`;
   }
   const t = d.t || {};
   const foot = docFootSig(d, 'owner', L.landlord) + docFootSig(d, 'tenant', L.tenant), sig = `<div class="dsig">${docSigBlock(d, 'owner', L.landlord, b.landlord)}${docSigBlock(d, 'tenant', L.tenant, t.name)}</div>`;
@@ -194,7 +194,7 @@ function docInvoice(d) {
     ${x.note ? `<p style="color:#555">หมายเหตุ: ${dEsc(x.note)}</p>` : ''}
     ${paid ? `<p>ชำระโดย <b>${dEsc(x.payMethod || '-')}</b> เมื่อ ${dEsc(dShort(x.paidDate, 'th'))} &nbsp; <span class="dpaid">ชำระแล้ว ✓</span></p>`
       : `<div class="dbox"><b>ช่องทางชำระเงิน</b>${d.pay && d.pay.promptpay ? `<br>พร้อมเพย์: ${dEsc(d.pay.promptpay)}` : ''}${d.pay && d.pay.bank ? `<br>${dEsc(d.pay.bank)}` : ''}${d.pay && d.pay.cash ? `<br>${dEsc(d.pay.cash)}` : ''}${d.link ? `<br><span style="color:#555;font-size:12.5px">ดูบิล/สแกนจ่ายออนไลน์: ${dEsc(d.link)}</span>` : ''}</div>`}
-    <div class="dsig" style="margin-top:34px"><div><div class="blank"></div>ลงชื่อ ....................................................<br>( ${dEsc(x.tenantName || '                         ')} )<br>ผู้ชำระเงิน</div><div><div class="blank"></div>ลงชื่อ ....................................................<br>( ${dEsc(b.landlord || '                         ')} )<br>${paid ? 'ผู้รับเงิน' : 'ผู้ออกบิล'}</div></div>
+    <div class="dsig" style="margin-top:34px"><div><div class="blank"></div>ลงชื่อ ....................................................<br>( ${dEsc(x.tenantName || '                         ')} )<br>ผู้ชำระเงิน</div><div><div class="blank"></div>ลงชื่อ ....................................................<br>( ${dEsc((paid ? x.paidBy : x.createdBy) || b.landlord || '                         ')} )<br>${paid ? 'ผู้รับเงิน' : 'ผู้ออกบิล'}</div></div>
     </div></div></div>`;
 }
 // หน้าแก้ไขสัญญา: แก้/เพิ่ม/ลบข้อความได้อิสระ (ช่องเซ็นชื่อระบบใส่ให้เอง)

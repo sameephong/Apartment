@@ -42,7 +42,8 @@ function rpRaster(cv) {
   for (let y0 = 0; y0 < h; y0 += 128) { const rows = Math.min(128, h - y0), buf = new Uint8Array(8 + bw * rows); buf.set([0x1D, 0x76, 0x30, 0, bw & 255, bw >> 8, rows & 255, rows >> 8]);
     for (let y = 0; y < rows; y++) for (let x = 0; x < w; x++) { const i = ((y0 + y) * w + x) * 4; if (d[i] * .3 + d[i + 1] * .59 + d[i + 2] * .11 < 150) buf[8 + y * bw + (x >> 3)] |= 0x80 >> (x & 7); }
     out.push(buf); }
-  out.push(new Uint8Array([0x1B, 0x4A, 200, 0x1B, 0x4A, 40])); // ป้อนกระดาษให้ท้ายใบพ้นใบมีดฉีก
+  const pad = 176, blank = new Uint8Array(8 + bw * pad); blank.set([0x1D, 0x76, 0x30, 0, bw & 255, bw >> 8, pad & 255, pad >> 8]); out.push(blank); // เว้นที่ว่างท้ายใบ ~22 มม. (เครื่องบางรุ่นไม่ป้อนกระดาษตามคำสั่ง)
+  out.push(new Uint8Array([0x1B, 0x4A, 200, 0x1B, 0x4A, 40, 0x1B, 0x64, 0x02])); // ป้อนกระดาษให้ท้ายใบพ้นใบมีดฉีก
   return out;
 }
 // ---------- วาดใบเสร็จ (กว้าง 384 จุด = กระดาษ 58 มม.) ----------
@@ -86,6 +87,7 @@ async function rpReceipt(b, opt) {
   else if (b.dueDate) text('กรุณาชำระภายใน ' + fmtDate(b.dueDate), 19, { bold: true, align: 'center' });
   if (qr) { y += 6; ops.push(['q', qr, (W - 232) / 2, y, 232]); y += 238; text('สแกนจ่าย พร้อมเพย์ ' + s.promptpay, 17, { align: 'center' }); text('ยอด ' + money(b.total) + ' บาท', 19, { bold: true, align: 'center' }); }
   else if (!paid && s.bankInfo) text(s.bankInfo, 17, { align: 'center' });
+  const who = paid ? b.paidBy : b.createdBy; if (who) { y += 2; text((paid ? 'ผู้รับเงิน: ' : 'ออกบิลโดย: ') + who, 17, { align: 'center' }); }
   y += 6; text('ขอบคุณครับ', 19, { align: 'center' });
   y += 14;
   const cv = document.createElement('canvas'); cv.width = W; cv.height = Math.ceil(y); const g = cv.getContext('2d');
