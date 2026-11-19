@@ -12,12 +12,12 @@
 <link rel="preconnect" href="https://script.google.com"><link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=6.0">
+<link rel="stylesheet" href="app.css?v=6.1">
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>document.write('<script src="config.js?t=' + Date.now() + '"><\/script>')</script>
-<script src="common.js?v=6.0"></script>
-<script src="docs.js?v=6.0"></script>
-<script src="printer.js?v=6.0"></script>
+<script src="common.js?v=6.1"></script>
+<script src="docs.js?v=6.1"></script>
+<script src="printer.js?v=6.1"></script>
 </head>
 <body class="admin">
 <div class="wrap">
@@ -101,7 +101,7 @@ function prevReading(room, month) {
 function meterRooms(month) { return active().filter(t => t.startDate.slice(0, 7) <= month).sort((a, b) => a.room.localeCompare(b.room, undefined, { numeric: true })); }
 function meterDone(month) { return meterRooms(month).filter(t => { const r = D.meters.find(m => m.month === month && m.room === t.room); return r && r.waterCur !== '' && r.elecCur !== ''; }).length; }
 function badgeCounts() {
-  return { bills: D.bills.filter(b => b.status === 'รออนุมัติ' || isOverdue(b)).length, repairs: D.repairs.filter(r => r.status === 'รอดำเนินการ').length };
+  return { bills: D.bills.filter(b => b.status === 'รออนุมัติ' || isOverdue(b)).length, repairs: (D.repairs.filter(r => r.status === 'รอดำเนินการ').length + (typeof tkHot === 'function' ? tkHot() : 0)) || '' };
 }
 
 /* ================= เข้าสู่ระบบ ================= */
@@ -171,7 +171,7 @@ function render() {
   $('#view').innerHTML = desk && !v.wide ? `<div class="narrow">${v.html}</div>` : v.html;
   if (desk) renderSide(v);
   const nav = v.nav || ROUTE[0], c = badgeCounts();
-  $('#nav').innerHTML = [['home', '🏠', 'ภาพรวม'], ['rooms', '🚪', 'ห้อง'], ['bills', '💰', 'บิล/เงิน', c.bills], ['repairs', '🔧', 'แจ้งซ่อม', c.repairs], ['more', '☰', 'เพิ่มเติม']]
+  $('#nav').innerHTML = [['home', '🏠', 'ภาพรวม'], ['rooms', '🚪', 'ห้อง'], ['bills', '💰', 'บิล/เงิน', c.bills], ['repairs', '📌', 'งาน', c.repairs], ['more', '☰', 'เพิ่มเติม']]
     .map(([k, i, l, n]) => `<button class="${k === nav ? 'on' : ''}" onclick="go('${k}')"><i>${i}</i>${l}${n ? `<span class="n">${n}</span>` : ''}</button>`).join('');
   document.title = v.title + ' · ' + S().apartmentName;
   if (v.after) v.after();
@@ -193,6 +193,7 @@ VIEWS.home = () => {
   if (OWN() && dueOk.length) todo.push(['💵', 'var(--warn-soft)', 'รอรับเงิน', 'ห้อง ' + [...new Set(dueOk.map(b => b.room))].slice(0, 8).join(', '), dueOk.length, '<button class="btn sm pri">บันทึกรับเงิน</button>', 'bills']);
   if (over.length) todo.push(['⏰', 'var(--bad-soft)', 'บิลเกินกำหนด', 'ห้อง ' + [...new Set(over.map(b => b.room))].join(', '), over.length, '<button class="btn sm">ดู</button>', 'bills']);
   if (reps.length) todo.push(['🔧', 'var(--warn-soft)', newReps.length ? 'งานแจ้งซ่อมใหม่' : 'งานซ่อมยังไม่เสร็จ', reps.slice(0, 3).map(r => r.category + ' ' + r.room).join(' · '), reps.length, '<button class="btn sm">ดู</button>', 'repairs']);
+  if (typeof homeTasks === 'function') homeTasks().forEach(x => todo.push([x.i, x.bg, x.t, x.d, x.n, x.btn, x.h]));
   if (exp.length) todo.push(['📄', 'var(--purple-soft)', 'สัญญาใกล้หมด', exp.slice(0, 3).map(t => t.room + (daysBetween(today(), t.endDate) < 0 ? ' (หมดแล้ว)' : ' · อีก ' + daysBetween(today(), t.endDate) + ' วัน')).join(', '), exp.length, '<button class="btn sm">ดู</button>', 'tenants']);
   if (!issued) todo.push(['📊', '#eef0f2', 'จดมิเตอร์ ' + fmtMonthS(cm), done >= need && need ? 'ครบแล้ว พร้อมออกบิล' : 'จดแล้ว ' + done + '/' + need + ' ห้อง · ปกติจดสิ้นเดือน', '', `<button class="btn sm ${done >= need && need ? 'pri' : ''}">${done >= need && need ? 'ออกบิล' : 'จด'}</button>`, done >= need && need ? 'issue/' + cm : 'meters']);
   return {
@@ -870,7 +871,7 @@ async function delNews(id) { if (!await uiConfirm('ลบประกาศน�
 <script>
 /* ===================== v3 · หน้าจอคอม/Mac + โหมดเจ้าของจัดการเอง ===================== */
 window.matchMedia('(min-width:1024px)').addEventListener('change', () => { if (D) { closeSheet(); render(); } });
-const APP_FRONT = '6.0';
+const APP_FRONT = '6.1';
 const ME = () => (D && D.me) || {};
 const STAFF = () => ME().role === 'staff';
 const M = Object.assign({}, VIEWS); // หน้ามือถือเดิม
@@ -907,13 +908,13 @@ function statusPill(b) {
 }
 
 /* ---------- เมนูซ้าย + แถบบน ---------- */
-function navKey() { const r = ROUTE[0] || 'home'; return ({ room: 'rooms', moveout: 'rooms', issue: 'meters', newbill: 'bills', editbill: 'bills', profile: 'settings' })[r] || r; }
+function navKey() { const r = ROUTE[0] || 'home'; return ({ tasks: 'repairs', room: 'rooms', moveout: 'rooms', issue: 'meters', newbill: 'bills', editbill: 'bills', profile: 'settings' })[r] || r; }
 function renderSide() {
   const f = FL(), c = deskCounts(), k = navKey(), own = OWN();
   const items = [['home', '📊', 'ภาพรวม'], ['rooms', '🏠', 'ผังห้อง'], ['meters', '💧', 'จดมิเตอร์'],
     ['bills', '🧾', own ? 'บิล / รับเงิน' : 'บิล / การเงิน', own ? c.open : c.over],
     (!own && (f.slip || c.review)) ? ['approve', '✅', 'อนุมัติสลิป', c.review] : null,
-    ['repairs', '🔧', 'งานซ่อม', c.rep], 'จัดการ', ['tenants', '👥', 'ผู้เช่า / สัญญา'], ['deposits', '💰', 'เงินประกัน', D.tenants.filter(t => t.refundStatus === 'รอคืนเงิน').length], STAFF() ? null : ['expenses', '💸', 'ค่าใช้จ่าย / กำไร'], ['viewings', '📅', 'นัดดูห้อง', (D.viewings || []).filter(v => v.status === 'ใหม่').length || ''], ['clean', '🧹', 'ทำความสะอาด', D.rooms.filter(r => r.cleanStatus === 'รอทำ').length || ''], ['find', '🔎', 'ค้นหา / อุปกรณ์ห้อง', itemIssueRooms() || ''], f.app ? ['pins', '🔐', 'รหัสผู้เช่า'] : null,
+    ['repairs', '📌', 'งาน', (c.rep + tkHot()) || ''], 'จัดการ', ['tenants', '👥', 'ผู้เช่า / สัญญา'], ['deposits', '💰', 'เงินประกัน', D.tenants.filter(t => t.refundStatus === 'รอคืนเงิน').length], STAFF() ? null : ['expenses', '💸', 'ค่าใช้จ่าย / กำไร'], ['viewings', '📅', 'นัดดูห้อง', (D.viewings || []).filter(v => v.status === 'ใหม่').length || ''], ['clean', '🧹', 'ทำความสะอาด', D.rooms.filter(r => r.cleanStatus === 'รอทำ').length || ''], ['find', '🔎', 'ค้นหา / อุปกรณ์ห้อง', itemIssueRooms() || ''], f.app ? ['pins', '🔐', 'รหัสผู้เช่า'] : null,
     ['news', '📢', 'ประกาศ'], ['report', '📈', 'รายงาน'], ['settings', '⚙️', 'ตั้งค่า'], ['more', '☰', 'เพิ่มเติม']].filter(Boolean);
   $('#side').innerHTML = `<div class="brand"><i>🏢</i><div style="min-width:0"><b>${esc(S().apartmentName)}</b><small>ระบบบริหารอพาร์ทเม้นท์</small></div></div>
     ${BLD_MANY ? `<div class="bchip"><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">🏢 <b style="color:#fff">${esc(S().buildingName || S().apartmentName)}</b></span><a onclick="changeBuilding()" style="flex:none;margin-left:8px">เปลี่ยนตึก</a></div>` : ''}
@@ -1048,6 +1049,7 @@ function dHome() {
   if (over.length > 2) task('⏰', 'var(--bad-soft)', `ค้างชำระอีก ${over.length - 2} บิล`, roomsOf(over.slice(2)).map(esc).join(', '), `<button class="btn sm" onclick="UI.billSeg='${own ? 'todo' : 'over'}';go('bills')">ดู</button>`);
   newR.slice(0, 2).forEach(r => task('🔧', 'var(--warn-soft)', `แจ้งซ่อมใหม่: ${esc(r.category)} ห้อง ${esc(r.room)}`, esc(r.detail.slice(0, 60)) + (r.source ? ' · ' + esc(r.source) : r.allowEntry === 'ได้' ? ' · อนุญาตเข้าห้องได้' : ''), `<button class="btn sm" onclick="takeJob(${q(r.id)})">รับงาน</button>`));
   if (doing.length) task('🛠', 'var(--o-soft)', `กำลังซ่อม ${doing.length} งาน`, doing.slice(0, 4).map(r => esc(r.category) + ' ' + esc(r.room)).join(' · '), `<button class="btn sm" onclick="go('repairs')">ดู</button>`);
+  homeTasks().forEach(x => task(x.i, x.bg, x.t, esc(x.d), x.btn));
   const exp = active().filter(t => t.endDate && daysBetween(today(), t.endDate) <= 45).sort((a, b) => a.endDate.localeCompare(b.endDate));
   if (exp.length) task('📄', 'var(--ok-soft)', `สัญญาใกล้หมด ${exp.length} ห้อง`, exp.slice(0, 3).map(t => 'ห้อง ' + esc(t.room) + ' (' + fmtDate(t.endDate) + ')').join(' · '), `<button class="btn sm" onclick="go('tenants')">ดู</button>`);
   const cm = curMonth(), need = meterRooms(cm).length, done = meterDone(cm), issued = D.bills.some(b => b.kind === 'รายเดือน' && b.month === cm);
@@ -1107,7 +1109,7 @@ function roomPanel(no) {
   const sub = [r.floor ? 'ชั้น ' + r.floor : '', r.type, money(r.rent) + ' ฿/เดือน'].filter(Boolean).map(esc).join(' · ');
   const head = name => `<div class="row" style="flex-wrap:nowrap;gap:12px;margin-bottom:14px"><div style="width:58px;height:58px;border-radius:14px;background:var(--o-soft);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:var(--o);flex:none">${esc(no)}</div><div style="flex:1;min-width:0"><b style="font-size:18px">${name}</b><div class="muted small">${sub}</div></div><span class="pl ${pc}">${esc(st.c === 'fix' ? 'ซ่อม' : st.c === 'clean' ? 'รอทำความสะอาด' : st.c === 'heavy' ? 'ซ่อมหนัก' : st.c === 'book' ? 'จอง ' + st.l : st.l)}</span></div>`;
   if (!t) return head(r.status === 'ว่าง' ? 'ห้องว่าง' : 'ห้อง' + esc(r.status)) + (r.note ? `<p class="muted">${esc(r.note)}</p>` : '') +
-    roomStatusCard(r) + `<button class="btn ok blk lg" onclick="go('room/${encodeURIComponent(no)}')">＋ เช็คอินผู้เช่า${r.status === 'จอง' && r.bookName ? ' (คุณ' + esc(r.bookName.split(' ')[0]) + ')' : 'ใหม่'}</button><button class="btn blk" style="margin-top:8px" onclick="roomSheet(${q(no)})">✏️ แก้ไขห้อง</button>` + cleanCard(no) + itemsCard(no) + docsHtml(no) + resetRoomBtn(no);
+    roomStatusCard(r) + `<button class="btn ok blk lg" onclick="go('room/${encodeURIComponent(no)}')">＋ เช็คอินผู้เช่า${r.status === 'จอง' && r.bookName ? ' (คุณ' + esc(r.bookName.split(' ')[0]) + ')' : 'ใหม่'}</button><button class="btn blk" style="margin-top:8px" onclick="roomSheet(${q(no)})">✏️ แก้ไขห้อง</button>` + roomTasksHtml(no) + cleanCard(no) + itemsCard(no) + docsHtml(no) + resetRoomBtn(no);
   const bills = D.bills.filter(b => b.tenantId === t.id).slice(0, 3), ob = openBills().filter(b => b.tenantId === t.id), reps = D.repairs.filter(x => x.room === no && repOpen(x));
   const lastM = D.meters.filter(m => m.room === no && (m.waterCur !== '' || m.elecCur !== '')).sort((a, b) => b.month.localeCompare(a.month))[0], dl = t.endDate ? daysBetween(today(), t.endDate) : null;
   return head(esc(t.name)) +
@@ -1119,7 +1121,7 @@ function roomPanel(no) {
     <div class="line"><span class="muted">มิเตอร์ล่าสุด</span><span>${lastM ? 'น้ำ ' + money(lastM.waterCur !== '' ? lastM.waterCur : lastM.waterPrev) + ' · ไฟ ' + money(lastM.elecCur !== '' ? lastM.elecCur : lastM.elecPrev) : '-'}</span></div>
     <b style="display:block;margin:14px 0 2px;font-size:14px">บิลล่าสุด</b>${bills.map(b => `<div class="line tap" onclick="billSheet(${q(b.id)})"><span>${esc(billTitle(b))}</span><span>${fmtB(b.total)} ${statusPill(b)}</span></div>`).join('') || '<div class="muted small">ยังไม่มีบิล</div>'}
     <b style="display:block;margin:14px 0 2px;font-size:14px">งานซ่อม</b>${reps.map(x => `<div class="task tap" onclick="repairSheet(${q(x.id)})"><i class="ic" style="background:var(--warn-soft);width:30px;height:30px;font-size:15px">🔧</i><div style="flex:1;min-width:0">${esc(x.category)} · ${esc(x.detail.slice(0, 40))}<div class="muted small">แจ้ง ${ago(x.createdAt)}</div></div><span class="pl ${x.status === 'กำลังซ่อม' ? 'o' : 'warn'}">${esc(x.status)}</span></div>`).join('') || '<div class="muted small">ไม่มีงานค้าง</div>'}
-    ${contractCard(no)}${lineCard(no)}${cleanCard(no)}${itemsCard(no)}${docsHtml(no)}
+    ${roomTasksHtml(no)}${contractCard(no)}${lineCard(no)}${cleanCard(no)}${itemsCard(no)}${docsHtml(no)}
     ${ob.length ? `<button class="btn ok blk" style="margin-top:14px" onclick="paySheet(${q(ob[ob.length - 1].id)})">💵 บันทึกรับเงิน ${fmtB(ob[ob.length - 1].total)}</button>` : ''}
     <div class="row" style="flex-wrap:nowrap;margin-top:${ob.length ? 8 : 16}px"><button class="btn" style="flex:1" onclick="go('newbill/${encodeURIComponent(no)}')">🧾 ออกบิล</button><button class="btn" style="flex:1" onclick="tenantSheet(${q(t.id)})">✏️ แก้ไข</button><button class="btn bad" style="flex:1" onclick="go('moveout/${t.id}')">🚪 ย้ายออก</button></div>` + resetRoomBtn(no);
 }
@@ -1321,7 +1323,7 @@ function mRepairs() {
   return {
     title: 'งานซ่อม', sub: 'ยังไม่เสร็จ ' + groups.open.length + ' งาน', right: `<button class="pill" onclick="newRepairSheet()">+ บันทึก</button>`,
     html: `<div class="seg">${[['open', 'ยังไม่เสร็จ'], ['done', 'เสร็จแล้ว'], ['broken', 'ซ่อมไม่ได้']].map(([k, l]) => `<button class="${k === seg ? 'on' : ''}" onclick="UI.repSeg='${k}';render()">${l} ${groups[k].length}</button>`).join('')}</div>
-      ${groups[seg].map(r => `<div class="card tap" onclick="repairSheet(${q(r.id)})"><div class="row"><b style="font-size:17px">ห้อง ${esc(r.room)}</b><span class="badge">${catIcon(r.category)} ${esc(r.category)}</span>${r.urgent && repOpen(r) ? '<span class="badge b-bad">ด่วน</span>' : ''}<span class="sp"></span><span class="badge ${pc[r.status] || ''}">${esc(r.status)}</span></div>
+      ${groups[seg].map(r => `<div class="card tap" onclick="repairSheet(${q(r.id)})"><div class="row"><b style="font-size:17px">ห้อง ${esc(r.room)}</b><span class="badge">${catIcon(r.category)} ${esc(r.category)}</span>${repSubBadge(r)}${r.urgent && repOpen(r) ? '<span class="badge b-bad">ด่วน</span>' : ''}<span class="sp"></span><span class="badge ${pc[r.status] || ''}">${esc(r.status)}</span></div>
         <div class="row" style="margin-top:8px;flex-wrap:nowrap;align-items:flex-start">${r.photoId ? `<img class="thumb" data-file="${esc(r.photoId)}">` : ''}<div style="flex:1;min-width:0">${esc(r.detail)}<div class="muted small">${esc(repWho(r))} · ${ago(r.createdAt)}</div>
         ${r.status === 'ซ่อมไม่ได้' && r.outcome ? `<div class="small" style="color:var(--bad)">${esc(r.outcome)}</div>` : ''}${r.appointAt && repOpen(r) ? `<div class="small">📅 นัดช่าง ${fmtDateTime(r.appointAt)}</div>` : ''}${+r.cost ? `<div class="small">${r.status === 'ซ่อมไม่ได้' ? 'ค่าเสียหาย' : 'ค่าซ่อม'} ${fmtB(r.cost)}${r.billId ? ' · ออกบิลแล้ว' : ''}</div>` : ''}</div></div>
         ${r.status === 'รอดำเนินการ' ? `<div class="row" style="margin-top:8px" onclick="event.stopPropagation()"><button class="btn sm pri" onclick="takeJob(${q(r.id)})">รับงาน</button>${r.phone ? `<button class="btn sm" onclick="callPhone(${q(r.phone)})">📞 โทร</button>` : ''}</div>` : ''}</div>`).join('') || `<div class="empty">${seg === 'open' ? 'ไม่มีงานค้าง 👍' : 'ไม่มีรายการ'}</div>`}`,
@@ -1352,7 +1354,7 @@ function repWho(r) { return r.source ? srcIcon(r.source) + ' ' + (r.source === '
 function repCard(r) {
   return `<div class="jc" draggable="true" ondragstart="event.dataTransfer.setData('text',${q(r.id)});this.classList.add('drag')" ondragend="this.classList.remove('drag')" onclick="repairSheet(${q(r.id)})">
     <div class="row" style="flex-wrap:nowrap"><span class="pl">ห้อง ${esc(r.room)}</span>${r.urgent ? '<span class="pl bad">ด่วน</span>' : ''}<span class="sp"></span><span class="muted small">${ago(repOpen(r) ? r.createdAt : r.updatedAt)}</span></div>
-    <div style="margin:8px 0 3px"><b>${catIcon(r.category)} ${esc(r.detail.slice(0, 70))}</b></div><div class="muted small">${esc(repWho(r))}</div>
+    <div style="margin:8px 0 3px"><b>${catIcon(r.category)} ${esc(r.detail.slice(0, 70))}</b></div><div class="muted small">${esc(repWho(r))}${repSubBadge(r)}</div>
     ${(r.photoId || (r.allowEntry === 'ได้' && repOpen(r))) ? `<div class="row" style="margin-top:8px">${r.photoId ? `<img class="shot" data-file="${esc(r.photoId)}">` : ''}${r.allowEntry === 'ได้' && repOpen(r) ? '<span class="pl ok">อนุญาตเข้าห้อง</span>' : ''}</div>` : ''}
     ${r.appointAt && repOpen(r) ? `<div class="small" style="margin-top:6px">📅 นัดช่าง ${fmtDateTime(r.appointAt)}</div>` : ''}
     ${r.ownerMsg ? `<div class="bubble">💬 ${FL().app ? 'แจ้งผู้เช่า' : 'บันทึก'}: “${esc(r.ownerMsg)}”</div>` : ''}
@@ -1379,6 +1381,7 @@ function repairSheet(id) {
     <label class="f">${app ? 'ข้อความถึงผู้เช่า (ผู้เช่าเห็นในแอป)' : 'บันทึก / ข้อความถึงผู้เช่า'}<input name="ownerMsg" value="${esc(r.ownerMsg)}" placeholder="เช่น ช่างเข้าพรุ่งนี้ 10 โมง"></label>
     <div class="row" style="align-items:flex-end"><label class="f" style="flex:1;margin:0"><span id="rsCostL">${r.status === 'ซ่อมไม่ได้' ? 'ค่าเสียหาย / ค่าของใหม่ (บาท)' : 'ค่าซ่อม (บาท)'}</span><input name="cost" type="number" inputmode="numeric" value="${esc(r.cost)}"></label>
       ${r.billId ? '<span class="badge b-ok" style="margin-bottom:10px">ออกบิลเก็บผู้เช่าแล้ว</span>' : `<div class="row" style="margin-bottom:8px"><button class="tog" id="rsChg" onclick="this.classList.toggle('on')"></button><span class="small">ออกบิลเก็บผู้เช่า</span></div>`}</div></div>
+    ${repSubHtml(r)}
     ${(r.log || []).length ? `<details style="margin:12px 0"><summary class="muted small" style="cursor:pointer">ประวัติ ${r.log.length} รายการ</summary>${r.log.slice().reverse().map(e => `<div class="small" style="padding:3px 0;border-bottom:1px solid #eef0f2"><b>${esc(e.s)}</b> · <span class="muted">${fmtDateTime(e.at)}</span>${e.m ? ' · ' + esc(e.m) : ''}</div>`).join('')}</details>` : ''}
     <div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn" onclick="rsSave(${q(id)},true)">บันทึก + ส่ง LINE แจ้งผู้เช่า</button><button class="btn pri" onclick="rsSave(${q(id)})">✓ บันทึก</button></div>`);
   document.querySelectorAll('#sbody img[data-file]').forEach(async im => { try { im.src = await getImg(im.dataset.file); } catch (e) {} });
@@ -1616,7 +1619,7 @@ async function dcUpload() {
 // ใส่ส่วนเอกสารในหน้าห้อง (มือถือ/คอมแบบหน้าเดียว)
 VIEWS.room = no => {
   const v = M.room(no);
-  if (D.rooms.some(r => r.room === no)) v.html += (tenantOf(no) ? `<div class="card">${contractCard(no)}${lineCard(no)}</div>` : '') + `<div class="card">${cleanCard(no)}</div><div class="card">${itemsCard(no)}</div><div class="card">${docsHtml(no)}</div>` + resetRoomBtn(no);
+  if (D.rooms.some(r => r.room === no)) v.html += (tenantOf(no) ? `<div class="card">${contractCard(no)}${lineCard(no)}</div>` : '') + `<div class="card">${roomTasksHtml(no)}</div><div class="card">${cleanCard(no)}</div><div class="card">${itemsCard(no)}</div><div class="card">${docsHtml(no)}</div>` + resetRoomBtn(no);
   return v;
 };
 
@@ -2389,6 +2392,146 @@ VIEWS.audit = () => {
     html: `<div class="segb" style="margin-bottom:10px"><button class="${!AUD.uid ? 'on' : ''}" onclick="AUD={uid:'',log:null};render()">ทุกคน</button>${(D.users || []).map(u => `<button class="${AUD.uid === u.id ? 'on' : ''}" onclick="AUD={uid:'${u.id}',log:null};render()">${esc(u.name)}</button>`).join('')}</div>
       ${AUD.log == null ? '<div class="empty">กำลังโหลด…</div>' : Object.keys(byDay).map(d => `<div class="card" style="padding:4px 14px"><h4 style="margin:8px 0 4px">${fmtDate(d)}</h4>${byDay[d].map(x => `<div class="line" style="align-items:flex-start"><span style="flex:1;min-width:0">${AUDIT_L[x.action] || esc(x.action)}<div class="muted small">${esc(auditText(x))}</div></span><span class="muted small" style="text-align:right;white-space:nowrap">${esc(x.userName || '-')}<br>${esc(String(x.at).slice(11, 16))}</span></div>`).join('')}</div>`).join('') || '<div class="empty">ยังไม่มีประวัติ</div>'}` };
 };
+
+/* ---------- 📌 งาน = งานซ่อม + งานอื่น (v6.1) ---------- */
+const TCATS = [['📄', 'เอกสาร/ราชการ'], ['🗣', 'ต้องคุย/ถามความเห็น'], ['🏢', 'รอเจ้าของตึก'], ['🛒', 'จัดซื้อ'], ['🧹', 'คน/ทำความสะอาด'], ['📌', 'อื่นๆ']];
+const tcIcon = c => (TCATS.find(x => x[1] === c) || ['📌'])[0];
+const TASKS = () => D.tasks || [];
+const tkOpen = t => t.status === 'todo' || t.status === 'wait';
+const tkDay = t => t.status === 'wait' ? String(t.followUp || '') : String(t.dueAt || '').slice(0, 10);
+const tkOther = () => TASKS().filter(t => !t.repairId);
+function tkHot() { const td = today(); return TASKS().filter(t => tkOpen(t) && tkDay(t) && tkDay(t) <= td).length; }
+function tkCounts() { const o = tkOther(); return { open: o.filter(t => t.status === 'todo').length, wait: o.filter(t => t.status === 'wait').length }; }
+let TKF = {};
+function tkWhen(t) {
+  const td = today();
+  if (t.status === 'done') return `<span class="pl ok">✓ ${fmtDate(String(t.doneAt || '').slice(0, 10))}${t.doneBy ? ' · ' + esc(t.doneBy) : ''}</span>`;
+  const d = tkDay(t); if (!d) return '';
+  const tm = t.status !== 'wait' && String(t.dueAt).length > 10 ? ' ' + String(t.dueAt).slice(11, 16) : '', dd = daysBetween(td, d);
+  const txt = dd === 0 ? 'วันนี้' : dd === 1 ? 'พรุ่งนี้' : fmtDate(d);
+  return `<span class="pl ${dd < 0 ? 'bad' : dd === 0 ? 'warn' : ''}">${t.status === 'wait' ? '🔔 ตามเรื่อง ' : '📅 '}${txt}${tm}${dd < 0 ? ' · เลย ' + (-dd) + ' วัน' : ''}</span>`;
+}
+function tkRow(t, back) {
+  const last = (t.log || [])[0], done = t.status === 'done', cancel = t.status === 'cancel', b = back ? ',' + q(back) : '';
+  return `<div class="tkr${done || cancel ? ' dn' : ''}"><button class="tkc${done ? ' on' : ''}" title="ติ๊กว่าเสร็จ" onclick="event.stopPropagation();tkTick(${q(t.id)},${!done}${b})" ${cancel ? 'disabled' : ''}>${done ? '✓' : ''}</button>
+    <div class="tap" style="flex:1;min-width:0" onclick="taskSheet(${q(t.id)},null${b})"><b class="tkt">${esc(t.title)}</b>
+    <div class="tkm"><span class="pl">${tcIcon(t.category)} ${esc(t.category || 'อื่นๆ')}</span>${tkWhen(t)}${t.room ? `<span class="pl o">ห้อง ${esc(t.room)}</span>` : ''}${t.status === 'wait' ? `<span class="pl warn">⏳ รอ ${esc(t.waitFor || 'คนอื่น')}</span>` : ''}${t.assignee ? `<span class="pl">👤 ${esc(t.assignee)}</span>` : ''}${t.repeat ? `<span class="pl">🔁 ${t.repeat === 'week' ? 'ทุกสัปดาห์' : 'ทุกเดือน'}</span>` : ''}${cancel ? '<span class="pl bad">ยกเลิก</span>' : ''}</div>
+    ${last && last.text !== 'สร้างงาน' ? `<div class="muted small tkl">💬 ${esc(last.text || '📎 แนบไฟล์')} · ${esc(last.by || '')} ${ago(last.at)}</div>` : ''}</div></div>`;
+}
+function tkOtherHtml() {
+  const seg = UI.tkSeg || 'todo', td = today(), L = tkOther();
+  const sortD = (a, b) => (tkDay(a) || '9999').localeCompare(tkDay(b) || '9999') || String(a.dueAt).localeCompare(String(b.dueAt));
+  const todo = L.filter(t => t.status === 'todo').sort(sortD), wait = L.filter(t => t.status === 'wait').sort(sortD);
+  const done = L.filter(t => t.status === 'done' || t.status === 'cancel').sort((a, b) => String(b.doneAt || b.updatedAt).localeCompare(String(a.doneAt || a.updatedAt)));
+  const grp = (h, arr) => arr.length ? `<div class="tkg">${h} <span class="muted">${arr.length}</span></div><div class="card tkbox">${arr.map(t => tkRow(t)).join('')}</div>` : '';
+  let body = '';
+  if (seg === 'todo') {
+    const fu = todo.filter(t => t.waitFor && t.followUp && t.followUp <= td).concat(wait.filter(t => t.followUp && t.followUp <= td)), rest = todo.filter(t => !fu.includes(t));
+    body = grp('⚠️ ถึงวันตามเรื่องแล้ว', fu) + grp('⏰ เลยกำหนด', rest.filter(t => tkDay(t) && tkDay(t) < td)) + grp('📅 วันนี้', rest.filter(t => tkDay(t) === td)) +
+      grp('🗓 ถัดไป', rest.filter(t => tkDay(t) > td)) + grp('📝 ไม่ระบุวัน', rest.filter(t => !tkDay(t))) + grp('⏳ รอคนอื่น', wait.filter(t => !fu.includes(t)));
+    if (!body) body = '<div class="empty">ไม่มีงานค้าง 🎉<br><span class="small">พิมพ์ด้านบนเพื่อเพิ่มงาน หรือพิมพ์ “งาน …” ในกลุ่ม LINE</span></div>';
+  } else if (seg === 'wait') body = wait.length ? `<div class="card tkbox">${wait.map(t => tkRow(t)).join('')}</div>` : '<div class="empty">ไม่มีเรื่องที่รอคนอื่น</div>';
+  else body = done.length ? `<div class="card tkbox">${done.map(t => tkRow(t)).join('')}</div><p class="muted small" style="text-align:center">แสดงงานที่เสร็จใน 60 วันล่าสุด</p>` : '<div class="empty">ยังไม่มีงานที่เสร็จ</div>';
+  return `<div class="tkq"><input id="tkQ" placeholder="＋ เพิ่มงานด่วน เช่น ตามใบอนุญาตก่อสร้าง" onkeydown="if(event.key==='Enter')tkQuick()"><button class="btn pri" onclick="tkQuick()">เพิ่ม</button><button class="btn" title="ใส่รายละเอียด วัน เวลา ห้อง" onclick="taskSheet(null,{title:$('#tkQ').value})">⋯</button></div>
+    <div class="seg">${[['todo', 'ต้องทำ', todo.length], ['wait', '⏳ รอคนอื่น', wait.length], ['done', 'เสร็จแล้ว', '']].map(([k, l, n]) => `<button class="${k === seg ? 'on' : ''}" onclick="UI.tkSeg='${k}';render()">${l}${n ? ' (' + n + ')' : ''}</button>`).join('')}</div>${body}`;
+}
+VIEWS.repairs = () => {
+  const tab = UI.tkTab || 'rep', c = tkCounts(), nr = D.repairs.filter(repOpen).length;
+  const top = `<div class="tktop"><button class="${tab === 'rep' ? 'on' : ''}" onclick="UI.tkTab='rep';render()">🔧 งานซ่อม${nr ? ` <span>${nr}</span>` : ''}</button><button class="${tab === 'oth' ? 'on' : ''}" onclick="UI.tkTab='oth';render()">📌 งานอื่น${c.open + c.wait ? ` <span>${c.open + c.wait}</span>` : ''}</button></div>`;
+  if (tab === 'rep') { const v = DESK() ? dRepairs() : mRepairs(); v.html = top + v.html; v.nav = 'repairs'; return v; }
+  return { title: 'งานอื่น', sub: 'ต้องทำ ' + c.open + ' · รอคนอื่น ' + c.wait, nav: 'repairs', right: `<button class="pill" onclick="taskSheet()">+ เพิ่มงาน</button>`, dright: `<button class="pill pri" onclick="taskSheet()">＋ เพิ่มงาน</button>`, html: top + tkOtherHtml() };
+};
+VIEWS.tasks = () => { UI.tkTab = 'oth'; return VIEWS.repairs(); };
+async function tkQuick() {
+  const v = ($('#tkQ') || {}).value || ''; if (!v.trim()) return taskSheet();
+  await act('saveTask', { task: { title: v.trim(), remind: 'morning' } }, 'เพิ่มงานแล้ว'); render();
+}
+function taskSheet(id, pre, back) {
+  const t = id ? TASKS().find(x => x.id === id) : Object.assign({ status: 'todo', remind: 'morning', category: 'อื่นๆ', title: '', room: '', assignee: '', dueAt: '', endAt: '', followUp: '', waitFor: '', repeat: '', note: '', repairId: '', log: [] }, pre || {});
+  if (!t) return;
+  TKF = { img: '', repairId: t.repairId || '', back: back || (pre && pre.repairId) || '' };
+  const pill = (gid, arr, cur, fn) => `<div class="segb" id="${gid}">${arr.map(([v, l]) => `<button class="${v === cur ? 'on' : ''}" data-v="${esc(v)}" onclick="segPick(this)${fn ? ';' + fn : ''}">${l}</button>`).join('')}</div>`;
+  const users = (D.users || []).filter(u => u.active).map(u => u.name); if (t.assignee && !users.includes(t.assignee)) users.push(t.assignee);
+  const d = String(t.dueAt || ''), e = String(t.endAt || ''), open = t.status === 'todo' || t.status === 'wait';
+  const rep = t.repairId ? D.repairs.find(r => r.id === t.repairId) : null;
+  openSheet(`<h3>${id ? tcIcon(t.category) + ' ' + esc(t.title) : '＋ เพิ่มงาน'}</h3>
+    ${id ? `<div class="muted small">สร้างโดย ${esc(t.createdBy || '-')} · ${fmtDateTime(t.createdAt)}${t.status === 'done' ? ' · <b style="color:var(--ok)">เสร็จแล้ว ' + fmtDateTime(t.doneAt) + (t.doneBy ? ' (' + esc(t.doneBy) + ')' : '') + '</b>' : ''}</div>` : ''}
+    ${rep ? `<div class="small" style="margin-top:4px">🔧 งานย่อยของงานซ่อม: <a class="tap" onclick="repairSheet(${q(rep.id)})">ห้อง ${esc(rep.room)} · ${esc(rep.category)}</a></div>` : ''}
+    <div id="fTk"><label class="f">ต้องทำอะไร *<input name="title" value="${esc(t.title)}" placeholder="เช่น ตามเรื่องใบอนุญาตก่อสร้างที่เขต"></label>
+    ${open ? `<div class="fl">สถานะ</div>${pill('tkStat', [['todo', 'ต้องทำ'], ['wait', '⏳ รอคนอื่น']].concat(id ? [['cancel', 'ยกเลิก']] : []), t.status, 'tkStShow()')}` : ''}
+    <div id="tkWait" class="${t.status === 'wait' ? '' : 'hide'}"><div class="g2"><label class="f">รอใคร / รออะไร<input name="waitFor" value="${esc(t.waitFor)}" placeholder="เช่น เจ้าของตึก, แม่เดด, เขต"></label><label class="f">ตามเรื่องอีกครั้งวันที่<input type="date" name="followUp" value="${esc(t.followUp)}"></label></div><div class="muted small" style="margin:-4px 0 6px">ถึงวันนั้นระบบย้ายกลับมา “ต้องทำ” และเตือนในสรุปเช้า</div></div>
+    ${t.repairId ? '' : `<div class="fl">ประเภท</div>${pill('tkCat', TCATS.map(x => [x[1], x[0] + ' ' + x[1]]), t.category || 'อื่นๆ')}`}
+    <div class="fl">ใครทำ</div>${pill('tkWho', [['', 'ทุกคน']].concat(users.map(n => [n, '👤 ' + esc(n)])), t.assignee || '')}
+    <div class="g2"><label class="f">วันที่ต้องทำ<input type="date" name="dDate" value="${esc(d.slice(0, 10))}"></label><label class="f">เวลา<input type="time" name="dTime" value="${esc(d.slice(11, 16))}"></label></div>
+    <div class="g2"><label class="f">คาดว่าเสร็จวันที่<input type="date" name="eDate" value="${esc(e.slice(0, 10))}"></label><label class="f">เวลา<input type="time" name="eTime" value="${esc(e.slice(11, 16))}"></label></div>
+    <label class="f">ห้อง (ไม่ใส่ก็ได้ · ติ๊กเสร็จแล้วจะบันทึกลงหมายเหตุห้อง)<select name="room"><option value="">— ไม่ระบุห้อง —</option>${D.rooms.map(r => `<option ${r.room === t.room ? 'selected' : ''}>${esc(r.room)}</option>`).join('')}</select></label>
+    <div class="fl">เตือน</div>${pill('tkRem', [['morning', '☀️ สรุปเช้าวันนั้น'], ['30', '⏰ 30 นาทีก่อน'], ['60', '⏰ 1 ชม.ก่อน'], ['1d', '⏰ 1 วันก่อน'], ['none', 'ไม่เตือน']], t.remind || 'morning')}
+    <div class="fl">ทำซ้ำ</div>${pill('tkRep', [['', 'ไม่ซ้ำ'], ['week', '🔁 ทุกสัปดาห์'], ['month', '🔁 ทุกเดือน']], t.repeat || '')}
+    <label class="f">รายละเอียด<textarea name="note" rows="2">${esc(t.note)}</textarea></label></div>
+    ${id ? `<div class="fl" style="margin-top:10px">ความคืบหน้า</div>
+    <div class="row" style="flex-wrap:nowrap"><input id="tkNote" style="flex:1" placeholder="เช่น โทรแล้ว เขตบอกรออีก 2 สัปดาห์"><label class="btn sm" style="margin:0" title="แนบรูป/PDF">📷<input type="file" accept="image/*,application/pdf" hidden onchange="tkPick(this.files[0])"></label><button class="btn sm pri" onclick="tkAddNote(${q(id)})">เพิ่ม</button></div><div id="tkImgP" class="small muted"></div>
+    <div class="tklog">${(t.log || []).map(x => `<div><span class="muted small">${fmtDateTime(x.at)}${x.by ? ' · ' + esc(x.by) : ''}</span><div>${esc(x.text || '')}${x.file ? ` <a class="tap" onclick="viewFile(${q(x.file)})">📎 ดูไฟล์</a>` : ''}</div></div>`).join('')}</div>` : ''}
+    <div class="row" style="margin-top:14px">${id ? `<button class="btn" style="color:var(--bad)" onclick="tkDel(${q(id)})">ลบ</button>` : ''}<span class="sp" style="flex:1"></span>
+      ${id && open ? `<button class="btn ok" onclick="tkSave(${q(id)},true)">✓ เสร็จแล้ว</button>` : ''}${id && t.status === 'done' ? `<button class="btn" onclick="tkTick(${q(id)},false)">↺ ยังไม่เสร็จ</button>` : ''}<button class="btn pri" onclick="tkSave(${q(id || '')})">บันทึก</button></div>`);
+}
+function tkStShow() { const b = $('#tkStat .on'); $('#tkWait').classList.toggle('hide', !b || b.dataset.v !== 'wait'); }
+function tkBack() { if (TKF.back && D.repairs.some(r => r.id === TKF.back)) { render(); repairSheet(TKF.back); } else { closeSheet(); render(); } }
+async function tkSave(id, done) {
+  const o = formObj('#fTk'), v = s => { const b = $('#' + s + ' .on'); return b ? b.dataset.v : null; };
+  if (!o.title) return uiAlert('กรุณาใส่ว่าต้องทำอะไร');
+  const rem = v('tkRem') || 'morning';
+  if ((rem === '30' || rem === '60') && !(o.dDate && o.dTime)) return uiAlert('เตือนก่อน 30 นาที / 1 ชม. ต้องใส่วันที่และเวลาที่ต้องทำด้วย');
+  if (rem === '1d' && !o.dDate) return uiAlert('เตือน 1 วันก่อน ต้องใส่วันที่ต้องทำด้วย');
+  if (o.eDate && o.dDate && (o.eDate + (o.eTime || '')) < (o.dDate + (o.dTime || ''))) return uiAlert('เวลาคาดว่าเสร็จ ต้องไม่ก่อนเวลาที่ต้องทำ');
+  const task = { title: o.title, assignee: v('tkWho') || '', room: o.room, remind: rem, repeat: v('tkRep') || '', note: o.note,
+    dueAt: o.dDate ? o.dDate + (o.dTime ? ' ' + o.dTime : '') : '', endAt: o.eDate ? o.eDate + (o.eTime ? ' ' + o.eTime : '') : (o.eTime && o.dDate ? o.dDate + ' ' + o.eTime : ''), waitFor: o.waitFor || '', followUp: o.followUp || '' };
+  if (id) task.id = id;
+  if (v('tkCat') != null) task.category = v('tkCat');
+  if (v('tkStat') != null) task.status = v('tkStat');
+  if (TKF.repairId) task.repairId = TKF.repairId;
+  if (task.repeat && !task.dueAt) return uiAlert('งานทำซ้ำ ต้องใส่วันที่ต้องทำครั้งแรก');
+  const j = await act('saveTask', { task }, done ? '' : id ? 'บันทึกแล้ว' : 'เพิ่มงานแล้ว');
+  if (done) await act('taskDone', { id: id || j.id }, '✓ เสร็จแล้ว' + (task.room ? ' · บันทึกในหมายเหตุห้อง ' + task.room : ''));
+  tkBack();
+}
+async function tkTick(id, done, back) {
+  const t = TASKS().find(x => x.id === id);
+  await act('taskDone', { id, done }, done ? '✓ เสร็จแล้ว' + (t && t.room ? ' · บันทึกในหมายเหตุห้อง ' + t.room : '') + (t && t.repeat ? ' · สร้างรอบถัดไปแล้ว' : '') : 'ย้อนกลับเป็นยังไม่เสร็จ');
+  if (back !== undefined) TKF.back = back;
+  if ($('#sbg').classList.contains('on') || back) tkBack(); else render();
+}
+async function tkDel(id) { if (!await uiConfirm('ลบงานนี้?')) return; await act('deleteTask', { id }, 'ลบงานแล้ว'); tkBack(); }
+async function tkPick(f) {
+  if (!f) return;
+  try { TKF.img = /pdf/.test(f.type) ? await readAsDataUrl(f) : await resizeImage(f, 1400, 0.75); $('#tkImgP').textContent = '📎 แนบ ' + f.name + ' แล้ว · กด “เพิ่ม”'; } catch (e) { uiAlert(e.message); }
+}
+async function tkAddNote(id) {
+  const text = ($('#tkNote') || {}).value || ''; if (!text.trim() && !TKF.img) return uiAlert('พิมพ์ความคืบหน้าหรือแนบรูปก่อน');
+  const back = TKF.back; await act('taskNote', { id, text: text.trim(), data: TKF.img }, 'บันทึกความคืบหน้าแล้ว'); render(); taskSheet(id, null, back);
+}
+function roomTasksHtml(no) {
+  const L = TASKS().filter(t => t.room === no && tkOpen(t));
+  return `<div class="row" style="margin:14px 0 4px"><b style="flex:1;font-size:14px">📌 สิ่งที่ต้องทำของห้องนี้</b><a class="small tap" onclick="taskSheet(null,{room:${q(no)}})">＋ เพิ่มงานให้ห้องนี้</a></div>${L.length ? L.map(t => tkRow(t)).join('') : '<div class="muted small">ไม่มีงานค้าง · ติ๊กเสร็จแล้วจะลงหมายเหตุห้องอัตโนมัติ</div>'}`;
+}
+function repSubHtml(r) {
+  const L = TASKS().filter(t => t.repairId === r.id);
+  return `<div class="row" style="margin:12px 0 4px"><b style="flex:1;font-size:14px">📌 งานย่อย${L.length ? ` <span class="muted">${L.filter(t => t.status === 'done').length}/${L.length}</span>` : ''}</b><a class="small tap" onclick="taskSheet(null,{repairId:${q(r.id)},room:${q(r.room)}})">＋ เพิ่มงานย่อย</a></div>${L.map(t => tkRow(t, r.id)).join('')}`;
+}
+function repSubBadge(r) { const L = TASKS().filter(t => t.repairId === r.id); return L.length ? ` <span class="pl">📌 ${L.filter(t => t.status === 'done').length}/${L.length}</span>` : ''; }
+
+// งาน/นัดช่างวันนี้ สำหรับหน้าภาพรวม (ใช้ทั้งมือถือและคอม) · t = html, d = ข้อความธรรมดา
+function homeTasks() {
+  const td = today(), O = TASKS().filter(tkOpen), out = [], ttl = t => esc(t.title) + (t.room ? ' · ห้อง ' + esc(t.room) : '');
+  const over = O.filter(t => t.status === 'todo' && tkDay(t) && tkDay(t) < td), tod = O.filter(t => t.status === 'todo' && tkDay(t) === td).sort((a, b) => String(a.dueAt).localeCompare(String(b.dueAt)));
+  const fu = O.filter(t => t.status === 'wait' && t.followUp && t.followUp <= td), wt = O.filter(t => t.status === 'wait');
+  const appt = D.repairs.filter(r => repOpen(r) && String(r.appointAt || '').slice(0, 10) === td);
+  if (over.length) out.push({ i: '⏰', bg: 'var(--bad-soft)', t: 'งานเลยกำหนด ' + over.length + ' งาน', d: over.slice(0, 3).map(t => t.title).join(' · '), n: over.length, btn: `<button class="btn sm" onclick="event.stopPropagation();go('tasks')">ดู</button>`, h: 'tasks' });
+  tod.slice(0, 4).forEach(t => out.push({ i: '📌', bg: 'var(--o-soft)', t: ttl(t), d: 'วันนี้' + (String(t.dueAt).length > 10 ? ' ' + t.dueAt.slice(11, 16) : '') + (t.endAt ? ' – ' + (t.endAt.slice(0, 10) === td ? t.endAt.slice(11, 16) : fmtDate(t.endAt.slice(0, 10))) : '') + (t.assignee ? ' · ' + t.assignee : ''), n: '', btn: `<button class="btn sm ok" onclick="event.stopPropagation();tkTick(${q(t.id)},true)">✓ เสร็จ</button>`, h: 'tasks' }));
+  if (tod.length > 4) out.push({ i: '📌', bg: 'var(--o-soft)', t: 'งานวันนี้อีก ' + (tod.length - 4) + ' งาน', d: tod.slice(4).map(t => t.title).join(' · '), n: '', btn: `<button class="btn sm" onclick="event.stopPropagation();go('tasks')">ดู</button>`, h: 'tasks' });
+  appt.forEach(r => out.push({ i: '🛠', bg: 'var(--warn-soft)', t: 'นัดช่างวันนี้ ' + esc(String(r.appointAt).slice(11, 16)) + ' · ห้อง ' + esc(r.room), d: r.category + ' — ' + r.detail.slice(0, 50), n: '', btn: `<button class="btn sm" onclick="event.stopPropagation();repairSheet(${q(r.id)})">เปิด</button>`, h: 'repairs' }));
+  if (fu.length || wt.length) out.push({ i: '⏳', bg: '#eef0f2', t: fu.length ? 'ถึงวันตามเรื่อง ' + fu.length + ' เรื่อง' : 'รอคนอื่นตัดสินใจ ' + wt.length + ' เรื่อง', d: (fu.length ? fu : wt).slice(0, 3).map(t => t.title + (t.waitFor ? ' (รอ ' + t.waitFor + ')' : '')).join(' · '), n: (fu.length || wt.length), btn: `<button class="btn sm" onclick="event.stopPropagation();UI.tkSeg='${fu.length ? 'todo' : 'wait'}';go('tasks')">ดู</button>`, h: 'tasks' });
+  return out;
+}
 </script>
 </body>
 </html>
