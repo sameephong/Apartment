@@ -33,8 +33,9 @@
 .dov{position:fixed;inset:0;z-index:9000;background:#e9edf3;overflow:auto;-webkit-overflow-scrolling:touch}
 .dov .dovbar{position:sticky;top:0;z-index:2;background:#1e293b;color:#fff;display:flex;gap:8px;align-items:center;padding:10px 14px;flex-wrap:wrap}.dov .dovbar b{flex:1;min-width:140px}
 .dov .dovin{padding:14px 8px 40px;overflow-x:hidden}
+.dpdfmsg{position:fixed;left:50%;top:40%;transform:translateX(-50%);background:#111827;color:#fff;padding:14px 20px;border-radius:12px;z-index:200;font-size:16px;box-shadow:0 8px 24px rgba(0,0,0,.3)}
 @media print{@page{size:A4;margin:0}body.docprint>*:not(.dov){display:none!important}body.docprint .dov{position:static;background:#fff;overflow:visible}body.docprint .dovbar{display:none}body.docprint .dovin{padding:0}
-  .dsheet.dpage{zoom:.84!important;margin:2mm auto 0!important;box-shadow:none!important;height:296mm;break-after:page;page-break-after:always} /* ย่อ 84%: iPhone/Safari ใส่ขอบกระดาษ+หัวท้ายเองเสมอ ถ้าเต็ม A4 จะตกขอบ */.dsheet.dpage.dlast{break-after:auto;page-break-after:auto}}`;
+  .dsheet.dpage{zoom:.8!important;margin:2mm auto 0!important;box-shadow:none!important;height:296mm;break-after:page;page-break-after:always} /* ย่อ 84%: iPhone/Safari ใส่ขอบกระดาษ+หัวท้ายเองเสมอ ถ้าเต็ม A4 จะตกขอบ */.dsheet.dpage.dlast{break-after:auto;page-break-after:auto}}`;
   const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
 })();
 
@@ -189,7 +190,7 @@ window.addEventListener('resize', () => document.querySelectorAll('.dovin,#docBo
 function docShow(d, bar) {
   docClose();
   const ov = document.createElement('div'); ov.className = 'dov'; ov.id = 'docOv';
-  ov.innerHTML = `<div class="dovbar"><b>${dEsc(d.kind === 'book' ? DOCL[d.lang].bookT : DOCL[d.lang].lease)} · ${dEsc(d.no || '')}</b>${bar || ''}<button class="btn sm" onclick="docPrint()">🖨 พิมพ์ / PDF</button><button class="btn sm" onclick="docClose()">✕ ปิด</button></div><div class="dovin"></div>`;
+  ov.innerHTML = `<div class="dovbar"><b>${dEsc(d.kind === 'book' ? DOCL[d.lang].bookT : DOCL[d.lang].lease)} · ${dEsc(d.no || '')}</b>${bar || ''}<button class="btn sm pri" onclick="docSavePdf()">💾 บันทึก PDF</button><button class="btn sm" onclick="docPrint()">🖨 พิมพ์</button><button class="btn sm" onclick="docClose()">✕ ปิด</button></div><div class="dovin"></div>`;
   document.body.appendChild(ov); document.body.style.overflow = 'hidden'; document.body.classList.add('docprint'); // เปิดเอกสารอยู่ = พิมพ์เฉพาะเอกสาร
   return docRender(ov.querySelector('.dovin'), d);
 }
@@ -202,6 +203,38 @@ function docPrint() {
   document.body.classList.add('docprint');
   window.print();
 }
+// สร้างไฟล์ PDF เอง (หน้าตรงกับที่เห็นบนจอทุกอย่าง ไม่ขึ้นกับการตั้งค่าพิมพ์ของ iPhone/Safari)
+async function docSavePdf(box, name) {
+  box = box || document.querySelector('#docOv .dovin') || document.getElementById('docBox'); if (!box) return;
+  const t = document.querySelector('#docOv .dovbar b'); name = name || (t ? t.textContent : document.title) || '';
+  const pre = /สัญญา|Lease/.test(name) ? 'Contract' : /จอง|Booking/.test(name) ? 'Booking' : /ใบเสร็จ|Receipt/.test(name) ? 'Receipt' : /ใบแจ้งหนี้|Invoice/.test(name) ? 'Invoice' : 'Document';
+  name = pre + '-' + (name.replace(/[^\x20-\x7e]/g, ' ').replace(/[\\/:*?"<>|·]/g, ' ').trim().replace(/\s+/g, '-') || 'file') + '.pdf'; // ชื่อไฟล์ภาษาอังกฤษ (บางเครื่องตั้งชื่อไทยไม่ได้)
+  const msg = document.createElement('div'); msg.className = 'dpdfmsg'; msg.textContent = 'กำลังสร้าง PDF…'; document.body.appendChild(msg);
+  const pages = Array.from(box.querySelectorAll('.dpage')), zs = pages.map(p => p.style.zoom);
+  try {
+    if (!window.html2canvas) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+    if (!window.jspdf) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+    if (document.fonts && document.fonts.ready) await document.fonts.ready;
+    pages.forEach(p => { p.style.zoom = ''; });
+    const pdf = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true });
+    for (let i = 0; i < pages.length; i++) {
+      msg.textContent = `กำลังสร้าง PDF… หน้า ${i + 1}/${pages.length}`;
+      const c = await window.html2canvas(pages[i], { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false, windowWidth: 1000,
+        onclone: doc => { doc.querySelectorAll('.dpage').forEach(p => { p.style.zoom = ''; p.style.boxShadow = 'none'; p.style.margin = '0'; }); } });
+      if (i) pdf.addPage('a4', 'portrait');
+      pdf.addImage(c.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, 210, 297);
+    }
+    pages.forEach((p, i) => { p.style.zoom = zs[i]; });
+    const blob = pdf.output('blob'), file = typeof File === 'function' ? new File([blob], name, { type: 'application/pdf' }) : null;
+    msg.remove();
+    const mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    if (mobile && file && navigator.canShare && navigator.canShare({ files: [file] })) {
+      const go = await uiDialog('PDF พร้อมแล้ว (' + pages.length + ' หน้า)\nกดปุ่มด้านล่าง แล้วเลือก “บันทึกไปยังไฟล์” หรือส่งทาง LINE ได้เลย', { cancel: true, ok: '💾 บันทึก / แชร์' });
+      if (go) { try { await navigator.share({ files: [file], title: name }); } catch (e) { if (e.name !== 'AbortError') dlBlob(blob, name); } }
+    } else dlBlob(blob, name);
+  } catch (e) { pages.forEach((p, i) => { p.style.zoom = zs[i]; }); msg.remove(); (window.uiAlert || alert)('สร้าง PDF ไม่สำเร็จ: ' + e.message + '\nลองใช้ปุ่ม 🖨 พิมพ์ แทนได้'); }
+}
+function dlBlob(blob, name) { const u = URL.createObjectURL(blob), a = document.createElement('a'); a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 60000); }
 // ใบแจ้งหนี้ / ใบเสร็จรับเงิน A4 (บิลทุกแบบ รวมบิลค่าใช้จ่ายเพิ่มเติมที่ออกให้ใครก็ได้)
 function docInvoice(d) {
   const x = d.bill, b = d.b || {}, paid = x.status === 'ชำระแล้ว', th = n => Number(n || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
