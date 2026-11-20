@@ -10,6 +10,7 @@
 .dsheet .dh{font-weight:700;margin:9px 0 0}.dsheet .dtb{width:100%;border-collapse:collapse;margin:6px 0}.dsheet .dtb td{border:1px solid #bbb;padding:4px 9px;text-align:left}.dsheet .dtb td.n{text-align:right;white-space:nowrap;font-weight:600}
 .dsheet .drow{display:grid;grid-template-columns:12mm 1fr 1.4fr;border:1px solid #bbb;border-top:0}.dsheet .drow>div{padding:4px 8px;border-left:1px solid #bbb}.dsheet .drow>div:first-child{border-left:0}.dsheet .drow.drh{border-top:1px solid #bbb;font-weight:700;background:#f5f5f5;margin-top:6px}
 .dsheet .dsig{display:flex;justify-content:space-between;gap:20px;margin-top:22px;text-align:center}.dsheet .dsig>div{flex:1}
+.dsheet .docc{margin:6px 0 6px 2em;line-height:2}.dsheet .dfill{display:inline-block;border-bottom:1px dotted #444;height:1em;vertical-align:baseline}.dsheet .dsig2{margin-top:10px}
 .dsheet .dsig img{height:60px;max-width:100%;display:block;margin:0 auto -14px}.dsheet .dsig .blank{height:46px}
 .dsheet .etag{display:inline-block;font-size:11px;color:#15803d;border:1px solid #9bd3ae;border-radius:99px;padding:0 8px;margin-top:2px}
 .dpfoot{flex:none;height:27mm;border-top:1px solid #ccc;display:flex;align-items:flex-end;gap:14px;padding:0 0 7mm;font-size:11.5px;line-height:1.35}
@@ -38,21 +39,23 @@
 })();
 
 const DOCL = {
-  th: { lease: 'สัญญาเช่าห้องพัก', no: 'เลขที่', at: 'ทำที่', date: 'วันที่', landlord: 'ผู้ให้เช่า', tenant: 'ผู้เช่า', sign: 'ลงชื่อ',
-    pay: 'เงินที่ผู้เช่าชำระในวันทำสัญญา', dep: 'เงินประกันการเช่า (คืนเมื่อสิ้นสุดสัญญา ตามข้อ 9)', adv: 'ค่าเช่าล่วงหน้า', key: 'มัดจำกุญแจ (คืนเมื่อคืนกุญแจ)', card: 'ค่าคีย์การ์ด', total: 'รวม', baht: 'บาท',
+  th: { lease: 'หนังสือสัญญาเช่า', no: 'เลขที่', at: 'ทำที่', date: 'วันที่', landlord: 'ผู้ให้เช่า', tenant: 'ผู้เช่า', sign: 'ลงชื่อ',
+    pay: 'เงินที่ผู้เช่าชำระในวันทำสัญญา', dep: 'เงินประกัน (คืนตามข้อ 2)', adv: 'ค่าเช่าล่วงหน้า', key: 'มัดจำกุญแจ (คืนเมื่อคืนกุญแจ)', card: 'ค่าคีย์การ์ด', total: 'รวม', baht: 'บาท',
     att: 'เอกสารแนบท้ายสัญญา · รายการทรัพย์สินในห้อง', item: 'รายการ', cond: 'สภาพวันเข้าอยู่', noItems: 'ยังไม่ได้บันทึกอุปกรณ์ห้องในระบบ', itemOk: 'มี / ใช้งานได้', esign: 'เซ็นอิเล็กทรอนิกส์',
-    estmt: 'สัญญานี้ทำเป็นเอกสารอิเล็กทรอนิกส์ คู่สัญญาได้อ่านและเข้าใจข้อความโดยตลอดแล้ว จึงลงลายมือชื่ออิเล็กทรอนิกส์ไว้เป็นสำคัญ',
-    pstmt: 'สัญญานี้ทำขึ้นเป็นสองฉบับมีข้อความตรงกัน คู่สัญญาได้อ่านและเข้าใจข้อความโดยตลอดแล้ว จึงลงลายมือชื่อไว้เป็นสำคัญ และต่างเก็บไว้ฝ่ายละหนึ่งฉบับ',
-    intro: (L, T, b) => `สัญญานี้ทำขึ้นระหว่าง ${L} ซึ่งต่อไปเรียกว่า <b>“ผู้ให้เช่า”</b> ฝ่ายหนึ่ง กับ ${T} ซึ่งต่อไปเรียกว่า <b>“ผู้เช่า”</b> อีกฝ่ายหนึ่ง ทั้งสองฝ่ายตกลงกันดังต่อไปนี้`,
+    estmt: 'ผู้เช่าได้อ่านและเข้าใจข้อความในสัญญาเช่านี้ดีแล้ว และยินยอมปฏิบัติตามทุกประการ จึงได้ลงลายมือชื่ออิเล็กทรอนิกส์ไว้เป็นหลักฐานสำคัญ',
+    pstmt: 'ผู้เช่าได้อ่านและเข้าใจข้อความในสัญญาเช่านี้ดีแล้ว และยินยอมปฏิบัติตามทุกประการ จึงได้ลงชื่อไว้เป็นหลักฐานสำคัญ',
+    intro: (L, T, b) => `หนังสือสัญญานี้ทำขึ้นระหว่าง${dEsc(b.name)} โดย ${L} ผู้มีอำนาจกระทำแทน${dEsc(b.name)} ซึ่งต่อไปในสัญญานี้จะเรียกว่า <b>“ผู้ให้เช่า”</b> ฝ่ายหนึ่ง กับ ${T} ซึ่งต่อไปในสัญญานี้จะเรียกว่า <b>“ผู้เช่า”</b> อีกฝ่ายหนึ่ง ทั้ง 2 ฝ่ายตกลงทำสัญญาเช่ากันโดยยึดถือระเบียบการและข้อบังคับของห้องพักดังต่อไปนี้`,
+    occ: 'ชื่อ', occAt: 'ออกให้ ณ', occDate: 'วันที่ออกบัตร', co: 'ผู้เช่า',
     idc: 'เลขบัตรประชาชน/พาสปอร์ต', addr: 'ที่อยู่', tel: 'โทร', page: 'หน้า',
     bookT: 'ใบรับเงินจองห้อง', booker: 'ผู้จอง', room: 'ห้อง', floor: 'ชั้น', moveAt: 'วันเวลาเข้าอยู่', recvAt: 'วันที่รับเงิน', bdep: 'เงินจอง', paid: 'ชำระแล้ว ✓',
     mi: 'ค่าแรกเข้าวันเข้าอยู่', miAll: 'ค่าแรกเข้าทั้งหมด', miLess: 'หักเงินจอง', miLeft: 'คงเหลือชำระวันเข้าอยู่', recv: 'ผู้รับเงิน', bnote: 'หมายเหตุ', cond2: 'เงื่อนไข' },
-  en: { lease: 'Residential Lease Agreement', no: 'No.', at: 'Made at', date: 'Date', landlord: 'Landlord', tenant: 'Tenant', sign: 'Signed',
-    pay: 'Payment on signing', dep: 'Security deposit (refundable per clause 9)', adv: 'Advance rent', key: 'Key deposit (refundable)', card: 'Key card fee', total: 'Total', baht: 'THB',
+  en: { lease: 'Lease Agreement', no: 'No.', at: 'Made at', date: 'Date', landlord: 'Landlord', tenant: 'Tenant', sign: 'Signed',
+    pay: 'Payment on signing', dep: 'Deposit (refundable per clause 2)', adv: 'Advance rent', key: 'Key deposit (refundable)', card: 'Key card fee', total: 'Total', baht: 'THB',
     att: 'Attachment · Room inventory', item: 'Item', cond: 'Condition at move-in', noItems: 'No room items recorded', itemOk: 'OK', esign: 'e-signed',
-    estmt: 'This agreement is made electronically. Both parties have read and understood it and have signed electronically below.',
-    pstmt: 'This agreement is made in two identical copies. Both parties have read and understood it, signed below, and each keeps one copy.',
-    intro: (L, T) => `This agreement is made between ${L} (the <b>“Landlord”</b>) and ${T} (the <b>“Tenant”</b>). Both parties agree as follows.`,
+    estmt: 'The Tenant has read and fully understood this lease, agrees to comply with all of its terms, and has signed electronically below as evidence.',
+    pstmt: 'The Tenant has read and fully understood this lease, agrees to comply with all of its terms, and has signed below as evidence.',
+    intro: (L, T, b) => `This lease is made between ${dEsc(b.name)}, represented by ${L}, authorized to act on behalf of ${dEsc(b.name)} (the <b>“Landlord”</b>), and ${T} (the <b>“Tenant”</b>). Both parties agree to this lease under the following rules and regulations of the premises.`,
+    occ: 'Name', occAt: 'ID/Passport no.', occDate: 'Issued on', co: 'Tenant',
     idc: 'ID/Passport no.', addr: 'Address', tel: 'Tel', page: 'Page',
     bookT: 'Booking Receipt', booker: 'Booked by', room: 'Room', floor: 'Floor', moveAt: 'Move-in', recvAt: 'Received on', bdep: 'Booking deposit', paid: 'PAID ✓',
     mi: 'Due on move-in', miAll: 'Total move-in cost', miLess: 'Less booking deposit', miLeft: 'Balance due on move-in', recv: 'Received by', bnote: 'Note', cond2: 'Terms' },
@@ -63,14 +66,35 @@ function dEsc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
 function dNum(n) { return Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 2 }); }
 function dDate(d, lang) { const m = String(d || '').match(/^(\d{4})-(\d{2})-(\d{2})/); if (!m) return '-'; return lang === 'en' ? Number(m[3]) + ' ' + DEN_M[+m[2] - 1] + ' ' + m[1] : Number(m[3]) + ' ' + DTH_M[+m[2] - 1] + ' ' + (+m[1] + 543); }
 function dShort(at, lang) { const m = String(at || '').match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{1,2}:\d{2}))?/); if (!m) return '-'; return Number(m[3]) + '/' + Number(m[2]) + '/' + (lang === 'en' ? m[1] : String(+m[1] + 543).slice(-2)) + (m[4] ? ' ' + m[4] + (lang === 'en' ? '' : ' น.') : ''); }
+// จำนวนเงินเป็นตัวหนังสือ เช่น 3500 → สามพันห้าร้อยบาทถ้วน
+function dBahtText(n) {
+  n = Math.round((Number(n) || 0) * 100) / 100; if (!n) return 'ศูนย์บาทถ้วน';
+  const D = ['', 'หนึ่ง', 'สอง', 'สาม', 'สี่', 'ห้า', 'หก', 'เจ็ด', 'แปด', 'เก้า'], P = ['', 'สิบ', 'ร้อย', 'พัน', 'หมื่น', 'แสน'];
+  const six = x => { const s = String(x), l = s.length; let o = ''; for (let i = 0; i < l; i++) { const c = +s[i], p = l - i - 1; if (!c) continue; o += (p === 1 && c === 1 ? '' : p === 1 && c === 2 ? 'ยี่' : p === 0 && c === 1 && l > 1 ? 'เอ็ด' : D[c]) + P[p]; } return o; };
+  const w = x => { let o = '', m = ''; while (x > 0) { const part = x % 1000000; o = (part ? six(part) : '') + m + o; m = 'ล้าน'; x = Math.floor(x / 1000000); } return o; };
+  const b = Math.floor(n), st = Math.round((n - b) * 100);
+  return (b ? w(b) + 'บาท' : '') + (st ? w(st) + 'สตางค์' : 'ถ้วน');
+}
+function dWordsEn(n) {
+  n = Math.floor(Number(n) || 0); if (!n) return 'zero baht';
+  const a = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'], t = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+  const h = x => (x >= 100 ? a[Math.floor(x / 100)] + ' hundred' + (x % 100 ? ' ' : '') : '') + (x % 100 < 20 ? a[x % 100] : t[Math.floor(x % 100 / 10)] + (x % 10 ? '-' + a[x % 10] : ''));
+  let o = [], u = ['', ' thousand', ' million'], i = 0; while (n > 0) { if (n % 1000) o.unshift(h(n % 1000) + u[i]); n = Math.floor(n / 1000); i++; }
+  return o.join(' ') + ' baht';
+}
 function dV(v) { return `<span class="dv">${dEsc(v == null || v === '' ? '                    ' : v)}</span>`; }
 function docTermsHtml(d) {
   const L = d.lang, t = d.t || {}, r = d.rates || {};
   const map = { room: d.room.room, floor: d.room.floor || '-', months: t.months || '-', start: dDate(t.start, L), end: dDate(t.end, L), rent: dNum(d.room.rent), dueDay: r.dueDay || '-', water: dNum(r.water), elec: dNum(r.elec),
-    common: r.common ? (L === 'en' ? ' Common/internet fee ' + dNum(r.common) + ' THB per month.' : ' และค่าส่วนกลาง/อินเทอร์เน็ตเดือนละ ' + dNum(r.common) + ' บาท') : '' };
+    common: r.common ? (L === 'en' ? ' Common/internet fee ' + dNum(r.common) + ' THB per month.' : ' และค่าส่วนกลาง/อินเทอร์เน็ตเดือนละ ' + dNum(r.common) + ' บาท') : '',
+    deposit: dNum(t.deposit), depositText: L === 'en' ? dWordsEn(t.deposit) : dBahtText(t.deposit), rentText: L === 'en' ? dWordsEn(d.room.rent) : dBahtText(d.room.rent),
+    waterMin: +r.waterMin ? (L === 'en' ? ' (minimum ' + dNum(r.waterMin) + ' THB per month)' : ' (ขั้นต่ำเดือนละ ' + dNum(r.waterMin) + ' บาท)') : '' };
+  const LL = DOCL[L] || DOCL.th, dots = n => `<span class="dfill" style="min-width:${n}px"></span>`;
+  const occ = () => [1, 2, 3].map(i => `<p class="docc">${i}. ${LL.occ} ${i === 1 && t.name ? `<span class="dv">${dEsc(t.name)}</span>` : dots(200)} ${LL.occAt} ${i === 1 && t.idCard && L === 'en' ? `<span class="dv">${dEsc(t.idCard)}</span>` : dots(130)} ${LL.occDate} ${dots(100)}</p>`).join('');
   return String(d.terms || '').split('\n').map(x => x.trim()).filter(Boolean).map(line => {
+    if (line === '{occupants}') return occ();
     const h = /^(ข้อ\s*\d+|\d+\.)\s*\S/.test(line) && line.length < 70;
-    const html = dEsc(line).replace(/\{(\w+)\}/g, (m, k) => map[k] != null ? (k === 'common' ? dEsc(map[k]) : '<b>' + dEsc(map[k]) + '</b>') : m);
+    const html = dEsc(line).replace(/\{(\w+)\}/g, (m, k) => map[k] != null ? (k === 'common' || k === 'waterMin' ? dEsc(map[k]) : '<b>' + dEsc(map[k]) + '</b>') : m);
     return h ? `<p class="dh">${html}</p>` : `<p style="text-indent:2em">${html}</p>`;
   }).join('');
 }
@@ -104,7 +128,7 @@ function docHtml(d) {
       <div class="dsig">${docSigBlock(d, 'tenant', L.booker, k.name)}${docSigBlock(d, 'owner', L.recv, d.recvBy || b.landlord)}</div></div></div></div>`;
   }
   const t = d.t || {};
-  const foot = docFootSig(d, 'owner', L.landlord) + docFootSig(d, 'tenant', L.tenant), sig = `<div class="dsig">${docSigBlock(d, 'owner', L.landlord, b.landlord)}${docSigBlock(d, 'tenant', L.tenant, t.name)}</div>`;
+  const foot = docFootSig(d, 'owner', L.landlord) + docFootSig(d, 'tenant', L.tenant), sig = `<div class="dsig">${docSigBlock(d, 'owner', L.landlord, b.landlord)}${docSigBlock(d, 'tenant', L.tenant, t.name)}</div><div class="dsig dsig2">${docSigBlock(d, 'co1', L.co, '')}${docSigBlock(d, 'co2', L.co, '')}</div>`;
   const secs = (d.custom ? String(d.custom) : docLeaseBody(d)).split(/<hr[^>]*class="?dpb"?[^>]*>/i);
   return `<div class="dflow" data-k="lease" data-pg="${L.page}"><template class="dpf">${foot}</template>` + secs.map((x, i) => `<div class="dsec">${x}${i === 0 ? sig : ''}</div>`).join('') + `</div>`;
 }
@@ -122,9 +146,7 @@ function docLeaseBody(d) {
     <p class="dr">${L.no} ${dV(d.no)} &nbsp; ${L.at} ${dV(b.name)}<br>${L.date} ${dV(dDate(d.date, d.lang))}</p>
     <p style="text-indent:2em">${L.intro(dV(b.landlord), party, b)}</p>
     ${docTermsHtml(d)}
-    <p class="dh">${L.pay}</p>
-    <table class="dtb">${rows.map(x => `<tr><td>${x[0]}</td><td class="n">${dNum(x[1])} ${L.baht}</td></tr>`).join('')}<tr><td><b>${L.total}</b></td><td class="n">${dNum(sum)} ${L.baht}</td></tr></table>
-    <p style="text-indent:2em;margin-top:12px">${d.mode === 'e' ? L.estmt : L.pstmt}</p>
+    <p class="dend" style="text-indent:2em;margin-top:12px">${d.mode === 'e' ? L.estmt : L.pstmt}</p>
     <hr class="dpb"><h1 style="font-size:19px">${L.att}</h1><p class="dsub">${L.no} ${dEsc(d.no || '')} · ${L.room} ${dEsc(d.room.room)}</p>
     ${items.length ? `<div class="drow drh"><div>#</div><div>${L.item}</div><div>${L.cond}</div></div>${items.map((k, i) => `<div class="drow"><div>${i + 1}</div><div>${dEsc(k)}</div><div>${ck(d.items[k] || {})}${(d.items[k] || {}).n ? ' · ' + dEsc(d.items[k].n) : ''}</div></div>`).join('')}` : `<p class="dc" style="color:#888">${L.noItems}</p>`}`;
 }
@@ -146,8 +168,9 @@ function docPaginate(el) {
       Array.from(sec.children).forEach(b => {
         c.appendChild(b);
         if (c.scrollHeight > c.clientHeight + 1 && c.children.length > 1) {
-          c.removeChild(b); const prev = c.lastElementChild, carry = prev && (prev.classList.contains('dh') || prev.classList.contains('drh') || /^H[1-4]$/.test(prev.tagName)) && c.children.length > 1 ? prev : null; // ไม่ให้หัวข้อค้างท้ายแผ่น
-          c = page(); if (carry) c.appendChild(carry); c.appendChild(b);
+          c.removeChild(b); const carry = [], keep = x => x.classList.contains('dh') || x.classList.contains('drh') || /^H[1-4]$/.test(x.tagName) || (b.classList.contains('dsig') && (x.classList.contains('dsig') || x.classList.contains('dend')));
+          while (c.children.length > 1 && keep(c.lastElementChild) && carry.length < 3) carry.unshift(c.removeChild(c.lastElementChild)); // ไม่ให้หัวข้อ/ช่องเซ็นแยกจากข้อความ
+          c = page(); carry.forEach(x => c.appendChild(x)); c.appendChild(b);
         }
       });
     });

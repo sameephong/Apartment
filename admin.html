@@ -12,12 +12,12 @@
 <link rel="preconnect" href="https://script.google.com"><link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=6.2">
+<link rel="stylesheet" href="app.css?v=6.3">
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>document.write('<script src="config.js?t=' + Date.now() + '"><\/script>')</script>
-<script src="common.js?v=6.2"></script>
-<script src="docs.js?v=6.2"></script>
-<script src="printer.js?v=6.2"></script>
+<script src="common.js?v=6.3"></script>
+<script src="docs.js?v=6.3"></script>
+<script src="printer.js?v=6.3"></script>
 </head>
 <body class="admin">
 <div class="wrap">
@@ -325,7 +325,7 @@ function ciCalc() {
   const d = o.startDate || today(), m = d.slice(0, 7), dim = new Date(+m.slice(0, 4), +m.slice(5, 7), 0).getDate(), days = dim - +d.slice(8) + 1;
   const adv = Math.max(0, +o.advanceMonths || 0), rows = [], rent = +r.rent || 0, part = partRent(rent, days, dim), dr = +S().dailyRate || 0;
   const pl = days >= dim ? fmtMonthS(m) : +d.slice(8) + '–' + dim + ' ' + TH_MONTHS_S[+m.slice(5) - 1] + ' (' + days + ' วัน)';
-  const how = days < dim ? (dr ? `${money(rent)} − ${dim - days} วัน × ${money(dr)}` : 'คิดตามสัดส่วนวัน') : '';
+  const how = days < dim ? (dr ? `${days} วัน × ${money(dr)}` : 'คิดตามสัดส่วนวัน') : '';
   if (adv) rows.push([days < dim ? 'ค่าเช่าล่วงหน้า ' + pl + (adv > 1 ? ' + ' + (adv - 1) + ' เดือน' : '') : 'ค่าเช่าล่วงหน้า ' + adv + ' เดือน', part + rent * (adv - 1), how || 'ใช้แทนค่าเช่าเดือนแรก']);
   else rows.push(['ค่าเช่า ' + pl, part, how]);
   if (+o.deposit) rows.push(['เงินประกัน', +o.deposit, 'คืนเมื่อครบสัญญา']);
@@ -871,7 +871,7 @@ async function delNews(id) { if (!await uiConfirm('ลบประกาศน�
 <script>
 /* ===================== v3 · หน้าจอคอม/Mac + โหมดเจ้าของจัดการเอง ===================== */
 window.matchMedia('(min-width:1024px)').addEventListener('change', () => { if (D) { closeSheet(); render(); } });
-const APP_FRONT = '6.2';
+const APP_FRONT = '6.3';
 const ME = () => (D && D.me) || {};
 const STAFF = () => ME().role === 'staff';
 const M = Object.assign({}, VIEWS); // หน้ามือถือเดิม
@@ -1471,7 +1471,7 @@ function setContent(tab) {
     extra: `<div class="muted small" style="margin:4px 2px 6px">ตัวอย่างหัวบิลที่ผู้เช่าเห็น</div><div class="card" id="profPrev" style="max-width:980px"></div>`, after: profPrev };
   if (tab === 'movein') return { title: 'ค่าแรกเข้า / เงินประกัน', sub: 'ค่าเริ่มต้นตอนเช็คอินผู้เช่าใหม่ · แก้รายห้องได้ตอนเช็คอิน',
     html: `<div id="fSet">${fields([['advanceMonths', 'ค่าเช่าล่วงหน้า (กี่เดือน · ใช้แทนค่าเช่าเดือนแรก)', 'n'], ['depositMonths', 'เงินประกัน (กี่เดือนของค่าเช่า · คืนเมื่อครบสัญญา)', 'n'], ['keyDeposit', 'มัดจำกุญแจ (บาท · คืนเมื่อคืนกุญแจ)', 'n'], ['cardFee', 'ค่าคีย์การ์ด (บาท · ไม่คืน)', 'n'], ['contractMonths', 'ระยะสัญญาเริ่มต้น (6 หรือ 12 เดือน)', 'n'], ['dailyRate', 'ค่าเช่ารายวัน (บาท/วัน · เข้า-ออกไม่เต็มเดือน · 0 = ตามสัดส่วน)', 'n']])}</div>
-      <div class="card" style="background:#eef4ff;border:0;font-size:14px">📅 <b>เข้าระหว่างเดือน</b> ค่าเช่าเดือนแรก = ค่าเช่า − วันที่ไม่ได้อยู่ × ค่ารายวัน<br>${+s.dailyRate ? `เช่น เข้าวันที่ 7 (เดือนมี 30 วัน) = 3,500 − 6 × ${money(s.dailyRate)} = <b>${money(Math.max(0, 3500 - 6 * s.dailyRate))} บาท</b> · ใช้เป็นค่าเช่าล่วงหน้าตอนเข้า` : 'ยังไม่ได้ตั้งค่ารายวัน → คิดตามสัดส่วนวัน (ค่าเช่า × วันที่อยู่ ÷ วันในเดือน)'}</div>
+      <div class="card" style="background:#eef4ff;border:0;font-size:14px">📅 <b>เข้าระหว่างเดือน</b> ค่าเช่าเดือนแรก = จำนวนวันที่อยู่ (นับวันเข้าด้วย ถึงสิ้นเดือน) × ค่ารายวัน<br>${+s.dailyRate ? `เช่น เข้าวันที่ 20 พ.ย. (เดือนมี 30 วัน) = 11 วัน × ${money(s.dailyRate)} = <b>${money(11 * s.dailyRate)} บาท</b> (ไม่เกินค่าเช่าเต็มเดือน) · ใช้เป็นค่าเช่าล่วงหน้าตอนเข้า` : 'ยังไม่ได้ตั้งค่ารายวัน → คิดตามสัดส่วนวัน (ค่าเช่า × วันที่อยู่ ÷ วันในเดือน)'}</div>
       <div class="card" style="background:#f6f7f9;border:0;font-size:14px">ตัวอย่างห้อง 3,500: ค่าเช่าล่วงหน้า ${money(3500 * (+s.advanceMonths || 0))} + เงินประกัน ${money(3500 * (+s.depositMonths || 0))} + มัดจำกุญแจ ${money(s.keyDeposit)} + คีย์การ์ด ${money(s.cardFee)} = <b>${money(3500 * ((+s.advanceMonths || 0) + (+s.depositMonths || 0)) + (+s.keyDeposit || 0) + (+s.cardFee || 0))} บาท</b></div>
       <button class="btn pri" onclick="saveSettings('#fSet')">บันทึกการตั้งค่า</button>` };
   if (tab === 'rates') return { title: 'ค่าน้ำ / ค่าไฟ', sub: 'ใช้คำนวณบิลรายเดือน', html: `<div id="fSet">${fields(SET_FIELDS[0][1].filter(f => !['depositMonths', 'contractMonths'].includes(f[0])))}</div><button class="btn pri" onclick="saveSettings('#fSet')">บันทึกการตั้งค่า</button>` };
@@ -1627,7 +1627,7 @@ VIEWS.room = no => {
 function partRent(rent, days, dim) {
   const daily = +S().dailyRate || 0;
   if (days >= dim) return rent;
-  return daily > 0 ? Math.max(0, Math.min(rent, Math.round(rent - (dim - days) * daily))) : Math.round(rent * days / dim);
+  return daily > 0 ? Math.max(0, Math.min(rent, Math.round(days * daily))) : Math.round(rent * days / dim);
 }
 
 /* ---------- ค่าใช้จ่ายของตึก & กำไร ---------- */
@@ -2304,7 +2304,7 @@ function docTermsSheet(kind) {
   const C = kind === 'contract', s = S(), k = C ? 'contractTerms' : 'bookTerms';
   const lang = DS.d && DS.d.lang === 'en' ? 'en' : 'th', key = k + (lang === 'en' ? 'En' : '');
   openSheet(`<h3>✏️ ${C ? 'ข้อความสัญญาเช่า' : 'เงื่อนไขใบรับเงินจอง'} (${lang === 'en' ? 'English' : 'ไทย'})</h3>
-    <div class="muted small" style="margin-bottom:6px">${C ? 'ขึ้นบรรทัดใหม่ด้วย “ข้อ 1 …” จะเป็นหัวข้อ · ตัวแปรที่ระบบเติมให้: {room} {floor} {months} {start} {end} {rent} {dueDay} {water} {elec} {common}' : 'หนึ่งบรรทัด = หนึ่งข้อ · {tel} = เบอร์โทรหลัก'} · ตารางเงินวันทำสัญญาและช่องเซ็นชื่อ ระบบใส่ให้เอง</div>
+    <div class="muted small" style="margin-bottom:6px">${C ? 'ขึ้นบรรทัดใหม่ด้วย “ข้อ 1 …” จะเป็นหัวข้อ · ตัวแปรที่ระบบเติมให้: {room} {floor} {months} {start} {end} {rent} {rentText} {dueDay} {deposit} {depositText} {water} {waterMin} {elec} {common} · บรรทัดที่มีแค่ {occupants} = ช่องรายชื่อผู้พัก 3 คน' : 'หนึ่งบรรทัด = หนึ่งข้อ · {tel} = เบอร์โทรหลัก'} · ตารางเงินวันทำสัญญาและช่องเซ็นชื่อ ระบบใส่ให้เอง</div>
     <textarea id="dtT" rows="16" style="width:100%;font-size:14px;line-height:1.5">${esc(s[key] || DS.d.terms || '')}</textarea>
     <div class="row" style="margin-top:8px"><button class="btn" onclick="$('#dtT').value='';toast('ล้างแล้ว · บันทึกเพื่อกลับไปใช้แบบมาตรฐาน')">↺ ใช้แบบมาตรฐาน</button><span class="sp"></span><button class="btn" onclick="leaseSheet(DS.kind,DS.id,true)">ยกเลิก</button><button class="btn pri" onclick="docTermsSave(${q(key)})">บันทึก</button></div>`);
 }

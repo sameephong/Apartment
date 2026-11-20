@@ -7,7 +7,7 @@
  * ไฟล์นี้ใช้เป็นโหมดทดลองในเบราว์เซอร์ได้ด้วย (ไม่ต้องแก้)
  ******************************************************************/
 
-const APP_VER = '6.2';
+const APP_VER = '6.3';
 const SCHEMA = {
   Settings: ['key', 'value', 'description'],
   Rooms:    ['room', 'floor', 'type', 'rent', 'status', 'note',
@@ -66,7 +66,7 @@ const DEFAULT_SETTINGS = [
   ['dueDay', '5', 'ครบกำหนดชำระ วันที่ ... ของเดือนถัดไป'],
   ['depositMonths', '1', 'เงินประกัน (จำนวนเดือนของค่าเช่า)'],
   ['advanceMonths', '1', 'ค่าเช่าล่วงหน้าตอนเข้า (จำนวนเดือน · ใช้แทนค่าเช่าเดือนแรก)'],
-  ['dailyRate', '0', 'ค่าเช่ารายวัน (บาท/วัน) สำหรับเดือนที่เข้า-ออกไม่เต็มเดือน: ค่าเช่า − วันที่ไม่ได้อยู่ × ราคานี้ · 0 = คิดตามสัดส่วนวัน'],
+  ['dailyRate', '0', 'ค่าเช่ารายวัน (บาท/วัน) สำหรับเดือนที่เข้า-ออกไม่เต็มเดือน: จำนวนวันที่อยู่ × ราคานี้ · 0 = คิดตามสัดส่วนวัน'],
   ['keyDeposit', '100', 'มัดจำกุญแจ (คืนเมื่อคืนกุญแจตอนย้ายออก)'],
   ['cardFee', '100', 'ค่าคีย์การ์ด (ไม่คืน)'],
   ['contractMonths', '12', 'ระยะสัญญาเริ่มต้น (เดือน)'],
@@ -1235,11 +1235,11 @@ function rentItem_(rent, from, to) {
   const f = Number(from.slice(8)), tt = Number(to.slice(8)), m = TH_MS[Number(from.slice(5, 7)) - 1];
   return { l: 'ค่าเช่าห้อง ' + f + '–' + tt + ' ' + m + ' (' + days + ' วัน)', a: partRent_(rent, days, dim), k: 'rent' };
 }
-// ค่าเช่าเดือนที่อยู่ไม่เต็มเดือน: ตั้งค่ารายวันไว้ = ค่าเช่า − (วันที่ไม่ได้อยู่ × ค่ารายวัน) · ไม่ตั้ง = ตามสัดส่วนวัน
+// ค่าเช่าเดือนที่อยู่ไม่เต็มเดือน: ตั้งค่ารายวันไว้ = จำนวนวันที่อยู่ × ค่ารายวัน (ไม่เกินค่าเช่าเต็มเดือน) · ไม่ตั้ง = ตามสัดส่วนวัน
 function partRent_(rent, days, dim) {
   const daily = Number(getSettings_().dailyRate) || 0;
   if (days >= dim) return rent;
-  return daily > 0 ? Math.max(0, Math.min(rent, Math.round(rent - (dim - days) * daily))) : Math.round(rent * days / dim);
+  return daily > 0 ? Math.max(0, Math.min(rent, Math.round(days * daily))) : Math.round(rent * days / dim);
 }
 // ค่าเช่าล่วงหน้าตอนเข้า: เข้ากลางเดือน = ค่าเช่าของวันที่เหลือในเดือนนั้น (+ เดือนถัดไปถ้าตั้งไว้มากกว่า 1 เดือน)
 function firstAdvance_(rent, start, months) {
@@ -2059,46 +2059,36 @@ function dueDate_(month, dueDay) {
 
 
 /* ============================ เอกสาร: สัญญาเช่า / ใบรับเงินจอง + ลายเซ็น ============================ */
-const CONTRACT_TH = `ข้อ 1 ห้องที่เช่า
-ผู้ให้เช่าตกลงให้เช่าและผู้เช่าตกลงเช่าห้องเลขที่ {room} ชั้น {floor} เพื่อใช้เป็นที่อยู่อาศัยเท่านั้น พร้อมทรัพย์สินตามรายการแนบท้ายสัญญา ซึ่งผู้เช่าได้ตรวจดูแล้วว่าอยู่ในสภาพใช้งานได้ดี
-ข้อ 2 ระยะเวลาเช่า
-มีกำหนด {months} เดือน เริ่มตั้งแต่วันที่ {start} ถึงวันที่ {end}
-ข้อ 3 ค่าเช่าและค่าบริการ
-ค่าเช่าเดือนละ {rent} บาท ชำระภายในวันที่ {dueDay} ของทุกเดือน ค่าน้ำประปาหน่วยละ {water} บาท และค่าไฟฟ้าหน่วยละ {elec} บาท ตามที่ใช้จริงจากมิเตอร์ของห้อง{common}
-ข้อ 4 การผิดนัดชำระ
-หากผู้เช่าค้างชำระค่าเช่าหรือค่าบริการ และผู้ให้เช่าได้แจ้งเตือนเป็นหนังสือหรือข้อความแล้ว ผู้เช่ายังไม่ชำระภายในเวลาที่กำหนด ผู้ให้เช่ามีสิทธิ์บอกเลิกสัญญาได้
-ข้อ 5 การดูแลรักษาห้อง
-ผู้เช่าต้องดูแลห้องและทรัพย์สินเหมือนวิญญูชนดูแลทรัพย์สินของตนเอง ห้ามดัดแปลง ต่อเติม เจาะผนัง หรือติดตั้งอุปกรณ์โดยไม่ได้รับอนุญาต หากเกิดความเสียหายที่ไม่ใช่จากการใช้งานตามปกติ ผู้เช่าต้องรับผิดชอบค่าซ่อมแซม
-ข้อ 6 ข้อห้าม
-ห้ามให้เช่าช่วงหรือโอนสิทธิการเช่า ห้ามนำสัตว์เลี้ยงเข้าห้องเว้นแต่ได้รับอนุญาต ห้ามเก็บวัตถุไวไฟหรือสิ่งผิดกฎหมาย ห้ามส่งเสียงดังรบกวนผู้อื่น และห้ามใช้ห้องประกอบกิจการใดๆ
-ข้อ 7 การเข้าตรวจห้อง
-ผู้ให้เช่าหรือตัวแทนเข้าตรวจหรือซ่อมแซมห้องได้โดยแจ้งล่วงหน้า เว้นแต่กรณีฉุกเฉินที่อาจเกิดความเสียหายแก่ชีวิตหรือทรัพย์สิน
-ข้อ 8 การบอกเลิกสัญญาโดยผู้เช่า
-ผู้เช่าบอกเลิกสัญญาได้โดยแจ้งผู้ให้เช่าล่วงหน้าไม่น้อยกว่า 30 วัน
-ข้อ 9 การคืนเงินประกัน
-เมื่อสัญญาสิ้นสุดและผู้เช่าส่งมอบห้องคืนแล้ว ผู้ให้เช่าจะคืนเงินประกันภายใน 7 วัน โดยหักค่าเช่า ค่าบริการที่ค้างชำระ และค่าความเสียหาย (ถ้ามี) พร้อมแจ้งรายการที่หัก
-ข้อ 10 ระเบียบของตึก
-ผู้เช่าตกลงปฏิบัติตามระเบียบของตึกที่ประกาศไว้ ซึ่งถือเป็นส่วนหนึ่งของสัญญานี้`;
-const CONTRACT_EN = `1. Premises
-The Landlord leases to the Tenant Room {room}, Floor {floor}, for residential use only, together with the items listed in the attachment, which the Tenant has inspected and found in good condition.
-2. Term
-{months} months, from {start} to {end}.
-3. Rent and utilities
-Rent is {rent} THB per month, payable by day {dueDay} of each month. Water is {water} THB per unit and electricity {elec} THB per unit, as metered for the room.{common}
-4. Late payment
-If rent or charges remain unpaid after written or text notice from the Landlord, the Landlord may terminate this agreement.
-5. Care of the room
-The Tenant shall take good care of the room and items, and shall not alter, drill or install anything without permission. The Tenant pays for damage beyond normal wear and tear.
-6. Prohibited
-No subletting or assignment; no pets unless permitted; no flammable or illegal items; no disturbing noise; no business use.
-7. Inspection
-The Landlord may enter for inspection or repairs with prior notice, except in emergencies.
-8. Early termination by Tenant
-The Tenant may terminate by giving at least 30 days' notice.
-9. Deposit refund
-After the lease ends and the room is returned, the deposit will be refunded within 7 days, less unpaid rent, charges and damages (if any), with an itemized list.
-10. Building rules
-The Tenant agrees to follow the building rules, which form part of this agreement.`;
+const CONTRACT_TH = `ข้อ 1 ผู้เช่าตกลงเช่าห้องพักเลขที่ {room} ตามสถานที่ดังกล่าวเบื้องต้นจำนวน 1 ห้อง มีกำหนดสัญญาเช่าอย่างน้อย {months} เดือน นับตั้งแต่วันเข้าพักอาศัย (วันที่ {start} ถึงวันที่ {end}) ในอัตราเดือนละ {rent} บาท ({rentText}) ซึ่งถือว่าเป็นค่าเช่าล่วงหน้า 1 เดือน และในแต่ละเดือนผู้เช่าต้องชำระค่าเช่าให้แก่ผู้ให้เช่าภายในวันที่ {dueDay} ของเดือน{common}
+ข้อ 2 ผู้เช่าได้วางเงินประกัน ค่าน้ำประปา ค่าไฟฟ้า และค่าของชำรุดเสียหายให้แก่ผู้ให้เช่ายึดถือไว้เป็นจำนวนเงิน {deposit} บาท ({depositText}) เงินจำนวนนี้จะคืนให้แก่ผู้เช่าเมื่อผู้เช่าอยู่ครบตามสัญญาเช่า และกรณีที่ผู้เช่ามีความจำเป็นต้องย้ายออกจากห้องไม่ว่ากรณีใดๆ หลังจากครบสัญญาเช่าแล้ว ผู้เช่าต้องบอกกล่าวล่วงหน้าอย่างน้อย 1 เดือน หรือ 30 วัน มิฉะนั้นจะไม่ได้รับเงินประกันคืน
+ข้อ 3 ผู้เช่าผิดสัญญาเช่าโดยชำระเงินค่าเช่าช้ากว่ากำหนด 5 วัน ผู้เช่าต้องชำระเงินค่าปรับวันละ 50 บาท และหากติดค้างค่าเช่าเป็นเวลานาน ผู้ให้เช่ามีสิทธิ์คล้องกุญแจห้องพักได้ทันที และเข้าครอบครองห้องพักได้ด้วย โดยไม่ต้องบอกกล่าว ในกรณีผู้เช่าทำให้ทรัพย์สินของผู้ให้เช่าเสียหาย หรือค้างค่าเช่าเมื่อหักกับเงินประกันในข้อ 2 แล้วยังไม่พอชำระ ผู้เช่ายินยอมให้ยึดทรัพย์สินในห้องพักออกขายทอดตลาดได้ทันทีโดยไม่มีข้อแม้ใดๆ ทั้งสิ้น
+ข้อ 4 ผู้เช่าเป็นผู้ชำระค่าน้ำประปา และค่าไฟฟ้า ตามจำนวนที่ผู้เช่าใช้โดยมีมิเตอร์ติดตั้งไว้ให้ ค่าน้ำคิดหน่วยละ {water} บาท{waterMin} ค่าไฟคิดหน่วยละ {elec} บาท ในกรณีผู้เช่าติดค้างชำระค่าน้ำประปา ค่าไฟฟ้า ผู้เช่ายินยอมให้ตัดน้ำตัดไฟได้ทันทีโดยไม่ต้องบอกกล่าว และผู้เช่าจะไม่โต้แย้งใดๆ ทั้งสิ้น
+ข้อ 5 ในห้องเช่าหนึ่งๆ มีทรัพย์สินของผู้ให้เช่าซึ่งได้มอบให้แก่ผู้เช่าไว้ใช้สอยดังนี้ ไฟฟ้านีออน 3 จุด ปลั๊กไฟฟ้า 3 จุด ปลั๊กต่อเคเบิ้ลทีวี 1 จุด พัดลมเพดาน 1 เครื่อง และสุขภัณฑ์ภายในห้องน้ำ 1 ชุด (รายละเอียดตามเอกสารแนบท้ายสัญญา) ทรัพย์สินหรือสิ่งของดังกล่าวอยู่ในสภาพที่ดีใช้การได้ ผู้เช่ามีหน้าที่ต้องดูแลให้อยู่ในสภาพที่ดีใช้การได้เสมอ หากเกิดการชำรุดเสียหายด้วยเหตุใดก็ตาม ผู้เช่าจะต้องรับผิดชอบชดใช้หรือซ่อมแซมให้อยู่ในสภาพดีเหมือนเดิม และส่งมอบคืนให้แก่ผู้ให้เช่าเมื่อเลิกสัญญาเช่าแล้ว กรณีห้องที่มีแอร์ผู้เช่าต้องล้างแอร์เองทุกๆ 6 เดือน 500 บาท แต่ถ้าผู้เช่าติดแอร์เอง หลังย้ายออกผู้เช่าต้องจ่ายค่าซ่อมแซมเพื่อปิดรูท่อแอร์ และรูน็อตต่างๆ หลังรื้อถอนไปแล้ว 1,500 บาท
+ข้อ 6 ในห้องเช่าหนึ่งๆ ผู้เช่าจะพักอาศัยได้ไม่เกิน 3 คน หากพักอาศัยเกินจำนวนดังกล่าว ผู้ให้เช่ามีสิทธิ์บอกเลิกสัญญาดังกล่าวได้ทันที ส่วนทรัพย์สินใดๆ ของผู้เช่าหรือบริวารของผู้เช่า หากเกิดความเสียหายหรือสูญหายขึ้นมา ผู้ให้เช่าจะไม่รับผิดชอบใดๆ ทั้งสิ้น
+ข้อ 7 กรณีผู้เช่ามีสัตว์เลี้ยง ทางห้องพักอนุญาตให้มีสัตว์เลี้ยงได้ ยกเว้นสุนัข ต้องแจ้งผู้ให้เช่าด้วยว่าจะเลี้ยงอะไร เท่าไหร่ และมีรูป กับสมุดวัคซีนด้วยจะดีมาก สัตว์เลี้ยงถ้าเป็นแมว เลี้ยงได้ไม่เกิน 3 ตัวต่อห้อง แต่ผู้เช่าต้องเลี้ยงระบบปิด ไม่ให้ออกมาเพ่นพ่านนอกห้อง หรือขับถ่ายเรี่ยราด ผู้เช่าต้องรักษาความสะอาด และต้องไม่ให้มีกลิ่นและเสียงรบกวนห้องอื่น ถ้าออกจากห้องต้องมีสายจูงหรืออยู่ในตะกร้าหรือรถเข็นให้เรียบร้อย กรณีทำผิดกฎครั้งแรกผู้ให้เช่าจะตักเตือน แต่ครั้งต่อไปจะถูกยกเลิกสัญญาได้ทันที และห้ามผู้เช่าทอดทิ้งสัตว์หลังจากย้ายออกด้วย
+ข้อ 8 ให้ห้องเช่าห้องหนึ่งๆ มีลูกบิดประตูเข้าออกพร้อมลูกกุญแจให้ 1 ชุด ซึ่งใช้การได้ดี และอยู่ในสภาพเรียบร้อย หากผู้เช่าทำกุญแจดังกล่าวชำรุดเสียหายหรือสูญหาย ผู้เช่าต้องเปลี่ยนกุญแจใหม่ทั้งชุด จะทำการซ่อมแซมหรือทำลูกกุญแจสำรองไม่ได้ และส่งมอบคืนเมื่อเลิกสัญญาเช่าแล้ว
+ข้อ 9 ผู้เช่าจะต้องไม่เล่นการพนันทุกชนิด ไม่ดื่มสุรามึนเมาเป็นที่รำคาญของผู้อื่น ไม่ทะเลาะวิวาททำร้ายร่างกายหรือทำลายทรัพย์สิน ไม่ว่าผู้เช่าจะอยู่ห้องเดียวกันหรือต่างห้องกันในบริเวณห้องพักอาศัยก็ตาม และไม่นำสิ่งของใดๆ ที่ผิดกฎหมาย หรือเพื่อใช้เพื่อกระทำผิด เช่น อาวุธ วัตถุระเบิด เชื้อเพลิง เข้ามาหรือเก็บไว้ในที่พักเป็นอันขาด หากผู้ใดฝ่าฝืนการกระทำดังกล่าว ผู้ให้เช่ามีสิทธิ์บอกเลิกสัญญาเช่าได้ทันทีโดยไม่ต้องบอกกล่าวล่วงหน้า
+ข้อ 10 ผู้เช่าต้องไม่ทำการโอนสิทธิ์การเช่าหรือเช่าช่วง ให้ผู้หนึ่งผู้ใดเข้าพักอาศัยแทนเป็นอันขาด หากพบว่าผู้หนึ่งผู้ใดเข้าพักในห้องพัก โดยผู้เช่าไม่ได้แจ้งหรือได้รับความยินยอมจากผู้ให้เช่า ย่อมถือว่าผู้นั้นเข้ามาพักโดยมิชอบ และถือเป็นการบุกรุก ผู้ให้เช่ามีสิทธิ์บอกเลิกสัญญาเช่า และดำเนินคดีฐานบุกรุกได้
+ข้อ 11 ผู้เช่าต้องไม่ทำการตอกตะปู ติดรูปภาพ ติดสติ๊กเกอร์ หรือกาว 2 หน้า เพื่อแขวนภาชนะใดๆ บริเวณผนังห้อง ผู้ใดฝ่าฝืนปรับจุดละ 80 บาท
+ข้อ 12 ผู้เช่าต้องไม่ใช้เตาแก๊ส หรือเตาถ่าน ในการประกอบอาหารโดยเด็ดขาด แต่ถ้ามีความจำเป็นอนุญาตให้ใช้กระทะไฟฟ้าได้ ทั้งนี้เพื่อความสะอาดและปลอดภัยต่อผู้พักอาศัยร่วมกัน หากผู้ใดฝ่าฝืนผู้ให้เช่ามีสิทธิ์บอกเลิกสัญญาเช่าได้ทันที และถ้าเกิดอัคคีภัยในห้องพัก ทรัพย์สินต่างๆ ของผู้เช่าเกิดความสูญหาย หรือเสียหาย ผู้ให้เช่าจะไม่รับผิดชอบใดๆ ทั้งสิ้น แต่ในกรณีที่ทรัพย์สินของผู้ให้เช่าเสียหาย ผู้เช่าต้องจัดการซ่อมแซมให้อยู่ในสภาพเดิม หรือชดใช้ค่าเสียหายตามความเป็นจริง
+ข้อ 13 ผู้เช่ามีรถยนต์ หรือรถจักรยานยนต์ จะนำเข้าออกบริเวณที่พักอาศัย จะต้องได้รับการอนุญาตจากผู้ให้เช่าเสียก่อน โดยผู้ให้เช่าจะจัดที่จอดรถให้ แต่หากเกิดความสูญหายหรือเสียหายขึ้นมาไม่ว่ากรณีใดๆ ผู้ให้เช่าจะไม่รับผิดชอบใดๆ ทั้งสิ้น ดังนั้นผู้เช่าต้องระวังรักษารถเอง
+ข้อ 14 ตามสัญญาเช่าห้องหนึ่งๆ จะพักอาศัยได้ไม่เกิน 3 คนนั้น ผู้เช่าจะต้องนำสำเนาบัตรประจำตัวประชาชนมามอบให้แก่ผู้ให้เช่า เพื่อแนบไว้กับหนังสือสัญญาเช่าฉบับนี้ หากมีการเปลี่ยนแปลงผู้เช่าจะต้องแจ้งให้ทราบทุกครั้ง ทั้งนี้เพื่อความสะดวกในการติดต่อ ผู้เช่าในห้องมีจำนวนคนดังนี้
+{occupants}`;
+const CONTRACT_EN = `1. The Tenant agrees to rent Room No. {room} at the above premises, 1 room, for a minimum term of {months} months from the move-in date ({start} to {end}), at the rate of {rent} THB ({rentText}) per month, which is treated as 1 month of advance rent. The Tenant shall pay the rent to the Landlord by day {dueDay} of each month.{common}
+2. The Tenant has placed a deposit of {deposit} THB ({depositText}) with the Landlord to cover water, electricity and any damage. This deposit will be returned to the Tenant when the Tenant has stayed for the full lease term. If, after the lease term, the Tenant needs to move out for any reason, the Tenant must give at least 1 month (30 days) notice in advance; otherwise the deposit will not be refunded.
+3. If the Tenant pays rent more than 5 days late, the Tenant shall pay a fine of 50 THB per day. If rent remains unpaid for a long time, the Landlord has the right to lock the room immediately and take possession of it without notice. If the Tenant damages the Landlord's property, or unpaid rent exceeds the deposit in clause 2, the Tenant agrees that the property in the room may be seized and sold at auction immediately without any condition.
+4. The Tenant pays for water and electricity according to actual use as shown by the meters installed. Water is {water} THB per unit{waterMin}; electricity is {elec} THB per unit. If water or electricity charges are unpaid, the Tenant agrees that the water and electricity may be cut off immediately without notice, and will not dispute this.
+5. Each room contains the Landlord's property provided for the Tenant's use: 3 fluorescent lights, 3 power sockets, 1 cable TV socket, 1 ceiling fan and 1 set of bathroom fixtures (details in the attachment). These items are in good working condition. The Tenant must keep them in good working condition at all times. If any item is damaged for any reason, the Tenant must pay for or repair it to its original condition and return it to the Landlord when the lease ends. For rooms with air-conditioning, the Tenant must have the air-conditioner cleaned every 6 months (500 THB). If the Tenant installs their own air-conditioner, after moving out the Tenant must pay 1,500 THB to repair and seal the pipe and screw holes after removal.
+6. No more than 3 people may live in each room. If more people live in the room, the Landlord has the right to terminate this lease immediately. The Landlord is not responsible for any damage to or loss of property belonging to the Tenant or the Tenant's guests.
+7. Pets are allowed, except dogs. The Tenant must inform the Landlord what pets and how many, preferably with photos and a vaccination record. Cats are limited to 3 per room and must be kept indoors, not allowed to roam outside the room or relieve themselves around the building. The Tenant must keep the room clean and free of odour and noise that disturbs other rooms. Outside the room, pets must be on a leash or in a carrier or pet stroller. A first violation will receive a warning; any further violation may lead to immediate termination of the lease. Abandoning pets after moving out is strictly prohibited.
+8. Each room comes with a door lock and 1 set of keys in good working order. If the Tenant damages or loses the keys, the Tenant must replace the whole lock set; repairs or duplicate keys are not allowed. The keys must be returned when the lease ends.
+9. The Tenant must not gamble in any form, get drunk and disturb others, fight, assault anyone or destroy property, whether within the same room or between rooms in the building, and must never bring in or keep anything illegal or intended for wrongdoing, such as weapons, explosives or fuel. If anyone violates this, the Landlord may terminate the lease immediately without prior notice.
+10. The Tenant must not transfer the lease or sublet the room, or allow anyone to live in the room in the Tenant's place. Anyone found staying in the room without the Tenant informing the Landlord or obtaining the Landlord's consent is deemed to be staying unlawfully and trespassing. The Landlord may terminate the lease and take legal action for trespass.
+11. The Tenant must not hammer nails, hang pictures, or use stickers or double-sided tape to hang anything on the walls. A fine of 80 THB per spot applies.
+12. Gas stoves and charcoal stoves are strictly prohibited for cooking; an electric pan may be used if necessary, for the cleanliness and safety of all residents. If violated, the Landlord may terminate the lease immediately. If a fire occurs in the room, the Landlord is not responsible for any loss of or damage to the Tenant's property; if the Landlord's property is damaged, the Tenant must repair it to its original condition or pay for the actual damage.
+13. A Tenant who wishes to bring a car or motorcycle onto the premises must first obtain the Landlord's permission; the Landlord will provide a parking space. The Landlord is not responsible for any loss or damage in any case, so the Tenant must take care of their own vehicle.
+14. As each room may house no more than 3 people, the Tenant must provide copies of each occupant's ID card or passport to the Landlord to be attached to this lease, and must inform the Landlord of any change, for ease of contact. The occupants of the room are as follows:
+{occupants}`;
 const BOOK_TH = `เงินจองนำไปหักค่าแรกเข้าในวันทำสัญญา
 หากไม่เข้าอยู่ตามกำหนด และไม่แจ้งล่วงหน้าภายใน 3 วัน ขอสงวนสิทธิ์ไม่คืนเงินจอง
 สอบถาม {tel}`;
@@ -2131,7 +2121,7 @@ function docPayload_(kind, o, withSigns) {
   const room = kind === 'contract' ? (findBy_('Rooms', 'room', o.room) || {}) : o;
   const b = { name: s.buildingName || s.apartmentName, address: s.address || s.mapText || '', tel: s.lineTel1 || s.phone || '', landlord: s.landlordName || s.apartmentName };
   const d = { kind, lang: en ? 'en' : 'th', b, room: { room: room.room, floor: room.floor, rent: Number(room.rent) || 0 },
-    rates: { water: Number(s.waterRate) || 0, elec: Number(s.elecRate) || 0, common: Number(s.commonFee) || 0, dueDay: s.dueDay },
+    rates: { water: Number(s.waterRate) || 0, waterMin: Number(s.waterMin) || 0, elec: Number(s.elecRate) || 0, common: Number(s.commonFee) || 0, dueDay: s.dueDay },
     mode: (kind === 'contract' ? o.signMode : o.bookSignMode) || '', signed: (kind === 'contract' ? o.signed : o.bookSigned) || '' };
   if (kind === 'contract') {
     const rent = Number(o.rent) || d.room.rent;
