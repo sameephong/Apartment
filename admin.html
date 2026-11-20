@@ -12,12 +12,12 @@
 <link rel="preconnect" href="https://script.google.com"><link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=6.1">
+<link rel="stylesheet" href="app.css?v=6.2">
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>document.write('<script src="config.js?t=' + Date.now() + '"><\/script>')</script>
-<script src="common.js?v=6.1"></script>
-<script src="docs.js?v=6.1"></script>
-<script src="printer.js?v=6.1"></script>
+<script src="common.js?v=6.2"></script>
+<script src="docs.js?v=6.2"></script>
+<script src="printer.js?v=6.2"></script>
 </head>
 <body class="admin">
 <div class="wrap">
@@ -871,7 +871,7 @@ async function delNews(id) { if (!await uiConfirm('ลบประกาศน�
 <script>
 /* ===================== v3 · หน้าจอคอม/Mac + โหมดเจ้าของจัดการเอง ===================== */
 window.matchMedia('(min-width:1024px)').addEventListener('change', () => { if (D) { closeSheet(); render(); } });
-const APP_FRONT = '6.1';
+const APP_FRONT = '6.2';
 const ME = () => (D && D.me) || {};
 const STAFF = () => ME().role === 'staff';
 const M = Object.assign({}, VIEWS); // หน้ามือถือเดิม
@@ -1846,13 +1846,23 @@ function itemsSheet(no) {
 }
 function itDraw() {
   const box = $('#itRows'); if (!box || !IT) return;
-  box.innerHTML = IT.names.map((k, i) => { const v = IT.items[k] || {}; return `<div class="itrow"><div class="itn">${esc(k)}</div><div class="itb">${IST.map(([st, ic, c]) => `<button class="${v.s === st ? 'on ' + c : ''}" onclick="itSet(${i},'${st}')">${ic} ${st}</button>`).join('')}</div>
+  box.innerHTML = IT.names.map((k, i) => { const v = IT.items[k] || {}; const cus = !itemDefaults().includes(k); return `<div class="itrow"><div class="itn">${esc(k)}${cus ? ` <a class="tap itdel" title="ลบรายการนี้ออกจากห้องนี้" onclick="itDel(${i})">🗑</a>` : ''}</div><div class="itb">${IST.map(([st, ic, c]) => `<button class="${v.s === st ? 'on ' + c : ''}" onclick="itSet(${i},'${st}')">${ic} ${st}</button>`).join('')}</div>
     <input class="itnote" placeholder="หมายเหตุ" value="${esc(v.n || '')}" oninput="itNote(${i},this.value)"></div>`; }).join('');
 }
 function itSet(i, st) { const k = IT.names[i], v = IT.items[k] || { s: '', n: '' }; v.s = v.s === st ? '' : st; IT.items[k] = v; itDraw(); }
 function itNote(i, n) { const k = IT.names[i]; IT.items[k] = Object.assign({ s: '' }, IT.items[k] || {}, { n }); }
 function itAll(st) { IT.names.forEach(k => { const v = IT.items[k] || { s: '', n: '' }; if (!v.s) v.s = st; IT.items[k] = v; }); itDraw(); }
-function itAdd() { const el = $('#itNew'), k = el.value.trim(); if (!k) return; if (!IT.names.includes(k)) IT.names.push(k); IT.items[k] = Object.assign({ s: 'มี', n: '' }, IT.items[k] || {}); el.value = ''; itDraw(); }
+async function itDel(i) { const k = IT.names[i]; if (!await uiConfirm('ลบ “' + k + '” ออกจากห้อง ' + IT.room + '?\n(กดบันทึกด้านล่างเพื่อยืนยัน)', 'ลบ', true)) return; IT.names.splice(i, 1); delete IT.items[k]; itDraw(); }
+// หาชื่อที่คล้ายกัน เช่น "ที่วางแปรง" กับ "ชั้นวางแปรงในห้องน้ำ" (มีคำซ้ำกันยาว 4 ตัวอักษรขึ้นไป)
+function itSimilar(k, list) {
+  const nz = x => String(x).replace(/\s+/g, ''), a = nz(k);
+  const lcs = (x, y) => { let best = 0; for (let i = 0; i < x.length; i++) for (let j = 0; j < y.length; j++) { let l = 0; while (x[i + l] && x[i + l] === y[j + l]) l++; if (l > best) best = l; } return best; };
+  return list.filter(n => n !== k).map(n => [n, lcs(a, nz(n))]).filter(([n, l]) => l >= 4 || (l >= 2 && (nz(n).includes(a) || a.includes(nz(n))))).sort((x, y) => y[1] - x[1]).map(x => x[0]);
+}
+async function itAdd() { const el = $('#itNew'); let k = el.value.trim(); if (!k) return;
+  if (!IT.names.includes(k)) { const sim = itSimilar(k, [...new Set(IT.names.concat(itemNamesAll()))]);
+    if (sim.length && await uiConfirm('มีรายการที่ชื่อคล้ายกันอยู่แล้ว:\n• ' + sim.slice(0, 3).join('\n• ') + '\n\nใช้ “' + sim[0] + '” แทน เพื่อไม่ให้นับซ้ำไหม?', 'ใช้ “' + sim[0] + '”')) k = sim[0]; }
+  if (!IT.names.includes(k)) IT.names.push(k); IT.items[k] = Object.assign({ s: 'มี', n: '' }, IT.items[k] || {}); el.value = ''; itDraw(); }
 async function itSave() {
   $('#itBtn').disabled = true;
   try { await api('saveRoomItems', { room: IT.room, items: IT.items }); toast('บันทึกอุปกรณ์ห้อง ' + IT.room + ' แล้ว'); IT = null; closeSheet(); render(); }
@@ -1929,7 +1939,7 @@ VIEWS.find = () => {
   const roomRow = r => { const it = roomItemsOf(r), t = tenantOf(r.room), ks = (sel ? [sel] : roomItemNames(r)).filter(k => { const v = it[k]; return UI.fSt === 'ยังไม่ตรวจ' ? !(v && v.s) : v && v.s === UI.fSt; });
     return `<div class="item tap" onclick="homeRoom(${q(r.room)})"><b style="width:48px">${esc(r.room)}</b><div style="flex:1;min-width:0">${ks.map(k => `<span class="pl ${stc[UI.fSt]}" style="margin:0 4px 3px 0">${esc(k)}</span>`).join('')}${ks.map(k => it[k] && it[k].n ? `<div class="muted small">${esc(k)}: ${esc(it[k].n)}</div>` : '').join('')}<div class="muted small">${t ? esc(t.name) : esc(r.status)}</div></div><button class="btn sm" onclick="event.stopPropagation();itemsSheet(${q(r.room)})">✏️</button></div>`; };
   const table = `<div class="card" style="padding:0;overflow:auto"><table class="dt"><tr><th>อุปกรณ์</th><th class="r">✅ มี</th><th class="r">❌ ขาด</th><th class="r">⚠️ ชำรุด</th><th class="r">ยังไม่ตรวจ</th></tr>
-    ${names.map(k => `<tr><td><b>${esc(k)}</b></td>${['มี', 'ขาด', 'ชำรุด', 'ยังไม่ตรวจ'].map(st => { const n = cnt(k, st); return `<td class="r tap" onclick="UI.fItem=${esc(JSON.stringify(k))};UI.fSt='${st}';render();window.scrollTo(0,0)" style="${n && (st === 'ขาด' || st === 'ชำรุด') ? 'color:var(--' + stc[st] + ');font-weight:700' : ''}">${n || '-'}</td>`; }).join('')}</tr>`).join('')}</table></div>`;
+    ${names.map(k => `<tr><td><b>${esc(k)}</b> <a class="tap small" title="เปลี่ยนชื่อ / รวม / ลบ" onclick="itManage(${esc(JSON.stringify(k))})">✏️</a></td>${['มี', 'ขาด', 'ชำรุด', 'ยังไม่ตรวจ'].map(st => { const n = cnt(k, st); return `<td class="r tap" onclick="UI.fItem=${esc(JSON.stringify(k))};UI.fSt='${st}';render();window.scrollTo(0,0)" style="${n && (st === 'ขาด' || st === 'ชำรุด') ? 'color:var(--' + stc[st] + ');font-weight:700' : ''}">${n || '-'}</td>`; }).join('')}</tr>`).join('')}</table></div>`;
   const unc = D.rooms.reduce((a, r) => a + roomItemNames(r).filter(k => !(roomItemsOf(r)[k] || {}).s).length, 0);
   const filter = `<div class="card"><h4>🛏️ ห้องไหนขาด / ชำรุดอะไร</h4>
     <div style="margin-bottom:6px"><span class="chip ${sel ? '' : 'on'}" onclick="UI.fItem='';render()">ทุกอย่าง</span>${names.map(k => { const n = cnt(k, 'ขาด') + cnt(k, 'ชำรุด'); return `<span class="chip ${sel === k ? 'on' : ''}" onclick="UI.fItem=${esc(JSON.stringify(k))};render()">${esc(k)}${n ? ` <b style="color:${sel === k ? '#fff' : 'var(--bad)'}">${n}</b>` : ''}</span>`; }).join('')}</div>
@@ -2531,6 +2541,24 @@ function homeTasks() {
   appt.forEach(r => out.push({ i: '🛠', bg: 'var(--warn-soft)', t: 'นัดช่างวันนี้ ' + esc(String(r.appointAt).slice(11, 16)) + ' · ห้อง ' + esc(r.room), d: r.category + ' — ' + r.detail.slice(0, 50), n: '', btn: `<button class="btn sm" onclick="event.stopPropagation();repairSheet(${q(r.id)})">เปิด</button>`, h: 'repairs' }));
   if (fu.length || wt.length) out.push({ i: '⏳', bg: '#eef0f2', t: fu.length ? 'ถึงวันตามเรื่อง ' + fu.length + ' เรื่อง' : 'รอคนอื่นตัดสินใจ ' + wt.length + ' เรื่อง', d: (fu.length ? fu : wt).slice(0, 3).map(t => t.title + (t.waitFor ? ' (รอ ' + t.waitFor + ')' : '')).join(' · '), n: (fu.length || wt.length), btn: `<button class="btn sm" onclick="event.stopPropagation();UI.tkSeg='${fu.length ? 'todo' : 'wait'}';go('tasks')">ดู</button>`, h: 'tasks' });
   return out;
+}
+
+// เปลี่ยนชื่อ / รวมรายการซ้ำ / ลบ — มีผลทุกห้อง (v6.2)
+function itManage(k) {
+  const used = D.rooms.filter(r => roomItemsOf(r)[k]).length, others = itemNamesAll().filter(n => n !== k), sim = itSimilar(k, others);
+  openSheet(`<h3>✏️ ${esc(k)}</h3><div class="muted small">บันทึกไว้ใน ${used} ห้อง${itemDefaults().includes(k) ? ' · อยู่ในรายการมาตรฐานทุกห้อง' : ''}</div>
+    ${sim.length ? `<div class="fl" style="margin-top:12px">ชื่อคล้ายกัน — เป็นของชิ้นเดียวกันไหม? กดเพื่อรวม</div><div class="row">${sim.map(n => `<button class="btn sm" onclick="itMerge(${q(k)},${q(n)})">รวมเข้ากับ “${esc(n)}”</button>`).join('')}</div>` : ''}
+    <label class="f" style="margin-top:12px">เปลี่ยนชื่อเป็น / รวมเข้ากับรายการอื่น<input id="itTo" list="itNames" value="${esc(k)}"><datalist id="itNames">${others.map(n => `<option value="${esc(n)}">`).join('')}</datalist></label>
+    <div class="muted small" style="margin:-4px 0 10px">ถ้าพิมพ์ชื่อที่มีอยู่แล้ว ระบบจะรวมเป็นรายการเดียว (ห้องที่ลงไว้ทั้งสองชื่อ จะเก็บสถานะที่หนักกว่า เช่น ขาด และรวมหมายเหตุ)</div>
+    <div class="row"><button class="btn" style="color:var(--bad)" onclick="itMerge(${q(k)},'')">🗑 ลบออกจากทุกห้อง</button><span style="flex:1"></span><button class="btn pri" onclick="itMerge(${q(k)},$('#itTo').value.trim())">บันทึก</button></div>`);
+}
+async function itMerge(from, to) {
+  if (to === from) return closeSheet();
+  const exists = to && itemNamesAll().includes(to);
+  const msg = !to ? `ลบ “${from}” ออกจากทุกห้องและรายการมาตรฐาน?` : exists ? `รวม “${from}” เข้ากับ “${to}” ทุกห้อง?\nหลังรวมจะเหลือชื่อ “${to}” ชื่อเดียว` : `เปลี่ยนชื่อ “${from}” เป็น “${to}” ทุกห้อง?`;
+  if (!await uiConfirm(msg, !to ? 'ลบ' : exists ? 'รวม' : 'เปลี่ยนชื่อ', !to)) return;
+  const j = await act('renameRoomItem', { from, to }, (!to ? 'ลบแล้ว' : exists ? 'รวมแล้ว' : 'เปลี่ยนชื่อแล้ว'));
+  if (UI.fItem === from) UI.fItem = to || ''; closeSheet(); render();
 }
 </script>
 </body>

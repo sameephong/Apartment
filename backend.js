@@ -7,7 +7,7 @@
  * ไฟล์นี้ใช้เป็นโหมดทดลองในเบราว์เซอร์ได้ด้วย (ไม่ต้องแก้)
  ******************************************************************/
 
-const APP_VER = '6.1';
+const APP_VER = '6.2';
 const SCHEMA = {
   Settings: ['key', 'value', 'description'],
   Rooms:    ['room', 'floor', 'type', 'rent', 'status', 'note',
@@ -197,7 +197,7 @@ const ADMIN_API = {
   postNews: api_postNews, deleteNews: api_deleteNews,
   saveSettings: api_saveSettings, testLine: api_testLine,
   saveExpense: api_saveExpense, deleteExpense: api_deleteExpense, addExpenseFile: api_addExpenseFile, removeExpenseFile: api_removeExpenseFile,
-  clearData: api_clearData, resetRoom: api_resetRoom, saveRoomItems: api_saveRoomItems, setClean: api_setClean, clearChatLog: api_clearChatLog, botTest: api_botTest, unlinkLine: api_unlinkLine, setupRichMenu: api_setupRichMenu, saveViewing: api_saveViewing, deleteViewing: api_deleteViewing, docData: api_docData, docInfo: api_docInfo, docSign: api_docSign, docLink: api_docLink, docReset: api_docReset, docEdit: api_docEdit, repairRoomsFrom: api_repairRoomsFrom, saveTask: api_saveTask, taskDone: api_taskDone, taskNote: api_taskNote, deleteTask: api_deleteTask, saveUser: api_saveUser, setUserPin: api_setUserPin, changeMyPin: api_changeMyPin, auditLog: api_auditLog, lineQuota: api_lineQuota, bulkRoomItems: api_bulkRoomItems,
+  clearData: api_clearData, resetRoom: api_resetRoom, saveRoomItems: api_saveRoomItems, setClean: api_setClean, clearChatLog: api_clearChatLog, botTest: api_botTest, unlinkLine: api_unlinkLine, setupRichMenu: api_setupRichMenu, saveViewing: api_saveViewing, deleteViewing: api_deleteViewing, docData: api_docData, docInfo: api_docInfo, docSign: api_docSign, docLink: api_docLink, docReset: api_docReset, docEdit: api_docEdit, repairRoomsFrom: api_repairRoomsFrom, saveTask: api_saveTask, taskDone: api_taskDone, taskNote: api_taskNote, deleteTask: api_deleteTask, saveUser: api_saveUser, setUserPin: api_setUserPin, changeMyPin: api_changeMyPin, auditLog: api_auditLog, lineQuota: api_lineQuota, bulkRoomItems: api_bulkRoomItems, renameRoomItem: api_renameRoomItem,
 };
 const NO_DATA = { previewBills: 1, fileImage: 1, auditLog: 1 }; // คำสั่งที่ไม่ต้องส่งข้อมูลทั้งหมดกลับ
 
@@ -321,7 +321,8 @@ function auditDetail_(a, req) {
   const o = {}, src = Object.assign({}, req, req.room && typeof req.room === 'object' ? req.room : {}, req.tenant || {}, req.bill || {}, req.repair || {}, req.expense || {}, req.user || {});
   AUDIT_KEYS.forEach(k => { const v = src[k]; if (v != null && v !== '' && typeof v !== 'object') o[k] = String(v).slice(0, 60); });
   if (req.settings) o.settings = Object.keys(req.settings).filter(k => !/password|token|pin/i.test(k)).join(',');
-  if (req.items) o.total = (req.items || []).reduce((x, i) => x + (Number(i.a) || 0), 0);
+  if (Array.isArray(req.items)) o.total = req.items.reduce((x, i) => x + (Number(i.a) || 0), 0);
+  if (req.from) o.from = String(req.from).slice(0, 40); if (req.to) o.to = String(req.to).slice(0, 40);
   return JSON.stringify(o).slice(0, 300);
 }
 function audit_(who, action, detail) { try { writeRow_('AuditLog', { at: now_(), userId: who ? who.id || '' : '', userName: who ? who.name || '' : '', action, detail }); } catch (e) {} }
@@ -1052,6 +1053,24 @@ function api_bulkRoomItems(req) {
     if (ch) { sh.getRange(r._row, col, 1, 1).setValues([[toCell_('items', JSON.stringify(it))]]); n++; }
   });
   dropCache_('Rooms');
+  return { result: n };
+}
+// เปลี่ยนชื่อ / รวมรายการอุปกรณ์ที่เรียกต่างกันแต่เป็นของชิ้นเดียวกัน (to ว่าง = ลบรายการนี้ออกจากทุกห้อง)
+function api_renameRoomItem(req) {
+  const from = String(req.from || '').trim(), to = String(req.to || '').trim().replace(/,/g, ' ').slice(0, 40);
+  if (!from) throw new Error('ไม่ระบุรายการ'); if (from === to) return { result: 0 };
+  const rank = s => ({ 'ขาด': 3, 'ชำรุด': 2, 'มี': 1 })[s] || 0;
+  const rows = readAll_('Rooms'), sh = sheet_('Rooms'), col = SCHEMA.Rooms.indexOf('items') + 1; let n = 0;
+  rows.forEach(r => {
+    const it = parseItems_(r); if (!it[from]) return;
+    const a = it[from]; delete it[from];
+    if (to) { const b = it[to]; it[to] = !b ? a : { s: rank(a.s) > rank(b.s) ? a.s : b.s, n: [b.n, a.n].filter(Boolean).filter((x, i, l) => l.indexOf(x) === i).join(' · ').slice(0, 200) }; }
+    sh.getRange(r._row, col, 1, 1).setValues([[toCell_('items', JSON.stringify(it))]]); n++;
+  });
+  dropCache_('Rooms');
+  // รายการมาตรฐานในตั้งค่า
+  const def = String(getSettings_().roomItems || '').split(',').map(x => x.trim()).filter(Boolean);
+  if (def.indexOf(from) >= 0) { const nd = []; def.forEach(x => { const y = x === from ? to : x; if (y && nd.indexOf(y) < 0) nd.push(y); }); api_saveSettings({ settings: { roomItems: nd.join(',') } }); }
   return { result: n };
 }
 function api_resetRoom(req) {
