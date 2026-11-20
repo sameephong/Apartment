@@ -7,7 +7,7 @@
  * ไฟล์นี้ใช้เป็นโหมดทดลองในเบราว์เซอร์ได้ด้วย (ไม่ต้องแก้)
  ******************************************************************/
 
-const APP_VER = '6.3';
+const APP_VER = '6.5';
 const SCHEMA = {
   Settings: ['key', 'value', 'description'],
   Rooms:    ['room', 'floor', 'type', 'rent', 'status', 'note',
@@ -17,7 +17,7 @@ const SCHEMA = {
   Tenants:  ['id', 'room', 'name', 'phone', 'lineId', 'startDate', 'endDate', 'deposit',
              'status', 'moveOutDate', 'pin', 'note', 'createdAt',
              'advanceRent', 'keyDeposit', 'cardFee', 'contractMonths', 'refundAmount', 'refundStatus', 'refundDate',
-             'idCard', 'idAddress', 'contractNo', 'docLang', 'signMode', 'signed', 'docToken', 'docHtml', 'docDate', 'createdBy'],
+             'idCard', 'idAddress', 'contractNo', 'docLang', 'signMode', 'signed', 'docToken', 'docHtml', 'docDate', 'createdBy', 'docAttach'],
   Meters:   ['month', 'room', 'waterPrev', 'waterCur', 'elecPrev', 'elecCur', 'updatedAt'],
   Bills:    ['id', 'no', 'token', 'kind', 'month', 'room', 'tenantId', 'tenantName', 'items',
              'waterUnits', 'elecUnits', 'total', 'dueDate', 'status', 'createdAt',
@@ -2063,7 +2063,7 @@ const CONTRACT_TH = `ข้อ 1 ผู้เช่าตกลงเช่า�
 ข้อ 2 ผู้เช่าได้วางเงินประกัน ค่าน้ำประปา ค่าไฟฟ้า และค่าของชำรุดเสียหายให้แก่ผู้ให้เช่ายึดถือไว้เป็นจำนวนเงิน {deposit} บาท ({depositText}) เงินจำนวนนี้จะคืนให้แก่ผู้เช่าเมื่อผู้เช่าอยู่ครบตามสัญญาเช่า และกรณีที่ผู้เช่ามีความจำเป็นต้องย้ายออกจากห้องไม่ว่ากรณีใดๆ หลังจากครบสัญญาเช่าแล้ว ผู้เช่าต้องบอกกล่าวล่วงหน้าอย่างน้อย 1 เดือน หรือ 30 วัน มิฉะนั้นจะไม่ได้รับเงินประกันคืน
 ข้อ 3 ผู้เช่าผิดสัญญาเช่าโดยชำระเงินค่าเช่าช้ากว่ากำหนด 5 วัน ผู้เช่าต้องชำระเงินค่าปรับวันละ 50 บาท และหากติดค้างค่าเช่าเป็นเวลานาน ผู้ให้เช่ามีสิทธิ์คล้องกุญแจห้องพักได้ทันที และเข้าครอบครองห้องพักได้ด้วย โดยไม่ต้องบอกกล่าว ในกรณีผู้เช่าทำให้ทรัพย์สินของผู้ให้เช่าเสียหาย หรือค้างค่าเช่าเมื่อหักกับเงินประกันในข้อ 2 แล้วยังไม่พอชำระ ผู้เช่ายินยอมให้ยึดทรัพย์สินในห้องพักออกขายทอดตลาดได้ทันทีโดยไม่มีข้อแม้ใดๆ ทั้งสิ้น
 ข้อ 4 ผู้เช่าเป็นผู้ชำระค่าน้ำประปา และค่าไฟฟ้า ตามจำนวนที่ผู้เช่าใช้โดยมีมิเตอร์ติดตั้งไว้ให้ ค่าน้ำคิดหน่วยละ {water} บาท{waterMin} ค่าไฟคิดหน่วยละ {elec} บาท ในกรณีผู้เช่าติดค้างชำระค่าน้ำประปา ค่าไฟฟ้า ผู้เช่ายินยอมให้ตัดน้ำตัดไฟได้ทันทีโดยไม่ต้องบอกกล่าว และผู้เช่าจะไม่โต้แย้งใดๆ ทั้งสิ้น
-ข้อ 5 ในห้องเช่าหนึ่งๆ มีทรัพย์สินของผู้ให้เช่าซึ่งได้มอบให้แก่ผู้เช่าไว้ใช้สอยดังนี้ ไฟฟ้านีออน 3 จุด ปลั๊กไฟฟ้า 3 จุด ปลั๊กต่อเคเบิ้ลทีวี 1 จุด พัดลมเพดาน 1 เครื่อง และสุขภัณฑ์ภายในห้องน้ำ 1 ชุด (รายละเอียดตามเอกสารแนบท้ายสัญญา) ทรัพย์สินหรือสิ่งของดังกล่าวอยู่ในสภาพที่ดีใช้การได้ ผู้เช่ามีหน้าที่ต้องดูแลให้อยู่ในสภาพที่ดีใช้การได้เสมอ หากเกิดการชำรุดเสียหายด้วยเหตุใดก็ตาม ผู้เช่าจะต้องรับผิดชอบชดใช้หรือซ่อมแซมให้อยู่ในสภาพดีเหมือนเดิม และส่งมอบคืนให้แก่ผู้ให้เช่าเมื่อเลิกสัญญาเช่าแล้ว กรณีห้องที่มีแอร์ผู้เช่าต้องล้างแอร์เองทุกๆ 6 เดือน 500 บาท แต่ถ้าผู้เช่าติดแอร์เอง หลังย้ายออกผู้เช่าต้องจ่ายค่าซ่อมแซมเพื่อปิดรูท่อแอร์ และรูน็อตต่างๆ หลังรื้อถอนไปแล้ว 1,500 บาท
+ข้อ 5 ในห้องเช่าหนึ่งๆ มีทรัพย์สินของผู้ให้เช่าซึ่งได้มอบให้แก่ผู้เช่าไว้ใช้สอยดังนี้ ไฟฟ้านีออน 3 จุด ปลั๊กไฟฟ้า 3 จุด ปลั๊กต่อเคเบิ้ลทีวี 1 จุด พัดลมเพดาน 1 เครื่อง และสุขภัณฑ์ภายในห้องน้ำ 1 ชุด{attachNote} ทรัพย์สินหรือสิ่งของดังกล่าวอยู่ในสภาพที่ดีใช้การได้ ผู้เช่ามีหน้าที่ต้องดูแลให้อยู่ในสภาพที่ดีใช้การได้เสมอ หากเกิดการชำรุดเสียหายด้วยเหตุใดก็ตาม ผู้เช่าจะต้องรับผิดชอบชดใช้หรือซ่อมแซมให้อยู่ในสภาพดีเหมือนเดิม และส่งมอบคืนให้แก่ผู้ให้เช่าเมื่อเลิกสัญญาเช่าแล้ว กรณีห้องที่มีแอร์ผู้เช่าต้องล้างแอร์เองทุกๆ 6 เดือน 500 บาท แต่ถ้าผู้เช่าติดแอร์เอง หลังย้ายออกผู้เช่าต้องจ่ายค่าซ่อมแซมเพื่อปิดรูท่อแอร์ และรูน็อตต่างๆ หลังรื้อถอนไปแล้ว 1,500 บาท
 ข้อ 6 ในห้องเช่าหนึ่งๆ ผู้เช่าจะพักอาศัยได้ไม่เกิน 3 คน หากพักอาศัยเกินจำนวนดังกล่าว ผู้ให้เช่ามีสิทธิ์บอกเลิกสัญญาดังกล่าวได้ทันที ส่วนทรัพย์สินใดๆ ของผู้เช่าหรือบริวารของผู้เช่า หากเกิดความเสียหายหรือสูญหายขึ้นมา ผู้ให้เช่าจะไม่รับผิดชอบใดๆ ทั้งสิ้น
 ข้อ 7 กรณีผู้เช่ามีสัตว์เลี้ยง ทางห้องพักอนุญาตให้มีสัตว์เลี้ยงได้ ยกเว้นสุนัข ต้องแจ้งผู้ให้เช่าด้วยว่าจะเลี้ยงอะไร เท่าไหร่ และมีรูป กับสมุดวัคซีนด้วยจะดีมาก สัตว์เลี้ยงถ้าเป็นแมว เลี้ยงได้ไม่เกิน 3 ตัวต่อห้อง แต่ผู้เช่าต้องเลี้ยงระบบปิด ไม่ให้ออกมาเพ่นพ่านนอกห้อง หรือขับถ่ายเรี่ยราด ผู้เช่าต้องรักษาความสะอาด และต้องไม่ให้มีกลิ่นและเสียงรบกวนห้องอื่น ถ้าออกจากห้องต้องมีสายจูงหรืออยู่ในตะกร้าหรือรถเข็นให้เรียบร้อย กรณีทำผิดกฎครั้งแรกผู้ให้เช่าจะตักเตือน แต่ครั้งต่อไปจะถูกยกเลิกสัญญาได้ทันที และห้ามผู้เช่าทอดทิ้งสัตว์หลังจากย้ายออกด้วย
 ข้อ 8 ให้ห้องเช่าห้องหนึ่งๆ มีลูกบิดประตูเข้าออกพร้อมลูกกุญแจให้ 1 ชุด ซึ่งใช้การได้ดี และอยู่ในสภาพเรียบร้อย หากผู้เช่าทำกุญแจดังกล่าวชำรุดเสียหายหรือสูญหาย ผู้เช่าต้องเปลี่ยนกุญแจใหม่ทั้งชุด จะทำการซ่อมแซมหรือทำลูกกุญแจสำรองไม่ได้ และส่งมอบคืนเมื่อเลิกสัญญาเช่าแล้ว
@@ -2078,7 +2078,7 @@ const CONTRACT_EN = `1. The Tenant agrees to rent Room No. {room} at the above p
 2. The Tenant has placed a deposit of {deposit} THB ({depositText}) with the Landlord to cover water, electricity and any damage. This deposit will be returned to the Tenant when the Tenant has stayed for the full lease term. If, after the lease term, the Tenant needs to move out for any reason, the Tenant must give at least 1 month (30 days) notice in advance; otherwise the deposit will not be refunded.
 3. If the Tenant pays rent more than 5 days late, the Tenant shall pay a fine of 50 THB per day. If rent remains unpaid for a long time, the Landlord has the right to lock the room immediately and take possession of it without notice. If the Tenant damages the Landlord's property, or unpaid rent exceeds the deposit in clause 2, the Tenant agrees that the property in the room may be seized and sold at auction immediately without any condition.
 4. The Tenant pays for water and electricity according to actual use as shown by the meters installed. Water is {water} THB per unit{waterMin}; electricity is {elec} THB per unit. If water or electricity charges are unpaid, the Tenant agrees that the water and electricity may be cut off immediately without notice, and will not dispute this.
-5. Each room contains the Landlord's property provided for the Tenant's use: 3 fluorescent lights, 3 power sockets, 1 cable TV socket, 1 ceiling fan and 1 set of bathroom fixtures (details in the attachment). These items are in good working condition. The Tenant must keep them in good working condition at all times. If any item is damaged for any reason, the Tenant must pay for or repair it to its original condition and return it to the Landlord when the lease ends. For rooms with air-conditioning, the Tenant must have the air-conditioner cleaned every 6 months (500 THB). If the Tenant installs their own air-conditioner, after moving out the Tenant must pay 1,500 THB to repair and seal the pipe and screw holes after removal.
+5. Each room contains the Landlord's property provided for the Tenant's use: 3 fluorescent lights, 3 power sockets, 1 cable TV socket, 1 ceiling fan and 1 set of bathroom fixtures{attachNote}. These items are in good working condition. The Tenant must keep them in good working condition at all times. If any item is damaged for any reason, the Tenant must pay for or repair it to its original condition and return it to the Landlord when the lease ends. For rooms with air-conditioning, the Tenant must have the air-conditioner cleaned every 6 months (500 THB). If the Tenant installs their own air-conditioner, after moving out the Tenant must pay 1,500 THB to repair and seal the pipe and screw holes after removal.
 6. No more than 3 people may live in each room. If more people live in the room, the Landlord has the right to terminate this lease immediately. The Landlord is not responsible for any damage to or loss of property belonging to the Tenant or the Tenant's guests.
 7. Pets are allowed, except dogs. The Tenant must inform the Landlord what pets and how many, preferably with photos and a vaccination record. Cats are limited to 3 per room and must be kept indoors, not allowed to roam outside the room or relieve themselves around the building. The Tenant must keep the room clean and free of odour and noise that disturbs other rooms. Outside the room, pets must be on a leash or in a carrier or pet stroller. A first violation will receive a warning; any further violation may lead to immediate termination of the lease. Abandoning pets after moving out is strictly prohibited.
 8. Each room comes with a door lock and 1 set of keys in good working order. If the Tenant damages or loses the keys, the Tenant must replace the whole lock set; repairs or duplicate keys are not allowed. The keys must be returned when the lease ends.
@@ -2125,7 +2125,7 @@ function docPayload_(kind, o, withSigns) {
     mode: (kind === 'contract' ? o.signMode : o.bookSignMode) || '', signed: (kind === 'contract' ? o.signed : o.bookSigned) || '' };
   if (kind === 'contract') {
     const rent = Number(o.rent) || d.room.rent;
-    d.custom = o.docHtml || ''; d.no = o.contractNo; d.terms = (en ? s.contractTermsEn : s.contractTerms) || (en ? CONTRACT_EN : CONTRACT_TH);
+    d.custom = o.docHtml || ''; d.attach = o.docAttach === '1'; d.no = o.contractNo; d.terms = (en ? s.contractTermsEn : s.contractTerms) || (en ? CONTRACT_EN : CONTRACT_TH);
     d.t = { name: o.name, phone: o.phone, idCard: o.idCard, idAddress: o.idAddress, start: o.startDate, end: o.endDate, months: Number(o.contractMonths) || (isDate_(o.startDate) && isDate_(o.endDate) ? Math.round((new Date(o.endDate) - new Date(o.startDate)) / 2629800000) : '') || '', deposit: Number(o.deposit) || 0, advance: Number(o.advanceRent) || 0, key: Number(o.keyDeposit) || 0, card: Number(o.cardFee) || 0 };
     d.room.rent = rent;
     const it = parseItems_(room), names = String(s.roomItems || '').split(',').map(x => x.trim()).filter(Boolean);
@@ -2159,6 +2159,7 @@ function api_docInfo(req) {
   }
   if (!C && req.bookAt != null) { if (!isDate_(String(req.bookAt).slice(0, 10))) throw new Error('วันเข้าอยู่ไม่ถูกต้อง'); o.bookAt = String(req.bookAt).slice(0, 16); }
   if (req.lang != null) o[C ? 'docLang' : 'bookLang'] = req.lang === 'en' ? 'en' : 'th';
+  if (C && req.attach != null) o.docAttach = req.attach === true || req.attach === '1' ? '1' : '0'; // แนบรายการอุปกรณ์ท้ายสัญญา
   if (req.mode != null) o[C ? 'signMode' : 'bookSignMode'] = req.mode === 'paper' ? 'paper' : req.mode === 'e' ? 'e' : '';
   if (req.paperDone != null) o[C ? 'signed' : 'bookSigned'] = req.paperDone ? 'paper:' + today_() : '';
   writeRow_(C ? 'Tenants' : 'Rooms', o, o._row);

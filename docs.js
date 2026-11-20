@@ -33,7 +33,8 @@
 .dov{position:fixed;inset:0;z-index:9000;background:#e9edf3;overflow:auto;-webkit-overflow-scrolling:touch}
 .dov .dovbar{position:sticky;top:0;z-index:2;background:#1e293b;color:#fff;display:flex;gap:8px;align-items:center;padding:10px 14px;flex-wrap:wrap}.dov .dovbar b{flex:1;min-width:140px}
 .dov .dovin{padding:14px 8px 40px;overflow-x:hidden}
-.dpdfmsg{position:fixed;left:50%;top:40%;transform:translateX(-50%);background:#111827;color:#fff;padding:14px 20px;border-radius:12px;z-index:200;font-size:16px;box-shadow:0 8px 24px rgba(0,0,0,.3)}
+.dpdfdlg{position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:9600;display:flex;align-items:center;justify-content:center;padding:16px}.dpdfdlg>div{background:#fff;color:#1f2933;border-radius:16px;padding:18px;width:100%;max-width:380px}.dpdfdlg .blk{display:block;width:100%;text-align:center;box-sizing:border-box}
+.dpdfmsg{position:fixed;left:50%;top:40%;transform:translateX(-50%);background:#111827;color:#fff;padding:14px 20px;border-radius:12px;z-index:9600;font-size:16px;box-shadow:0 8px 24px rgba(0,0,0,.3)}
 @media print{@page{size:A4;margin:0}body.docprint>*:not(.dov){display:none!important}body.docprint .dov{position:static;background:#fff;overflow:visible}body.docprint .dovbar{display:none}body.docprint .dovin{padding:0}
   .dsheet.dpage{zoom:.8!important;margin:2mm auto 0!important;box-shadow:none!important;height:296mm;break-after:page;page-break-after:always} /* ย่อ 84%: iPhone/Safari ใส่ขอบกระดาษ+หัวท้ายเองเสมอ ถ้าเต็ม A4 จะตกขอบ */.dsheet.dpage.dlast{break-after:auto;page-break-after:auto}}`;
   const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
@@ -89,13 +90,14 @@ function docTermsHtml(d) {
   const map = { room: d.room.room, floor: d.room.floor || '-', months: t.months || '-', start: dDate(t.start, L), end: dDate(t.end, L), rent: dNum(d.room.rent), dueDay: r.dueDay || '-', water: dNum(r.water), elec: dNum(r.elec),
     common: r.common ? (L === 'en' ? ' Common/internet fee ' + dNum(r.common) + ' THB per month.' : ' และค่าส่วนกลาง/อินเทอร์เน็ตเดือนละ ' + dNum(r.common) + ' บาท') : '',
     deposit: dNum(t.deposit), depositText: L === 'en' ? dWordsEn(t.deposit) : dBahtText(t.deposit), rentText: L === 'en' ? dWordsEn(d.room.rent) : dBahtText(d.room.rent),
+    attachNote: d.attach ? (L === 'en' ? ' (details in the attachment)' : ' (รายละเอียดตามเอกสารแนบท้ายสัญญา)') : '',
     waterMin: +r.waterMin ? (L === 'en' ? ' (minimum ' + dNum(r.waterMin) + ' THB per month)' : ' (ขั้นต่ำเดือนละ ' + dNum(r.waterMin) + ' บาท)') : '' };
   const LL = DOCL[L] || DOCL.th, dots = n => `<span class="dfill" style="min-width:${n}px"></span>`;
   const occ = () => [1, 2, 3].map(i => `<p class="docc">${i}. ${LL.occ} ${i === 1 && t.name ? `<span class="dv">${dEsc(t.name)}</span>` : dots(200)} ${LL.occAt} ${i === 1 && t.idCard && L === 'en' ? `<span class="dv">${dEsc(t.idCard)}</span>` : dots(130)} ${LL.occDate} ${dots(100)}</p>`).join('');
   return String(d.terms || '').split('\n').map(x => x.trim()).filter(Boolean).map(line => {
     if (line === '{occupants}') return occ();
     const h = /^(ข้อ\s*\d+|\d+\.)\s*\S/.test(line) && line.length < 70;
-    const html = dEsc(line).replace(/\{(\w+)\}/g, (m, k) => map[k] != null ? (k === 'common' || k === 'waterMin' ? dEsc(map[k]) : '<b>' + dEsc(map[k]) + '</b>') : m);
+    const html = dEsc(line).replace(/\{(\w+)\}/g, (m, k) => map[k] != null ? (k === 'common' || k === 'waterMin' || k === 'attachNote' ? dEsc(map[k]) : '<b>' + dEsc(map[k]) + '</b>') : m);
     return h ? `<p class="dh">${html}</p>` : `<p style="text-indent:2em">${html}</p>`;
   }).join('');
 }
@@ -148,8 +150,8 @@ function docLeaseBody(d) {
     <p style="text-indent:2em">${L.intro(dV(b.landlord), party, b)}</p>
     ${docTermsHtml(d)}
     <p class="dend" style="text-indent:2em;margin-top:12px">${d.mode === 'e' ? L.estmt : L.pstmt}</p>
-    <hr class="dpb"><h1 style="font-size:19px">${L.att}</h1><p class="dsub">${L.no} ${dEsc(d.no || '')} · ${L.room} ${dEsc(d.room.room)}</p>
-    ${items.length ? `<div class="drow drh"><div>#</div><div>${L.item}</div><div>${L.cond}</div></div>${items.map((k, i) => `<div class="drow"><div>${i + 1}</div><div>${dEsc(k)}</div><div>${ck(d.items[k] || {})}${(d.items[k] || {}).n ? ' · ' + dEsc(d.items[k].n) : ''}</div></div>`).join('')}` : `<p class="dc" style="color:#888">${L.noItems}</p>`}`;
+    ${d.attach ? `<hr class="dpb"><h1 style="font-size:19px">${L.att}</h1><p class="dsub">${L.no} ${dEsc(d.no || '')} · ${L.room} ${dEsc(d.room.room)}</p>
+    ${items.length ? `<div class="drow drh"><div>#</div><div>${L.item}</div><div>${L.cond}</div></div>${items.map((k, i) => `<div class="drow"><div>${i + 1}</div><div>${dEsc(k)}</div><div>${ck(d.items[k] || {})}${(d.items[k] || {}).n ? ' · ' + dEsc(d.items[k].n) : ''}</div></div>`).join('')}` : `<p class="dc" style="color:#888">${L.noItems}</p>`}` : ''}`;
 }
 // ใส่เอกสารลงในกล่อง แล้วแบ่งเป็นแผ่น A4 (ใบจอง = 1 แผ่นเสมอ · สัญญา = มีช่องเซ็นชื่อท้ายทุกแผ่น)
 async function docRender(el, d) {
@@ -160,23 +162,27 @@ async function docRender(el, d) {
 function docPaginate(el) {
   el.querySelectorAll('.dflow').forEach(fl => {
     const tp = fl.querySelector('template.dpf'), foot = tp ? tp.innerHTML : '', one = fl.dataset.k !== 'lease', pages = [];
-    const page = () => { const p = document.createElement('div'); p.className = 'dsheet dpage' + (one ? ' rc' : ''); p.innerHTML = `<div class="dpc"></div>${foot ? `<div class="dpfoot">${foot}<div class="dpn"></div></div>` : ''}`; fl.parentNode.insertBefore(p, fl); pages.push(p); return p.firstChild; };
-    fl.querySelectorAll(':scope > .dsec').forEach(sec => {
+    const page = () => { const p = document.createElement('div'); p.className = 'dsheet dpage' + (one ? ' rc' : ''); p.innerHTML = `<div class="dpc"></div>${foot ? `<div class="dpfoot">${foot}</div>` : ''}`; fl.parentNode.insertBefore(p, fl); pages.push(p); return p.firstChild; };
+    fl.querySelectorAll(':scope > .dsec').forEach((sec, si) => {
       while (sec.children.length === 1 && sec.firstElementChild.tagName === 'DIV' && !sec.firstElementChild.className && sec.firstElementChild.children.length) sec.firstElementChild.replaceWith(...sec.firstElementChild.childNodes); // แกะ div ห่อ
       Array.from(sec.childNodes).forEach(n => { if (n.nodeType === 3) { if (n.textContent.trim()) { const p = document.createElement('p'); n.replaceWith(p); p.appendChild(n); } else n.remove(); } else if (n.nodeType !== 1) n.remove(); });
       if (!sec.children.length) return;
-      let c = page();
-      Array.from(sec.children).forEach(b => {
-        c.appendChild(b);
-        if (c.scrollHeight > c.clientHeight + 1 && c.children.length > 1) {
-          c.removeChild(b); const carry = [], keep = x => x.classList.contains('dh') || x.classList.contains('drh') || /^H[1-4]$/.test(x.tagName) || (b.classList.contains('dsig') && (x.classList.contains('dsig') || x.classList.contains('dend')));
-          while (c.children.length > 1 && keep(c.lastElementChild) && carry.length < 3) carry.unshift(c.removeChild(c.lastElementChild)); // ไม่ให้หัวข้อ/ช่องเซ็นแยกจากข้อความ
-          c = page(); carry.forEach(x => c.appendChild(x)); c.appendChild(b);
-        }
-      });
+      const saved = sec.innerHTML, fit = !one && si === 0 ? 2 : 0; // สัญญา: เนื้อหาหลัก + ช่องเซ็น ให้จบใน 2 แผ่น (ย่อตัวอักษรอัตโนมัติ)
+      for (let fs = 14.5; ; fs -= .5) {
+        const start = pages.length; let c = page(); c.style.fontSize = fs + 'px';
+        Array.from(sec.children).forEach(b => {
+          c.appendChild(b);
+          if (c.scrollHeight > c.clientHeight + 1 && c.children.length > 1) {
+            c.removeChild(b); const carry = [], keep = x => x.classList.contains('dh') || x.classList.contains('drh') || /^H[1-4]$/.test(x.tagName) || (b.classList.contains('dsig') && (x.classList.contains('dsig') || x.classList.contains('dend')));
+            while (c.children.length > 1 && keep(c.lastElementChild) && carry.length < 3) carry.unshift(c.removeChild(c.lastElementChild)); // ไม่ให้หัวข้อ/ช่องเซ็นแยกจากข้อความ
+            c = page(); c.style.fontSize = fs + 'px'; carry.forEach(x => c.appendChild(x)); c.appendChild(b);
+          }
+        });
+        if (!fit || pages.length - start <= fit || fs <= 10.5) break;
+        pages.splice(start).forEach(p => p.remove()); sec.innerHTML = saved;
+      }
     });
     if (one && pages[0]) { const c = pages[0].firstChild; let fs = 14.5; while (c.scrollHeight > c.clientHeight + 1 && fs > 9.5) { fs -= .5; c.style.fontSize = fs + 'px'; } }
-    pages.forEach((p, i) => { const n = p.querySelector('.dpn'); if (n) n.textContent = (fl.dataset.pg || '') + ' ' + (i + 1) + '/' + pages.length; });
     if (pages.length) pages[pages.length - 1].classList.add('dlast');
     fl.remove();
   });
@@ -226,13 +232,29 @@ async function docSavePdf(box, name) {
     }
     pages.forEach((p, i) => { p.style.zoom = zs[i]; });
     const blob = pdf.output('blob'), file = typeof File === 'function' ? new File([blob], name, { type: 'application/pdf' }) : null;
-    msg.remove();
-    const mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    if (mobile && file && navigator.canShare && navigator.canShare({ files: [file] })) {
-      const go = await uiDialog('PDF พร้อมแล้ว (' + pages.length + ' หน้า)\nกดปุ่มด้านล่าง แล้วเลือก “บันทึกไปยังไฟล์” หรือส่งทาง LINE ได้เลย', { cancel: true, ok: '💾 บันทึก / แชร์' });
-      if (go) { try { await navigator.share({ files: [file], title: name }); } catch (e) { if (e.name !== 'AbortError') dlBlob(blob, name); } }
-    } else dlBlob(blob, name);
+    msg.remove(); docPdfReady(blob, file, name, pages.length);
   } catch (e) { pages.forEach((p, i) => { p.style.zoom = zs[i]; }); msg.remove(); (window.uiAlert || alert)('สร้าง PDF ไม่สำเร็จ: ' + e.message + '\nลองใช้ปุ่ม 🖨 พิมพ์ แทนได้'); }
+}
+// หน้าต่างเลือกวิธีบันทึก (ทุกปุ่มเป็นการแตะจริง → iPhone/แอปที่ติดตั้งบนหน้าจอโฮมยอมให้แชร์/ดาวน์โหลด)
+function docPdfReady(blob, file, name, n) {
+  const url = URL.createObjectURL(blob), canShare = !!(file && navigator.canShare && navigator.canShare({ files: [file] }));
+  const keep = typeof window.docPdfKeep === 'function' ? window.docPdfKeep() : null; // admin: เก็บเข้าแฟ้มห้อง
+  const w = document.createElement('div'); w.className = 'dpdfdlg';
+  w.innerHTML = `<div><b style="font-size:17px">📄 PDF พร้อมแล้ว (${n} หน้า)</b><div style="color:#666;font-size:13px;margin:2px 0 12px">${dEsc(name)}</div>
+    ${canShare ? '<button class="btn pri blk" data-a="share">📤 แชร์ / บันทึกลงเครื่อง</button><div style="color:#666;font-size:12.5px;margin:4px 0 8px">iPhone: เลือก “บันทึกไปยังไฟล์” หรือส่ง LINE ได้เลย</div>' : ''}
+    <a class="btn ${canShare ? '' : 'pri'} blk" data-a="dl" href="${url}" download="${dEsc(name)}">⬇️ ${canShare ? 'เปิด / ดาวน์โหลด' : 'ดาวน์โหลด PDF'}</a>
+    ${keep ? `<button class="btn blk" data-a="keep" style="margin-top:8px">📁 เก็บเข้าแฟ้มห้อง ${dEsc(keep.room)} (Google Drive)</button>` : ''}
+    <button class="btn blk" data-a="x" style="margin-top:8px">ปิด</button></div>`;
+  document.body.appendChild(w);
+  const close = () => { w.remove(); setTimeout(() => URL.revokeObjectURL(url), 120000); };
+  w.addEventListener('click', e => {
+    const b = e.target.closest('[data-a]'); if (!b && e.target === w) return close(); if (!b) return;
+    const a = b.dataset.a;
+    if (a === 'share') navigator.share({ files: [file], title: name }).then(close).catch(err => { if (err.name !== 'AbortError') alert('แชร์ไม่ได้: ' + err.message + '\nลองกด “เปิด / ดาวน์โหลด” แทน'); });
+    else if (a === 'dl') setTimeout(close, 800);
+    else if (a === 'keep') { b.disabled = true; b.textContent = 'กำลังอัปโหลด…'; const r = new FileReader(); r.onload = () => keep.save(r.result, name).then(() => { b.textContent = '✓ เก็บแล้ว · ดูได้ที่หน้าห้อง › เอกสาร'; }).catch(err => { b.disabled = false; b.textContent = '📁 ลองอีกครั้ง'; alert(err.message); }); r.readAsDataURL(blob); }
+    else close();
+  });
 }
 function dlBlob(blob, name) { const u = URL.createObjectURL(blob), a = document.createElement('a'); a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 60000); }
 // ใบแจ้งหนี้ / ใบเสร็จรับเงิน A4 (บิลทุกแบบ รวมบิลค่าใช้จ่ายเพิ่มเติมที่ออกให้ใครก็ได้)

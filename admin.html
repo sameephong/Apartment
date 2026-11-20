@@ -12,12 +12,12 @@
 <link rel="preconnect" href="https://script.google.com"><link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=6.4">
+<link rel="stylesheet" href="app.css?v=6.5">
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>document.write('<script src="config.js?t=' + Date.now() + '"><\/script>')</script>
-<script src="common.js?v=6.4"></script>
-<script src="docs.js?v=6.4"></script>
-<script src="printer.js?v=6.4"></script>
+<script src="common.js?v=6.5"></script>
+<script src="docs.js?v=6.5"></script>
+<script src="printer.js?v=6.5"></script>
 </head>
 <body class="admin">
 <div class="wrap">
@@ -871,7 +871,7 @@ async function delNews(id) { if (!await uiConfirm('ลบประกาศน�
 <script>
 /* ===================== v3 · หน้าจอคอม/Mac + โหมดเจ้าของจัดการเอง ===================== */
 window.matchMedia('(min-width:1024px)').addEventListener('change', () => { if (D) { closeSheet(); render(); } });
-const APP_FRONT = '6.3';
+const APP_FRONT = '6.5';
 const ME = () => (D && D.me) || {};
 const STAFF = () => ME().role === 'staff';
 const M = Object.assign({}, VIEWS); // หน้ามือถือเดิม
@@ -2213,6 +2213,7 @@ async function leaseSheet0(kind, id, keep) {
     <label class="f">ชื่อ${C ? 'ผู้ให้เช่า' : 'ผู้รับเงิน'} (ใช้กับทุกเอกสาร)<input id="dsLl" value="${esc(S().landlordName || '')}" placeholder="${esc(S().apartmentName)}"></label>
     ${C ? '' : `<div style="margin:-2px 0 10px">${bookFilesHtml(o)}</div>`}
     <div class="fl">ภาษาเอกสาร</div><div class="segb" style="margin:4px 0 10px"><button class="${d.lang !== 'en' ? 'on' : ''}" onclick="docSet({lang:'th'})">🇹🇭 ไทย</button><button class="${d.lang === 'en' ? 'on' : ''}" onclick="docSet({lang:'en'})">🇬🇧 English</button></div>
+    ${C ? `<div class="fl">เอกสารแนบท้ายสัญญา</div><div class="segb" style="margin:4px 0 10px"><button class="${!d.attach ? 'on' : ''}" onclick="docSet({attach:false})">ไม่แนบ · สัญญา 2 แผ่น</button><button class="${d.attach ? 'on' : ''}" onclick="docSet({attach:true})">📎 แนบรายการอุปกรณ์ห้อง (+1 แผ่น)</button></div>` : ''}
     <div class="fl">วิธีเซ็น</div><div class="segb" style="margin:4px 0 10px"><button class="${mode === 'e' ? 'on' : ''}" onclick="docSet({mode:'e'})">✍️ เซ็นในระบบ</button><button class="${mode === 'paper' ? 'on' : ''}" onclick="docSet({mode:'paper'})">🖨 เซ็นบนกระดาษ</button></div>
     ${mode === 'e' ? `<div class="card" style="padding:4px 12px;margin-bottom:10px">${sgl('tenant', who)}${sgl('owner', C ? 'ผู้ให้เช่า' : 'ผู้รับเงิน')}</div>
       ${sg.tenant ? '' : `<button class="btn pri blk" onclick="docHere()">📱 ${who}เซ็นที่เครื่องนี้</button><button class="btn blk" style="margin-top:8px" onclick="docSend()">💬 ส่งลิงก์ให้${who}เซ็นในมือถือตัวเอง</button>`}
@@ -2560,6 +2561,16 @@ async function itMerge(from, to) {
   const j = await act('renameRoomItem', { from, to }, (!to ? 'ลบแล้ว' : exists ? 'รวมแล้ว' : 'เปลี่ยนชื่อแล้ว'));
   if (UI.fItem === from) UI.fItem = to || ''; closeSheet(); render();
 }
+
+/* ---------- บันทึก PDF → เก็บเข้าแฟ้มเอกสารของห้อง (v6.5) ---------- */
+const _docShow0 = docShow;
+docShow = function (d, bar) {
+  window.DOCKEEP = d.kind === 'contract' ? { room: d.room.room, tenantId: DS && DS.kind === 'contract' ? DS.id : '', cat: 'สัญญาเช่า' }
+    : d.kind === 'book' ? { room: d.room.room, cat: 'การจอง' } : d.kind === 'invoice' && d.bill && d.bill.room ? { room: d.bill.room, cat: 'อื่นๆ' } : null;
+  return _docShow0(d, bar);
+};
+window.docPdfKeep = () => { const k = window.DOCKEEP; if (!k || !$('#docOv')) return null;
+  return { room: k.room, save: (data, name) => api('uploadDoc', { room: k.room, tenantId: k.tenantId || '', category: k.cat, name, data, note: 'บันทึกจากระบบ' }, true) }; };
 </script>
 </body>
 </html>

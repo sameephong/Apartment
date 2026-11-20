@@ -60,7 +60,7 @@ function loadScript(src) {
   });
 }
 function demoReady() {
-  if (!_demoReady) _demoReady = loadScript('demo.js?v=6.4').then(() => loadScript('backend.js?v=6.4')).then(() => window.DemoGAS.init());
+  if (!_demoReady) _demoReady = loadScript('demo.js?v=6.5').then(() => loadScript('backend.js?v=6.5')).then(() => window.DemoGAS.init());
   return _demoReady;
 }
 async function callApi(action, payload) {
@@ -197,7 +197,7 @@ function uiDialog(msg, opts) {
   opts = opts || {};
   return new Promise(res => {
     const w = document.createElement('div');
-    w.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:90;display:flex;align-items:center;justify-content:center;padding:16px';
+    w.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:9700;display:flex;align-items:center;justify-content:center;padding:16px';
     w.innerHTML = `<div style="background:#fff;color:#1f2933;border-radius:16px;padding:18px;width:100%;max-width:380px;box-shadow:0 10px 30px rgba(0,0,0,.2)">
       <div style="font-size:16px;line-height:1.5;white-space:pre-wrap">${esc(msg)}</div>
       ${opts.input != null ? `<input id="dlgIn" inputmode="decimal" style="width:100%;margin-top:12px;font-size:18px" value="${esc(opts.input)}">` : ''}
@@ -217,7 +217,7 @@ function uiPrompt(msg, def) { return uiDialog(msg, { cancel: true, input: def ==
 /* ---------- โทรออก: แสดงเบอร์ให้คัดลอก (ไม่พาหน้าเว็บออกไป) ---------- */
 function callPhone(num) {
   const w = document.createElement('div');
-  w.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:90;display:flex;align-items:center;justify-content:center;padding:16px';
+  w.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:9700;display:flex;align-items:center;justify-content:center;padding:16px';
   w.innerHTML = `<div style="background:#fff;color:#1f2933;border-radius:16px;padding:18px;width:100%;max-width:340px;text-align:center">
     <div style="color:#6b7280;font-size:14px">เบอร์โทร</div>
     <div style="font-size:26px;font-weight:700;letter-spacing:1px;margin:4px 0 14px;user-select:all">${esc(num)}</div>
