@@ -12,12 +12,12 @@
 <link rel="preconnect" href="https://script.google.com"><link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app.css?v=6.5">
+<link rel="stylesheet" href="app.css?v=6.6">
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>document.write('<script src="config.js?t=' + Date.now() + '"><\/script>')</script>
-<script src="common.js?v=6.5"></script>
-<script src="docs.js?v=6.5"></script>
-<script src="printer.js?v=6.5"></script>
+<script src="common.js?v=6.6"></script>
+<script src="docs.js?v=6.6"></script>
+<script src="printer.js?v=6.6"></script>
 </head>
 <body class="admin">
 <div class="wrap">
@@ -871,7 +871,7 @@ async function delNews(id) { if (!await uiConfirm('ลบประกาศน�
 <script>
 /* ===================== v3 · หน้าจอคอม/Mac + โหมดเจ้าของจัดการเอง ===================== */
 window.matchMedia('(min-width:1024px)').addEventListener('change', () => { if (D) { closeSheet(); render(); } });
-const APP_FRONT = '6.5';
+const APP_FRONT = '6.6';
 const ME = () => (D && D.me) || {};
 const STAFF = () => ME().role === 'staff';
 const M = Object.assign({}, VIEWS); // หน้ามือถือเดิม
@@ -1383,7 +1383,7 @@ function repairSheet(id) {
       ${r.billId ? '<span class="badge b-ok" style="margin-bottom:10px">ออกบิลเก็บผู้เช่าแล้ว</span>' : `<div class="row" style="margin-bottom:8px"><button class="tog" id="rsChg" onclick="this.classList.toggle('on')"></button><span class="small">ออกบิลเก็บผู้เช่า</span></div>`}</div></div>
     ${repSubHtml(r)}
     ${(r.log || []).length ? `<details style="margin:12px 0"><summary class="muted small" style="cursor:pointer">ประวัติ ${r.log.length} รายการ</summary>${r.log.slice().reverse().map(e => `<div class="small" style="padding:3px 0;border-bottom:1px solid #eef0f2"><b>${esc(e.s)}</b> · <span class="muted">${fmtDateTime(e.at)}</span>${e.m ? ' · ' + esc(e.m) : ''}</div>`).join('')}</details>` : ''}
-    <div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn" onclick="rsSave(${q(id)},true)">บันทึก + ส่ง LINE แจ้งผู้เช่า</button><button class="btn pri" onclick="rsSave(${q(id)})">✓ บันทึก</button></div>`);
+    <div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn" style="color:var(--bad);margin-right:auto" onclick="delRepair(${q(id)},${q(r.room)})">🗑 ลบ</button><button class="btn" onclick="rsSave(${q(id)},true)">บันทึก + ส่ง LINE แจ้งผู้เช่า</button><button class="btn pri" onclick="rsSave(${q(id)})">✓ บันทึก</button></div>`);
   document.querySelectorAll('#sbody img[data-file]').forEach(async im => { try { im.src = await getImg(im.dataset.file); } catch (e) {} });
 }
 const OUTCOMES = ['รอเปลี่ยนของใหม่', 'เปลี่ยนใหม่แล้ว', 'ไม่เปลี่ยน · เลิกใช้'];
@@ -2449,7 +2449,7 @@ function tkOtherHtml() {
 VIEWS.repairs = () => {
   const tab = UI.tkTab || 'rep', c = tkCounts(), nr = D.repairs.filter(repOpen).length;
   const top = `<div class="tktop"><button class="${tab === 'rep' ? 'on' : ''}" onclick="UI.tkTab='rep';render()">🔧 งานซ่อม${nr ? ` <span>${nr}</span>` : ''}</button><button class="${tab === 'oth' ? 'on' : ''}" onclick="UI.tkTab='oth';render()">📌 งานอื่น${c.open + c.wait ? ` <span>${c.open + c.wait}</span>` : ''}</button></div>`;
-  if (tab === 'rep') { const v = DESK() ? dRepairs() : mRepairs(); v.html = top + v.html; v.nav = 'repairs'; return v; }
+  if (tab === 'rep') { const v = DESK() ? dRepairs() : mRepairs(); if (!UI.repSel) v.html = top + v.html; v.nav = 'repairs'; return v; }
   return { title: 'งานอื่น', sub: 'ต้องทำ ' + c.open + ' · รอคนอื่น ' + c.wait, nav: 'repairs', right: `<button class="pill" onclick="taskSheet()">+ เพิ่มงาน</button>`, dright: `<button class="pill pri" onclick="taskSheet()">＋ เพิ่มงาน</button>`, html: top + tkOtherHtml() };
 };
 VIEWS.tasks = () => { UI.tkTab = 'oth'; return VIEWS.repairs(); };
@@ -2571,6 +2571,119 @@ docShow = function (d, bar) {
 };
 window.docPdfKeep = () => { const k = window.DOCKEEP; if (!k || !$('#docOv')) return null;
   return { room: k.room, save: (data, name) => api('uploadDoc', { room: k.room, tenantId: k.tenantId || '', category: k.cat, name, data, note: 'บันทึกจากระบบ' }, true) }; };
+
+/* ---------- 🔧 งานซ่อมแบบใหม่: ชั้น › ห้อง › รายการ + ลบ (v6.6) ---------- */
+const repFloor = no => { const r = D.rooms.find(x => x.room === no); return String((r && r.floor) || String(no).replace(/\D/g, '').slice(0, 1) || '-'); };
+const repSort = (a, b) => String(a).localeCompare(String(b), undefined, { numeric: true });
+const RPC = { 'รอดำเนินการ': 'new', 'กำลังซ่อม': 'doing', 'เสร็จแล้ว': 'done', 'ซ่อมไม่ได้': 'bad' };
+function repPill(r) {
+  if (repOpen(r) && r.appointAt) { const d = String(r.appointAt); return `<span class="rpl doing">นัดช่าง ${+d.slice(8, 10)} ${TH_MONTHS_S[+d.slice(5, 7) - 1]}${d.length > 10 ? ' ' + d.slice(11, 16) : ''}</span>`; }
+  return `<span class="rpl ${RPC[r.status] || ''}">${r.status === 'รอดำเนินการ' ? 'ใหม่' : esc(r.status)}</span>`;
+}
+function repList() { const seg = UI.repSeg2 || 'open'; return D.repairs.filter(r => seg === 'all' ? true : seg === 'open' ? repOpen(r) : !repOpen(r)); }
+function repGroups(list) { // { floor: { room: [repairs] } }
+  const g = {}; list.forEach(r => { const f = repFloor(r.room); ((g[f] = g[f] || {})[r.room] = g[f][r.room] || []).push(r); });
+  Object.values(g).forEach(rm => Object.values(rm).forEach(a => a.sort((x, y) => (repOpen(y) - repOpen(x)) || String(y.createdAt).localeCompare(String(x.createdAt)))));
+  return g;
+}
+function repRoomCard(no, arr, sel) {
+  const t = tenantOf(no), open = arr.filter(repOpen).length, S0 = UI.repSel;
+  if (sel) return `<div class="rpc"><div class="rph"><span class="rpn">${esc(no)}</span><a class="rpall" onclick="repSelRoom(${q(no)})">${arr.every(r => S0.has(r.id)) ? 'ไม่เลือกทั้งห้อง' : 'เลือกทั้งห้อง'}</a></div>
+    ${arr.map(r => `<div class="rpi tap" onclick="repSelToggle(${q(r.id)})"><span class="rcb${S0.has(r.id) ? ' on' : ''}">${S0.has(r.id) ? '✓' : ''}</span><span class="d">${esc(r.detail)}</span>${repPill(r)}</div>`).join('')}</div>`;
+  return `<div class="rpc tap" onclick="roomRepSheet(${q(no)})"><div class="rph"><span class="rpn">${esc(no)}</span><span class="muted small">${t ? 'คุณ' + esc(t.name.split(' ')[0]) : 'ห้องว่าง'}</span>${open ? `<span class="rpcnt">${open}</span>` : ''}</div>
+    ${arr.map(r => `<div class="rpi"><span>${catIcon(r.category)}</span><span class="d">${r.urgent && repOpen(r) ? '<b style="color:var(--bad)">ด่วน</b> ' : ''}${esc(r.detail)}</span>${repPill(r)}</div>`).join('')}</div>`;
+}
+function repHeadBits() {
+  const all = repList(), fl = UI.repFl || '', g = repGroups(all), floors = Object.keys(g).sort(repSort);
+  const seg = `<div class="seg">${[['open', 'ยังไม่เสร็จ'], ['done', 'เสร็จแล้ว'], ['all', 'ทั้งหมด']].map(([k, l]) => `<button class="${(UI.repSeg2 || 'open') === k ? 'on' : ''}" onclick="UI.repSeg2='${k}';render()">${l}</button>`).join('')}</div>`;
+  const chips = `<div class="rpchips"><span class="chip ${fl ? '' : 'on'}" onclick="UI.repFl='';render()">ทุกชั้น</span>${floors.map(f => `<span class="chip ${fl === f ? 'on' : ''}" onclick="UI.repFl=${q(f)};render()">ชั้น ${esc(f)} · ${Object.values(g[f]).reduce((a, x) => a + x.length, 0)}</span>`).join('')}<span class="chip" style="margin-left:auto" onclick="repMenu()">⋯</span></div>`;
+  return { all, g, floors: floors.filter(f => !fl || f === fl), seg, chips };
+}
+function repEmpty() { return `<div class="empty">${(UI.repSeg2 || 'open') === 'open' ? 'ไม่มีงานซ่อมค้าง 🎉' : 'ไม่มีรายการ'}<br><button class="btn pri" style="margin-top:10px" onclick="newRepairSheet()">＋ บันทึกแจ้งซ่อม</button></div>`; }
+function mRepairs() {
+  if (UI.repSel) return repSelView();
+  const h = repHeadBits(), rooms = h.all.length ? new Set(h.all.map(r => r.room)).size : 0;
+  return { title: 'งานซ่อม', sub: ((UI.repSeg2 || 'open') === 'open' ? 'ยังไม่เสร็จ ' : '') + h.all.length + ' รายการ · ' + rooms + ' ห้อง', right: `<button class="pill" onclick="newRepairSheet()">+ บันทึก</button>`,
+    html: h.seg + h.chips + (h.floors.map(f => { const rm = h.g[f], ks = Object.keys(rm).sort(repSort);
+      return `<div class="rpfl">ชั้น ${esc(f)} <span>${ks.length} ห้อง · ${ks.reduce((a, k) => a + rm[k].length, 0)} รายการ</span></div>` + ks.map(k => repRoomCard(k, rm[k])).join(''); }).join('') || repEmpty()),
+    after: repHdReset };
+}
+function dRepairs() {
+  if (UI.repSel) return Object.assign(repSelView(), { wide: true });
+  const h = repHeadBits();
+  return { title: 'งานซ่อม', sub: 'แยกตามชั้น · กดการ์ดห้องเพื่อดู / เพิ่ม / ลบรายการ', wide: true,
+    dright: `<button class="pill ${OWN() ? 'pri' : ''}" onclick="newRepairSheet()">＋ บันทึกแจ้งซ่อม</button>`,
+    html: `<div style="max-width:560px">${h.seg}</div>${h.chips}` + (h.floors.length ? `<div class="rpboard">${h.floors.map(f => { const rm = h.g[f], ks = Object.keys(rm).sort(repSort);
+      return `<div class="rpcol"><h4>ชั้น ${esc(f)} <span class="pl">${ks.reduce((a, k) => a + rm[k].length, 0)}</span></h4>${ks.map(k => repRoomCard(k, rm[k])).join('')}</div>`; }).join('')}</div>` : repEmpty()),
+    after: repHdReset };
+}
+function repHdReset() { const h = $('#hd'); if (h) h.style.background = ''; document.body.classList.remove('rpsel'); }
+// หน้าต่างห้อง: ทุกรายการของห้องนั้น
+function roomRepSheet(no) {
+  const t = tenantOf(no), all = D.repairs.filter(r => r.room === no).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))), op = all.filter(repOpen), dn = all.filter(r => !repOpen(r));
+  const row = r => `<div class="rpln"><span>${catIcon(r.category)}</span><div style="flex:1;min-width:0" class="tap" onclick="repairSheet(${q(r.id)})"><b>${r.urgent && repOpen(r) ? '<span style="color:var(--bad)">ด่วน</span> ' : ''}${esc(r.detail)}</b><div class="muted small">${esc(r.source || 'แจ้งซ่อม')} · ${fmtDate(String(r.createdAt).slice(0, 10))}${r.appointAt && repOpen(r) ? ' · 📅 นัดช่าง ' + fmtDateTime(r.appointAt) : ''}${+r.cost ? ' · ' + fmtB(r.cost) : ''}${repSubBadge(r)}</div></div>${repPill(r)}<a class="rpdel" title="ลบรายการนี้" onclick="delRepair(${q(r.id)},${q(no)})">🗑</a></div>`;
+  UI.rrCat = UI.rrCat || 'อื่นๆ';
+  openSheet(`<div class="row" style="flex-wrap:nowrap"><h3 style="margin:0">🔧 ห้อง ${esc(no)}</h3><span class="muted small">ชั้น ${esc(repFloor(no))} · ${t ? 'คุณ' + esc(t.name) : 'ห้องว่าง'}</span></div>
+    <div class="muted small" style="margin:2px 0 8px">ยังไม่เสร็จ ${op.length} · เสร็จแล้ว ${dn.length}</div>
+    ${op.map(row).join('') || '<div class="muted small" style="padding:8px 0">ไม่มีงานค้าง</div>'}
+    ${dn.length ? `<details style="margin:8px 0"><summary class="muted small" style="cursor:pointer">เสร็จแล้ว ${dn.length} รายการ</summary>${dn.map(row).join('')}</details>` : ''}
+    <div class="row" style="flex-wrap:nowrap;margin-top:10px"><input id="rrNew" placeholder="＋ เพิ่มรายการซ่อมห้องนี้…" style="flex:1;min-width:0" onkeydown="if(event.key==='Enter')rrAdd(${q(no)})"><button class="btn pri" onclick="rrAdd(${q(no)})">เพิ่ม</button></div>
+    <div class="rpchips" id="rrCat" style="margin-top:8px">${RCATS.map(x => `<span class="chip ${UI.rrCat === x[1] ? 'on' : ''}" data-v="${esc(x[1])}" onclick="UI.rrCat=this.dataset.v;this.parentNode.querySelectorAll('.chip').forEach(c=>c.classList.toggle('on',c===this))">${x[0]} ${x[1]}</span>`).join('')}</div>
+    <div class="muted small" style="margin-top:4px">มีรูป / นัดช่าง / แจ้งทาง? <a class="tap" onclick="newRepairSheet(${q(no)})">ใช้ฟอร์มเต็ม</a></div>
+    <div class="row" style="margin-top:12px;flex-wrap:nowrap">${t ? `<button class="btn" style="flex:1" onclick="rrLine(${q(no)})">💬 ส่ง LINE แจ้งผู้เช่า</button>` : ''}${op.length ? `<button class="btn" style="flex:1" onclick="rrAllDone(${q(no)})">✓ เสร็จทั้งห้อง</button>` : ''}</div>`);
+}
+async function rrAdd(no) {
+  const el = $('#rrNew'), v = el ? el.value.trim() : ''; if (!v) return uiAlert('พิมพ์รายการที่ต้องซ่อมก่อน');
+  await act('createRepair', { repair: { room: no, detail: v, category: UI.rrCat || 'อื่นๆ', source: 'เจ้าของพบเอง' } }, 'เพิ่มรายการแล้ว'); render(); roomRepSheet(no);
+}
+async function rrAllDone(no) {
+  const op = D.repairs.filter(r => r.room === no && repOpen(r)); if (!op.length) return;
+  if (!await uiConfirm(`ตั้งงานซ่อมห้อง ${no} ทั้ง ${op.length} รายการ เป็น “เสร็จแล้ว”?`)) return;
+  for (const r of op) await api('saveRepair', { repair: { id: r.id, status: 'เสร็จแล้ว' } }, true);
+  toast('ห้อง ' + no + ' ซ่อมเสร็จทั้งหมดแล้ว'); render(); roomRepSheet(no);
+}
+function rrLine(no) {
+  const op = D.repairs.filter(r => r.room === no && repOpen(r)), dn = D.repairs.filter(r => r.room === no && r.status === 'เสร็จแล้ว' && String(r.updatedAt).slice(0, 10) === today());
+  const txt = `แจ้งงานซ่อม ห้อง ${no} · ${S().apartmentName}\n` + (op.length ? 'กำลังดำเนินการ:\n' + op.map(r => '• ' + r.detail.slice(0, 60) + (r.appointAt ? ' (นัดช่าง ' + fmtDateTime(r.appointAt) + ')' : '')).join('\n') : '') + (dn.length ? '\nซ่อมเสร็จวันนี้:\n' + dn.map(r => '✓ ' + r.detail.slice(0, 60)).join('\n') : '');
+  openLine(txt);
+}
+async function delRepair(id, back) {
+  const r = D.repairs.find(x => x.id === id); if (!r) return;
+  if (!await uiConfirm(`ลบรายการ “${r.detail.slice(0, 40)}” ห้อง ${r.room}?${r.billId ? '\n(บิลที่ออกไปแล้วจะยังอยู่)' : ''}`, 'ลบ', true)) return;
+  await act('deleteRepairs', { ids: [id] }, 'ลบแล้ว'); render();
+  if (back && D.repairs.some(x => x.room === back)) roomRepSheet(back); else closeSheet();
+}
+// เมนู ⋯
+function repMenu() {
+  openSheet(`<h3>⋯ งานซ่อม</h3>
+    <button class="btn blk" onclick="closeSheet();newRepairSheet()">＋ บันทึกแจ้งซ่อม</button>
+    <button class="btn blk" style="margin-top:8px" onclick="closeSheet();UI.repSel=new Set();render();window.scrollTo(0,0)">☑️ เลือกลบหลายรายการ</button>
+    <button class="btn blk" style="margin-top:8px;color:var(--bad)" onclick="repClearAll()">🗑 ล้างงานซ่อมทั้งหมด (เริ่มบันทึกใหม่)</button>
+    <div class="muted small" style="margin-top:8px">ล้างทั้งหมด: ระบบสำรองไว้ในชีต Repairs_backup ก่อนลบ · บิลที่ออกไปแล้วไม่ถูกลบ</div>`);
+}
+async function repClearAll() {
+  const n = D.repairs.length; closeSheet(); if (!n) return uiAlert('ไม่มีงานซ่อมให้ลบ');
+  const v = await uiDialog(`🗑 ล้างงานซ่อมทั้งหมด?\n\nลบงานซ่อมทั้งหมด ${n} รายการ (ทุกสถานะ) เพื่อเริ่มบันทึกใหม่\nระบบจะสำรองไว้ในชีต Repairs_backup ก่อน · บิลที่ออกไปแล้วไม่ถูกลบ\n\nพิมพ์คำว่า ลบ เพื่อยืนยัน`, { cancel: true, input: '', ok: 'ลบทั้งหมด', danger: true });
+  if (v == null) return; if (v.trim() !== 'ลบ') return uiAlert('ยังไม่ได้ลบ — ต้องพิมพ์คำว่า ลบ');
+  const j = await act('clearRepairs', { confirm: 'ลบ' }); UI.repSel = null; render();
+  uiAlert(`ล้างงานซ่อมแล้ว ${j.result || n} รายการ\nสำรองไว้ที่ชีต ${j.backup || 'Repairs_backup'} ใน Google Sheet`);
+}
+// โหมดเลือกลบ
+function repSelView() {
+  const S0 = UI.repSel, h = repHeadBits();
+  return { title: 'เลือกรายการที่จะลบ', sub: 'เลือกแล้ว ' + S0.size + ' รายการ', nav: 'repairs', right: `<button class="pill" onclick="UI.repSel=null;render()">ยกเลิก</button>`, dright: `<button class="pill" onclick="UI.repSel=null;render()">ยกเลิก</button>`,
+    html: h.seg + (h.floors.map(f => { const rm = h.g[f], ks = Object.keys(rm).sort(repSort); return `<div class="rpfl">ชั้น ${esc(f)}</div>` + ks.map(k => repRoomCard(k, rm[k], true)).join(''); }).join('') || repEmpty())
+      + `<div class="rpselbar"><button class="btn" onclick="UI.repSel=null;render()">ยกเลิก</button><button class="btn badfill" ${S0.size ? '' : 'disabled'} onclick="repSelDel()">🗑 ลบที่เลือก (${S0.size})</button></div><div style="height:70px"></div>`,
+    after: () => { const hd = $('#hd'); if (hd && !DESK()) hd.style.background = '#991b1b'; document.body.classList.add('rpsel'); } };
+}
+function repSelToggle(id) { const S0 = UI.repSel; S0.has(id) ? S0.delete(id) : S0.add(id); const y = window.scrollY; render(); window.scrollTo(0, y); }
+function repSelRoom(no) { const S0 = UI.repSel, arr = repList().filter(r => r.room === no), all = arr.every(r => S0.has(r.id)); arr.forEach(r => all ? S0.delete(r.id) : S0.add(r.id)); const y = window.scrollY; render(); window.scrollTo(0, y); }
+async function repSelDel() {
+  const ids = [...UI.repSel]; if (!ids.length) return;
+  if (!await uiConfirm(`ลบงานซ่อม ${ids.length} รายการที่เลือก?`, 'ลบ', true)) return;
+  await act('deleteRepairs', { ids }, 'ลบแล้ว ' + ids.length + ' รายการ'); UI.repSel = null; render();
+}
+window.addEventListener('hashchange', () => { if (UI.repSel) UI.repSel = null; repHdReset(); });
 </script>
 </body>
 </html>

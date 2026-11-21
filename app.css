@@ -266,3 +266,16 @@ mark{background:#fde68a;color:inherit;border-radius:3px;padding:0 1px}
 .tklog{margin-top:8px;max-height:260px;overflow:auto;border-left:3px solid var(--line,#e3e6ea);padding-left:10px}.tklog>div{padding:5px 0}
 #tkCat,#tkRem{flex-wrap:wrap}#tkCat button{flex:1 1 30%;min-width:0}#tkRem button{flex:1 1 30%;min-width:0}
 .itdel{font-size:13px;margin-left:2px;opacity:.7}
+/* v6.6 งานซ่อมแยกชั้น/ห้อง */
+.rpchips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}.rpchips .chip{cursor:pointer}
+.rpfl{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;margin:12px 2px 6px;color:#334155}.rpfl span{font-weight:400;color:#94a3b8;font-size:13px}.rpfl:after{content:"";flex:1;height:1px;background:#d7dce3}
+.rpc{background:#fff;border-radius:14px;padding:10px 12px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,.07);border:1px solid #eef0f3}
+.rph{display:flex;align-items:center;gap:8px}.rpn{font-size:18px;font-weight:700}.rpcnt{margin-left:auto;background:var(--bad-soft);color:var(--bad);font-size:12.5px;font-weight:700;border-radius:99px;padding:1px 9px}
+.rpall{margin-left:auto;color:var(--brand);font-size:13px;font-weight:700;cursor:pointer}
+.rpi{display:flex;align-items:center;gap:8px;font-size:14px;padding:6px 0 0}.rpi .d{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rpl{font-size:12px;padding:1px 9px;border-radius:99px;font-weight:700;white-space:nowrap;background:#eef0f3;color:#555}.rpl.new{background:#fef3c7;color:#b45309}.rpl.doing{background:#ffedd5;color:#c2410c}.rpl.done{background:#dcfce7;color:#15803d}.rpl.bad{background:#fee2e2;color:#b91c1c}
+.rpln{display:flex;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid #eef0f3}.rpdel{color:#b91c1c;cursor:pointer;font-size:17px;padding:2px 4px}
+.rcb{width:22px;height:22px;border-radius:6px;border:2px solid #b8c0cc;flex:none;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px}.rcb.on{background:#dc2626;border-color:#dc2626}
+.rpselbar{position:fixed;left:0;right:0;bottom:0;z-index:60;background:#fff;border-top:1px solid #e5e7eb;padding:10px 14px max(10px,env(safe-area-inset-bottom));display:flex;gap:10px}.rpselbar .btn{flex:1}
+.rpboard{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;align-items:start}.rpcol{background:#f2f4f7;border-radius:12px;padding:10px}.rpcol h4{margin:0 0 8px}
+body.rpsel #nav{display:none}

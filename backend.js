@@ -7,7 +7,7 @@
  * ไฟล์นี้ใช้เป็นโหมดทดลองในเบราว์เซอร์ได้ด้วย (ไม่ต้องแก้)
  ******************************************************************/
 
-const APP_VER = '6.5';
+const APP_VER = '6.6';
 const SCHEMA = {
   Settings: ['key', 'value', 'description'],
   Rooms:    ['room', 'floor', 'type', 'rent', 'status', 'note',
@@ -192,7 +192,7 @@ const ADMIN_API = {
   saveMeters: api_saveMeters, previewBills: api_previewBills, generateBills: api_generateBills,
   createBill: api_createBill, updateBill: api_updateBill, deleteBill: api_deleteBill,
   approveSlip: api_approveSlip, rejectSlip: api_rejectSlip, receiveCash: api_receiveCash, recordPayment: api_recordPayment, unpay: api_unpay,
-  fileImage: api_fileImage, saveRepair: api_saveRepair, createRepair: api_createRepair,
+  fileImage: api_fileImage, saveRepair: api_saveRepair, createRepair: api_createRepair, deleteRepairs: api_deleteRepairs, clearRepairs: api_clearRepairs,
   uploadDoc: api_uploadDoc, deleteDoc: api_deleteDoc, updateDoc: api_updateDoc,
   postNews: api_postNews, deleteNews: api_deleteNews,
   saveSettings: api_saveSettings, testLine: api_testLine,
@@ -845,6 +845,28 @@ function api_createRepair(req) {
   if (p.charge) chargeRepair_(r);
   writeRow_('Repairs', r);
   return { id: r.id };
+}
+
+// ลบงานซ่อมที่เลือก (+ งานย่อยของงานนั้น)
+function api_deleteRepairs(req) {
+  const ids = (req.ids || []).map(String); if (!ids.length) throw new Error('ยังไม่ได้เลือกรายการ');
+  const want = new Set(ids), rows = readAll_('Repairs').filter(r => want.has(String(r.id))).map(r => r._row).sort((a, b) => b - a);
+  rows.forEach(n => sheet_('Repairs').deleteRow(n)); dropCache_('Repairs');
+  const tk = readAll_('Tasks').filter(t => t.repairId && want.has(String(t.repairId))).map(t => t._row).sort((a, b) => b - a);
+  tk.forEach(n => sheet_('Tasks').deleteRow(n)); if (tk.length) dropCache_('Tasks');
+  return { result: rows.length };
+}
+// ล้างงานซ่อมทั้งหมดเพื่อเริ่มใหม่ (สำรองชีตไว้ก่อน · บิลไม่ถูกลบ)
+function api_clearRepairs(req) {
+  if (String(req.confirm || '').trim() !== 'ลบ') throw new Error('พิมพ์คำว่า ลบ เพื่อยืนยัน');
+  const ss = SpreadsheetApp.getActive(), sh = sheet_('Repairs'), last = sh.getLastRow(), n = Math.max(0, last - 1);
+  if (!n) return { result: 0 };
+  const stamp = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyyMMdd_HHmm');
+  sh.copyTo(ss).setName('Repairs_backup_' + stamp);
+  sh.deleteRows(2, n); dropCache_('Repairs');
+  const tk = readAll_('Tasks').filter(t => t.repairId).map(t => t._row).sort((a, b) => b - a);
+  tk.forEach(r => sheet_('Tasks').deleteRow(r)); if (tk.length) dropCache_('Tasks');
+  return { result: n, backup: 'Repairs_backup_' + stamp };
 }
 
 function api_postNews(req) {

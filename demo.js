@@ -40,6 +40,8 @@
     setFrozenRows() {}
     deleteRow(r) { DB[this.name].splice(r - 1, 1); }
     deleteRows(r, n) { DB[this.name].splice(r - 1, n); }
+    copyTo() { const src = this.name; return { setName: n => { DB[n] = JSON.parse(JSON.stringify(DB[src])); } }; }
+    setName(n) { DB[n] = DB[this.name]; delete DB[this.name]; this.name = n; return this; }
   }
   const book = {
     getSheetByName: n => (DB[n] ? new Sheet(n) : null),
